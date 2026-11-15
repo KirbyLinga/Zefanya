@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Buyer\AddressController;
 use App\Http\Controllers\Api\Buyer\CartController;
 use App\Http\Controllers\Api\Buyer\CatalogController;
 use App\Http\Controllers\Api\Buyer\CheckoutController;
+use App\Http\Controllers\Api\Buyer\CheckoutPreviewController;
 use App\Http\Controllers\Api\Buyer\LoginController;
 use App\Http\Controllers\Api\Buyer\LogoutController;
 use App\Http\Controllers\Api\Buyer\MessageController;
@@ -11,21 +12,33 @@ use App\Http\Controllers\Api\Buyer\NotificationController;
 use App\Http\Controllers\Api\Buyer\OrderActionController;
 use App\Http\Controllers\Api\Buyer\OrderController;
 use App\Http\Controllers\Api\Buyer\ProfileController;
+use App\Http\Controllers\Api\Buyer\ReviewController;
 use App\Http\Controllers\Api\Buyer\WishlistController;
 use App\Http\Controllers\Api\Courier\AuthController as CourierAuthController;
 use App\Http\Controllers\Api\Courier\TransferController as CourierTransferController;
+use App\Http\Controllers\Api\Rider\CashController as RiderCashController;
 use App\Http\Controllers\Api\Rider\IncidentController as RiderIncidentController;
 use App\Http\Controllers\Api\Rider\JobController as RiderJobController;
 use App\Http\Controllers\Api\Rider\LoginController as RiderLoginController;
 use App\Http\Controllers\Api\Rider\LogoutController as RiderLogoutController;
 use App\Http\Controllers\Api\Rider\NotificationController as RiderNotificationController;
 use App\Http\Controllers\Api\Rider\ParcelActionController as RiderParcelActionController;
+use App\Http\Controllers\Api\Rider\PayoutController as RiderPayoutController;
+use App\Http\Controllers\Api\Rider\PickupController as RiderPickupController;
 use App\Http\Controllers\Api\Rider\ProfileController as RiderProfileController;
+use App\Http\Controllers\Api\Rider\ProofController as RiderProofController;
 use App\Http\Controllers\Api\Rider\ProviderController as RiderProviderController;
+use App\Http\Controllers\Api\Rider\ReturnPickupController as RiderReturnPickupController;
 use App\Http\Controllers\Api\Rider\TokenController as RiderTokenController;
+use App\Http\Controllers\Api\Rider\WaybillController as RiderWaybillController;
+use App\Http\Controllers\PolicyController;
 use App\Http\Controllers\Rider\ParcelIncidentController;
 use App\Http\Controllers\Rider\RegistrationController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/v1/buyer/checkout/quote', CheckoutPreviewController::class)
+    ->middleware(['auth:sanctum', 'api.role:buyer', 'throttle:20,1'])
+    ->name('api.v1.buyer.checkout.quote');
 
 /* --------------------------------------------------------------------------
  * Buyer API
@@ -39,8 +52,8 @@ use Illuminate\Support\Facades\Route;
 
 // Public policy content for the mobile apps. No token; internal documents are never listed.
 Route::middleware('throttle:120,1')->prefix('policies')->name('api.policies.')->group(function (): void {
-    Route::get('/', [\App\Http\Controllers\PolicyController::class, 'index'])->name('index');
-    Route::get('/{slug}', [\App\Http\Controllers\PolicyController::class, 'showJson'])
+    Route::get('/', [PolicyController::class, 'index'])->name('index');
+    Route::get('/{slug}', [PolicyController::class, 'showJson'])
         ->where('slug', '[a-z0-9-]+')->name('show');
 });
 
@@ -89,6 +102,7 @@ Route::prefix('buyer')->name('api.buyer.')->group(function (): void {
             // Orders: list/detail, cancel, returns.
             Route::get('/orders', [OrderActionController::class, 'index'])->name('orders.index');
             Route::get('/orders/{order}', [OrderActionController::class, 'show'])->name('orders.show');
+            Route::get('/reviews/mine', [ReviewController::class, 'index'])->name('reviews.mine');
 
             // Wishlist.
             Route::get('/wishlist', [WishlistController::class, 'index'])->name('wishlist.index');
@@ -110,7 +124,10 @@ Route::prefix('buyer')->name('api.buyer.')->group(function (): void {
 
         // Checkout (COD) and order state changes: tighter limits.
         Route::middleware('throttle:20,1')->group(function (): void {
+            Route::patch('/shipments/{shipment}/products/{product}/review', [ReviewController::class, 'save'])
+                ->whereNumber(['shipment', 'product'])->name('reviews.save');
             Route::post('/checkout/quote', [CheckoutController::class, 'quote'])->name('checkout.quote');
+            Route::post('/checkout/reconcile', [CheckoutController::class, 'reconcile'])->name('checkout.reconcile');
             Route::post('/checkout', [CheckoutController::class, 'store'])->middleware('throttle:10,1')->name('checkout.store');
             Route::post('/orders/{order}/shipments/{shipment}/cancel', [OrderActionController::class, 'cancel'])->name('orders.cancel');
             Route::post('/orders/{order}/shipments/{shipment}/return', [OrderActionController::class, 'requestReturn'])->name('orders.return');
@@ -150,6 +167,9 @@ Route::prefix('rider')->name('api.rider.')->group(function (): void {
         Route::middleware('throttle:60,1')->group(function (): void {
             Route::get('/jobs', [RiderJobController::class, 'index'])->name('jobs.index');
             Route::get('/earnings', [RiderJobController::class, 'earnings'])->name('earnings');
+            Route::get('/cod', [RiderCashController::class, 'index'])->name('cod');
+            Route::get('/payouts', [RiderPayoutController::class, 'index'])->name('payouts');
+            Route::get('/proofs/{deliveryProof}', [RiderProofController::class, 'show'])->whereNumber('deliveryProof')->name('proofs.show');
             Route::get('/notifications', [RiderNotificationController::class, 'index'])->name('notifications.index');
             Route::post('/notifications/read-all', [RiderNotificationController::class, 'markAllRead'])->name('notifications.readAll');
             Route::post('/notifications/{notification}/read', [RiderNotificationController::class, 'markRead'])->name('notifications.read');
@@ -165,9 +185,14 @@ Route::prefix('rider')->name('api.rider.')->group(function (): void {
     // Fully operational riders only.
     Route::middleware(['auth:sanctum', 'api.role:rider'])->group(function (): void {
         Route::get('/history', [RiderJobController::class, 'history'])->middleware('throttle:60,1')->name('history');
+        Route::get('/return-pickups', [RiderReturnPickupController::class, 'index'])->middleware('throttle:60,1')->name('return-pickups.index');
+        Route::get('/waybills/{sellerOrder}', [RiderWaybillController::class, 'show'])->whereNumber('sellerOrder')->middleware('throttle:60,1')->name('waybills.show');
         Route::middleware('throttle:20,1')->group(function (): void {
             Route::post('/availability', [RiderJobController::class, 'availability'])->name('availability');
             Route::post('/pickups/{sellerOrder}/confirm', [RiderParcelActionController::class, 'confirmPickup'])->name('pickups.confirm');
+            Route::post('/pickups/stops/{pickupSession}/finish', [RiderPickupController::class, 'finishStop'])->whereNumber('pickupSession')->name('pickups.stops.finish');
+            Route::post('/pickups/{sellerOrder}/failed', [RiderPickupController::class, 'reportFailure'])->whereNumber('sellerOrder')->name('pickups.failed');
+            Route::post('/return-pickups/{parcelReturn}/collect', [RiderReturnPickupController::class, 'collect'])->whereNumber('parcelReturn')->name('return-pickups.collect');
             Route::post('/deliveries/{sellerOrder}/start', [RiderParcelActionController::class, 'startDelivery'])->name('deliveries.start');
         });
     });

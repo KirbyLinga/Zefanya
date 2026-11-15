@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\Seller;
 
+use App\Models\Admin\Admin;
 use App\Models\Catalog\InventoryTransaction;
 use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Category;
+use App\Services\Seller\ProductApprovalService;
 use Database\Seeders\EdGamingCatalogSeeder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -26,9 +28,12 @@ class EdGamingCatalogSeederTest extends TestCase
 
         $products = Product::query()->where('seller_id', $seller->id)->with(['images', 'variants'])->get();
         $this->assertGreaterThanOrEqual(40, $products->count());
+        $admin = Admin::factory()->create(['role' => 'admin']);
+        $approval = app(ProductApprovalService::class);
 
         foreach ($products as $product) {
-            $this->assertTrue($product->isPurchasable(), $product->name);
+            $this->assertFalse($product->isPurchasable(), $product->name);
+            $this->assertTrue($approval->approve($product, $admin)->isPurchasable(), $product->name);
             $this->assertGreaterThan(0, $product->variants->sum('stock_quantity'), $product->name);
             $this->assertSame((int) $product->stock_quantity, (int) $product->variants->sum('stock_quantity'), $product->name);
             $this->assertSame(1, $product->images->where('is_primary', true)->count(), $product->name);

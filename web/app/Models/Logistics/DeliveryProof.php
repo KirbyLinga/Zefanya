@@ -25,6 +25,7 @@ class DeliveryProof extends Model
         'photo_size',
         'received_by',
         'notes',
+        'recipient_acknowledgement',
         'submitted_at',
     ];
 
@@ -32,6 +33,7 @@ class DeliveryProof extends Model
     {
         return [
             'photo_size' => 'integer',
+            'recipient_acknowledgement' => 'array',
             'submitted_at' => 'datetime',
         ];
     }

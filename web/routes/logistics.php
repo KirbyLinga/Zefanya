@@ -103,8 +103,8 @@ Route::prefix('logistics')->name('logistics.')->group(function (): void {
         // ── Internal hub-to-hub manifests (same provider only) ──────────────
         // Lost parcels: what this company owes Sellers, and the verified scan that records a find.
         Route::get('/lost-parcels', [LostParcelController::class, 'index'])->name('lost-parcels.index');
-        Route::post('/lost-parcels/{case}/scan/verify', [LostParcelController::class, 'verifyScan'])->name('lost-parcels.scan.verify');
-        Route::post('/lost-parcels/{case}/recover', [LostParcelController::class, 'recover'])->name('lost-parcels.recover');
+        Route::post('/lost-parcels/{case}/scan/verify', [LostParcelController::class, 'verifyScan'])->middleware('throttle:30,1')->name('lost-parcels.scan.verify');
+        Route::post('/lost-parcels/{case}/recover', [LostParcelController::class, 'recover'])->middleware('throttle:10,1')->name('lost-parcels.recover');
 
         // Courier Management: transport personnel records (not accounts).
         Route::get('/transfer-couriers', [TransferCourierController::class, 'index'])->name('transfer-couriers.index');

@@ -160,7 +160,13 @@ class F2OriginStationPersistenceTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertSame(OrderStatus::AtSortingCenter, $parcel->fresh()->status);
+        $parcel->refresh();
+        $this->assertSame($this->originStationId, (int) $parcel->origin_station_hub_id);
+        $this->assertSame(OrderStatus::Sorted, $parcel->status);
+        $this->assertSame(
+            [OrderStatus::AtSortingCenter, OrderStatus::Sorted],
+            $parcel->statusHistories()->orderBy('id')->get()->pluck('to_status')->all(),
+        );
     }
 
     public function test_stale_parcel_cannot_overwrite_a_station_persisted_by_another_caller(): void

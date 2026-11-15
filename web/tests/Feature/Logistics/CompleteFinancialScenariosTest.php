@@ -87,10 +87,15 @@ class CompleteFinancialScenariosTest extends DeliveryScenarioSeederTest
             $seller = $parcel->seller;
             $admin = Admin::query()->firstOrFail();
             $shipping = $parcel->shipping_fee_minor;
-            // One fixed fee for every route: ₱50 for the first 2 kg.
-            $this->assertSame(5000, $shipping);
+            // The scenario seeder installs the carrier's zone rate cards.
+            $expectedShipping = match ($sellerSlug) {
+                'seller-pila' => 4900,
+                'seller-lumban' => 6900,
+                default => 19900,
+            };
+            $this->assertSame($expectedShipping, $shipping);
             $this->assertSame(50000 + $shipping, $cod->amount_minor);
-            $originShare = $expectedHandoffs ? 2000 : 0;
+            $originShare = $expectedHandoffs ? 7960 : 0;
             $retained = $shipping - $originShare;
             $due = $cod->amount_minor - $retained;
             $this->assertSame($originShare, $cod->originShareMinor());

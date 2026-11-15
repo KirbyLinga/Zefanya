@@ -20,6 +20,7 @@ use App\Notifications\Rider\PickupAssigned;
 use App\Services\Logistics\CourierAssignmentService;
 use App\Services\Logistics\ManifestService;
 use App\Services\Logistics\ParcelHandoffService;
+use App\Services\Logistics\ParcelHandoffVerification;
 use App\Services\Rider\RiderRegistrationService;
 use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -353,10 +354,18 @@ class AutomaticDispatchTest extends TestCase
         $this->assertNull($parcel->fresh()->custody_provider_id);
         $scan = $service->verifyScan($handoff, $b['provider'], $parcel->tracking_number, 'receive');
         $service->receive($handoff, $b['provider'], $scan['verification_token']);
-        $this->assertSame($courier->id, (int) $parcel->fresh()->delivery_courier_id);
+        $this->assertSame(OrderStatus::ArrivedAtHub, $parcel->fresh()->status);
+        $this->assertNull($parcel->fresh()->delivery_courier_id);
         $this->assertSame($b['provider']->id, $parcel->fresh()->custody_provider_id);
         $this->assertSame($a['provider']->id, $parcel->fresh()->carrier_provider_id);
+        $token = app(ParcelHandoffVerification::class)->issueForLogistics(
+            $b['provider'], $parcel->fresh(), ParcelHandoffVerification::ACTION_SORT, stationHubId: $b['station']->id,
+        );
+        $this->actingAs($b['provider'], 'logistics')
+            ->post(route('logistics.parcel-sorting.sort', $parcel), ['verification_token' => $token])->assertSessionHasNoErrors()
+            ->assertSessionMissing('error');
         $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
+        $this->assertSame($courier->id, (int) $parcel->fresh()->delivery_courier_id);
     }
 
     public function test_internal_station_receipt_retries_a_waiting_delivery_reservation(): void

@@ -127,6 +127,13 @@ class ParcelActionController extends Controller
                 'notes' => $request->input('delivery_notes'),
                 'cod_amount_minor' => $request->codAmountMinor(),
                 'verification_method' => $method,
+                'recipient_acknowledgement' => [
+                    'category' => $request->validated('recipient_category'),
+                    'relationship' => $request->validated('recipient_category') === 'representative'
+                        ? $request->validated('recipient_relationship') : null,
+                    'physical_handover' => true,
+                    'recipient_accepted' => true,
+                ],
             ]);
             $this->consume($rider, $sellerOrder, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, $token, $method);
 

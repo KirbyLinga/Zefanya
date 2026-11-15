@@ -348,7 +348,7 @@ class LogisticsHubService
     private function assertLegacyVerificationAllowed(LogisticsProvider $provider, SellerOrder $parcel): void
     {
         Gate::forUser($provider)->authorize('remediate-shipment-address', $parcel);
-        if (! in_array($parcel->status, [OrderStatus::AtSortingCenter, OrderStatus::Sorted], true)
+        if (! in_array($parcel->status, [...OrderStatus::AWAITING_SORT, OrderStatus::Sorted], true)
             || $parcel->delivery_courier_id !== null || filled($parcel->order?->shipping_address['barangay_code'] ?? null)) {
             throw ValidationException::withMessages(['address' => 'Only an unassigned delivery at sorting with a missing snapshot barangay code can be verified.']);
         }

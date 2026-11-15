@@ -341,7 +341,7 @@ class StaleActionConflictTest extends TestCase
         $seller = Seller::factory()->create();
         $settlement = $this->earnings($seller);
         $this->actingAs(Admin::factory()->create(['role' => 'super_admin']), 'admin');
-        $input = ['amount_minor' => 61655, 'reference' => 'DIRECT-1', 'reason' => 'Seller asked for a direct transfer'];
+        $input = ['amount_minor' => 58410, 'reference' => 'DIRECT-1', 'reason' => 'Seller asked for a direct transfer'];
 
         $this->postJson(route('admin.settlements.confirm', $settlement), $input)->assertOk();
         $this->postJson(route('admin.settlements.confirm', $settlement), ['reference' => 'DIRECT-2'] + $input)
@@ -350,7 +350,7 @@ class StaleActionConflictTest extends TestCase
         $settlement->refresh();
         $this->assertSame(SellerSettlement::PAID, $settlement->status);
         $this->assertSame('DIRECT-1', $settlement->payout_reference);
-        $this->assertSame(61655, (int) $settlement->paid_amount_minor);
+        $this->assertSame(58410, (int) $settlement->paid_amount_minor);
     }
 
     public function test_paying_a_payout_request_another_admin_rejected_is_a_409(): void
@@ -358,7 +358,7 @@ class StaleActionConflictTest extends TestCase
         $seller = Seller::factory()->create();
         $settlement = $this->earnings($seller);
         $payouts = app(SellerPayoutRequestService::class);
-        $payout = $payouts->request($seller, '616.55', (string) Str::uuid(), 'GCash 09171234567');
+        $payout = $payouts->request($seller, '584.10', (string) Str::uuid(), 'GCash 09171234567');
         $admin = Admin::factory()->create(['role' => 'admin']);
         $payouts->reject($payout, $admin, 'GCash number not registered');
 

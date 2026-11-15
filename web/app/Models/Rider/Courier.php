@@ -105,9 +105,21 @@ class Courier extends Model
     }
 
     /** True when the Rider already holds the maximum number of active jobs. */
-    public function isAtJobLimit(): bool
+    public function isAtJobLimit(?SellerOrder $parcel = null): bool
     {
-        return $this->activeWorkload() >= self::ACTIVE_CAPACITY;
+        return $this->activeWorkload() >= self::ACTIVE_CAPACITY
+            && ($parcel === null || ! $this->holdsActiveJob($parcel));
+    }
+
+    public function holdsActiveJob(SellerOrder $parcel): bool
+    {
+        $id = (int) $this->getKey();
+
+        return match ($parcel->status) {
+            OrderStatus::ReadyForPickup, OrderStatus::PickedUp => $id === (int) $parcel->courier_id,
+            OrderStatus::Sorted, OrderStatus::AssignedToRider, OrderStatus::OutForDelivery => $id === (int) $parcel->delivery_courier_id,
+            default => false,
+        };
     }
 
     /**

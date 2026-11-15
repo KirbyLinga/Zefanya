@@ -11,6 +11,7 @@ use App\Models\Rider\RiderEarning;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Order;
 use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\CourierAssignmentService;
 use App\Services\Seller\SellerOrderStatusService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -68,6 +69,8 @@ class RiderPickupStopApiTest extends TestCase
         ]);
         app(SellerOrderStatusService::class)->transition($parcel, OrderStatus::ReadyForPickup,
             actor: OrderActor::Seller, actorId: $parcel->seller_id);
+        $this->assertNull($parcel->fresh()->courier_id);
+        app(CourierAssignmentService::class)->dispatch($parcel->fresh(), 'pickup', $this->provider);
 
         return $parcel->fresh();
     }

@@ -31,6 +31,12 @@ class CheckoutFinancialIntegrityTest extends TestCase
     use BootstrapsCheckoutCarriers;
     use LazilyRefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['buyer.shipping_rates.same_municipality.first_kg_minor' => 5000]);
+    }
+
     private function line(Buyer $buyer, string $price = '100.00'): CartItem
     {
         $product = Product::factory()->create(['seller_id' => Seller::factory()->create()->id, 'price' => $price, 'stock_quantity' => 10]);

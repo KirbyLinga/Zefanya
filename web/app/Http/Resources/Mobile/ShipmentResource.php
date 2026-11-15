@@ -53,6 +53,7 @@ class ShipmentResource extends JsonResource
                 'amount_minor' => (int) $payment->amount_minor,
             ],
             'can_confirm_receipt' => $shipment->status === OrderStatus::Delivered,
+            'can_cancel' => $shipment->status->canBuyerCancel(),
             'created_at' => $shipment->created_at?->toIso8601String(),
             'updated_at' => $shipment->updated_at?->toIso8601String(),
         ];

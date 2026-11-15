@@ -42,6 +42,7 @@ class CommissionShippingIntegrityTest extends TestCase
     {
         parent::setUp();
         $this->withoutVite();
+        config(['buyer.shipping_rates.same_municipality.first_kg_minor' => 5000]);
     }
 
     private function checkout(array $prices = ['100.00', '200.00'], array $extra = [], bool $voucher = true, string $slot = 'platform', string $funding = Voucher::FUNDING_MARKETPLACE, bool $shippingError = false): array

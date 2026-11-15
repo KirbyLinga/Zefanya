@@ -56,7 +56,7 @@ class ParcelSortingController extends Controller
 
         // Tab counts for the UI
         $sortingCount = (clone $baseQuery)
-            ->whereIn('status', [OrderStatus::AtSortingCenter, OrderStatus::Sorted])
+            ->whereIn('status', [...OrderStatus::AWAITING_SORT, OrderStatus::Sorted])
             ->count();
 
         $assignedCount = (clone $baseQuery)
@@ -65,7 +65,7 @@ class ParcelSortingController extends Controller
 
         $statuses = $tab === 'assigned'
             ? [OrderStatus::AssignedToRider]
-            : [OrderStatus::AtSortingCenter, OrderStatus::Sorted];
+            : [...OrderStatus::AWAITING_SORT, OrderStatus::Sorted];
 
         // The immutable destination snapshot is authoritative; never use the buyer's live address.
         $grammar = DB::connection()->getQueryGrammar();
@@ -96,7 +96,7 @@ class ParcelSortingController extends Controller
         return view('Logistics.ParcelSorting.index', [
             'shipments' => $shipments,
             'sortingBlocked' => $shipments->getCollection()
-                ->filter(fn (SellerOrder $parcel): bool => $parcel->status === OrderStatus::AtSortingCenter)
+                ->filter(fn (SellerOrder $parcel): bool => in_array($parcel->status, OrderStatus::AWAITING_SORT, true))
                 ->mapWithKeys(fn (SellerOrder $parcel): array => [$parcel->id => app(RouteExecutionService::class)->sortingBlockedReason($parcel)]),
             'tab' => $tab,
             'sortingCount' => $sortingCount,
@@ -137,7 +137,7 @@ class ParcelSortingController extends Controller
     }
 
     /**
-     * Sort a parcel: AtSortingCenter → Sorted.
+     * Sort a parcel after verified receipt at its authorized hub.
      *
      * Sorting is also when the parcel's DESTINATION AREA is determined: the
      * buyer's municipality is matched against this provider's active areas so
@@ -160,7 +160,7 @@ class ParcelSortingController extends Controller
         $alreadySorted = $fresh->status === OrderStatus::Sorted;
         $token = $request->input('verification_token');
 
-        if (! $alreadySorted && $fresh->status !== OrderStatus::AtSortingCenter) {
+        if (! $alreadySorted && ! in_array($fresh->status, OrderStatus::AWAITING_SORT, true)) {
             return back()->with('error', 'This parcel has already been sorted.');
         }
 
@@ -189,11 +189,16 @@ class ParcelSortingController extends Controller
                 $method = $payload['method'] ?? null;
             }
 
-            DB::transaction(function () use ($fresh, $provider, $area, $method, $alreadySorted): void {
+            DB::transaction(function () use ($fresh, $provider, $area, $method, $alreadySorted, $hubs, $stationHubId): void {
                 $fresh = SellerOrder::query()->whereKey($fresh->id)->lockForUpdate()->firstOrFail();
+                $this->authorizeForUser($provider, 'advance-shipment', [$fresh]);
                 ParcelIncidentService::assertOperationsAllowed($fresh);
                 if ($alreadySorted) {
                     return;
+                }
+                if (! in_array($fresh->status, OrderStatus::AWAITING_SORT, true)
+                    || $hubs->sortingHubId((int) $provider->id, $fresh) !== $stationHubId) {
+                    throw new \InvalidArgumentException('The parcel changed hubs or status. Scan it again at its current hub.');
                 }
 
                 if (($blocked = app(RouteExecutionService::class)->sortingBlockedReason($fresh)) !== null) {
@@ -261,7 +266,7 @@ class ParcelSortingController extends Controller
         $preferredCourierId = $request->integer('courier_id') ?: null;
         $request->validate(['courier_id' => ['nullable', 'integer']]);
 
-        if (($limit = $this->assignment->manualRiderBlockReason($preferredCourierId, $provider->id)) !== null) {
+        if (($limit = $this->assignment->manualRiderBlockReason($preferredCourierId, $provider->id, $sellerOrder)) !== null) {
             return back()->with('error', $limit);
         }
 
@@ -330,7 +335,7 @@ class ParcelSortingController extends Controller
 
                 continue;
             }
-            if (Courier::query()->withWorkload()->findOrFail($courierId)->isAtJobLimit()) {
+            if (Courier::query()->withWorkload()->findOrFail($courierId)->isAtJobLimit($parcel)) {
                 $skippedLimit++;
 
                 continue;

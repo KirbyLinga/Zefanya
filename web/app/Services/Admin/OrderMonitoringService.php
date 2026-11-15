@@ -256,7 +256,9 @@ class OrderMonitoringService
         $earnings = RiderEarning::query()->where('seller_order_id', $shipment->id)->with(['courier', 'payout'])->orderBy('id')->paginate(20, ['*'], 'earnings_page')->withQueryString();
         $allocations = SellerPayoutAllocation::query()->where('seller_settlement_id', $shipment->settlement?->id ?? 0)->with('payoutRequest')->orderBy('id')->paginate(20, ['*'], 'payouts_page')->withQueryString();
         $debts = SellerDebt::query()->where('seller_order_id', $shipment->id)->orderBy('id')->paginate(20, ['*'], 'debts_page')->withQueryString();
-        $loss = ParcelLossCase::query()->where('seller_order_id', $shipment->id)->with('adjustments')->first();
+        $loss = class_exists(ParcelLossCase::class) && RuntimeSchema::hasTable('parcel_loss_cases')
+            ? ParcelLossCase::query()->where('seller_order_id', $shipment->id)->with('adjustments')->first()
+            : null;
         $unpaidRider = (int) RiderEarning::query()->where('seller_order_id', $shipment->id)->whereNull('rider_payout_id')->sum('amount_minor');
 
         return compact('cod', 'batch', 'earnings', 'allocations', 'debts', 'loss', 'unpaidRider');

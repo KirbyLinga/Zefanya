@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Admin\PlatformSetting;
 use App\Models\Logistics\CodRemittance;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\LogisticsRemittance;
@@ -21,6 +22,7 @@ class LogisticsRemittanceController extends Controller
     public function index(LogisticsRemittanceService $remittances, SellerSettlementService $settlements): View
     {
         return view('Admin.LogisticsRemittances.index', [
+            'paymentDetailsMissing' => blank(PlatformSetting::query()->where('key', 'remittance_payment_details')->value('value')),
             'waiting' => LogisticsRemittance::query()->where('status', LogisticsRemittance::SUBMITTED)
                 ->with(['provider:id,business_name', 'codRemittances.sellerOrder:id,tracking_number,shipping_fee_minor,carrier_provider_id', 'codRemittances.sellerOrder.parcelReturn'])
                 ->orderBy('id')->get(),

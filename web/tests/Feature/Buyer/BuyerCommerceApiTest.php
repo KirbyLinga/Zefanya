@@ -7,6 +7,7 @@ use App\Enums\PaymentMethod;
 use App\Models\Buyer\Buyer;
 use App\Models\Buyer\BuyerAddress;
 use App\Models\Buyer\CartItem;
+use App\Models\Buyer\CheckoutToken;
 use App\Models\Buyer\Wishlist;
 use App\Models\Catalog\Product;
 use App\Models\Catalog\ProductImage;
@@ -306,6 +307,44 @@ class BuyerCommerceApiTest extends TestCase
         $this->api()->postJson('/api/buyer/checkout', $payload)->assertStatus(409);
         $this->assertSame(0, Order::query()->count());
         $this->assertSame(5, $this->variant->fresh()->stock_quantity);
+    }
+
+    public function test_checkout_recovery_is_private_and_never_places_a_second_order(): void
+    {
+        $endpoint = '/api/buyer/checkout/reconcile';
+        $lineId = $this->addToCart();
+        $payload = $this->placePayload([$lineId]);
+        $recovery = ['checkout_token' => $payload['checkout_token']];
+        $this->api($this->otherBuyer())->postJson($endpoint, $recovery)->assertNotFound();
+        $this->api()->postJson($endpoint, ['checkout_token' => str_repeat('f', 64)])->assertNotFound();
+        $this->api()->postJson($endpoint, $recovery)->assertOk()->assertJsonPath('data.status', 'rejected');
+        $this->api()->postJson($endpoint, $recovery)->assertOk()->assertJsonPath('data.status', 'rejected');
+        $this->api()->postJson('/api/buyer/checkout', $payload)->assertConflict();
+        $this->assertDatabaseCount('orders', 0);
+
+        $payload = $this->placePayload([$lineId]);
+        $recovery = ['checkout_token' => $payload['checkout_token']];
+        $initialStock = $this->variant->fresh()->stock_quantity;
+        $placed = $this->api()->postJson('/api/buyer/checkout', $payload)->assertCreated();
+        $this->api($this->otherBuyer())->postJson($endpoint, $recovery)->assertNotFound();
+        $this->api()->postJson($endpoint, $recovery)->assertOk()
+            ->assertJsonPath('data.status', 'placed')
+            ->assertJsonPath('data.order.id', $placed->json('data.id'));
+        CheckoutToken::query()->where('token', $recovery['checkout_token'])->update(['expires_at' => now()->subMinute()]);
+        CheckoutToken::issue($this->buyer->id);
+        $this->api()->postJson($endpoint, $recovery)->assertOk()->assertJsonPath('data.order.id', $placed->json('data.id'));
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertSame($initialStock - 1, $this->variant->fresh()->stock_quantity);
+    }
+
+    public function test_recovery_does_not_guess_an_order_for_a_legacy_consumed_token(): void
+    {
+        $token = CheckoutToken::issue($this->buyer->id);
+        $token->forceFill(['used' => true])->save();
+
+        $this->api()->postJson('/api/buyer/checkout/reconcile', ['checkout_token' => $token->token])
+            ->assertOk()->assertJsonPath('data.status', 'unknown')->assertJsonMissingPath('data.order');
+        $this->assertDatabaseCount('orders', 0);
     }
 
     public function test_a_quantity_change_after_review_is_a_409_and_writes_nothing(): void

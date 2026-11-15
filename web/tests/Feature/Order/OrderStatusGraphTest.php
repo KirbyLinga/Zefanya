@@ -10,6 +10,8 @@ use App\Models\Shared\SellerOrder;
 use App\Models\Shared\StatusHistory;
 use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
@@ -32,8 +34,10 @@ class OrderStatusGraphTest extends TestCase
         'PREPARING' => ['READY_FOR_PICKUP', 'CANCELLED'],
         'READY_FOR_PICKUP' => ['PICKED_UP', 'CANCELLED'],
         'PICKED_UP' => ['AT_SORTING_CENTER'],
-        'AT_SORTING_CENTER' => ['SORTED'],
-        'SORTED' => ['ASSIGNED_TO_RIDER'],
+        'AT_SORTING_CENTER' => ['SORTED', 'IN_TRANSIT'],
+        'SORTED' => ['ASSIGNED_TO_RIDER', 'IN_TRANSIT'],
+        'IN_TRANSIT' => ['ARRIVED_AT_HUB'],
+        'ARRIVED_AT_HUB' => ['SORTED', 'IN_TRANSIT'],
         'ASSIGNED_TO_RIDER' => ['OUT_FOR_DELIVERY'],
         'OUT_FOR_DELIVERY' => ['DELIVERED', 'DELIVERY_FAILED'],
         'DELIVERED' => ['COMPLETED', 'RETURNED'],
@@ -41,6 +45,7 @@ class OrderStatusGraphTest extends TestCase
         'RETURNED' => [],
         'COMPLETED' => [],
         'CANCELLED' => [],
+        'LOST' => [],
     ];
 
     private SellerOrderStatusService $service;
@@ -77,6 +82,21 @@ class OrderStatusGraphTest extends TestCase
                         'reason' => 'Verified physical receipt fixture', 'requested_at' => now(),
                         'seller_received_at' => now(), 'received_by_seller_id' => $so->seller_id])->save();
                     $result = $this->service->transition($so, OrderStatus::Returned, actor: OrderActor::Seller, actorId: $so->seller_id);
+                } elseif (in_array($to, [OrderStatus::InTransit->value, OrderStatus::ArrivedAtHub->value], true)) {
+                    try {
+                        $this->service->transition($so, OrderStatus::from($to));
+                        $this->fail('A general transition cannot record a transport scan.');
+                    } catch (\InvalidArgumentException $error) {
+                        $this->assertStringContainsString('verified transfer scan', $error->getMessage());
+                    }
+                    $this->assertSame($before, StatusHistory::count());
+                    DB::transaction(function () use ($so, $to): void {
+                        $locked = SellerOrder::query()->whereKey($so->id)->lockForUpdate()->firstOrFail();
+                        $this->assertTrue($this->service->recordTransferMovement(
+                            $locked, OrderStatus::from($to), (int) $locked->carrier_provider_id, 'Graph fixture', 'graph_test',
+                        ));
+                    });
+                    $result = $so->fresh();
                 } else {
                     $result = $this->service->transition($so, OrderStatus::from($to));
                 }
@@ -87,9 +107,7 @@ class OrderStatusGraphTest extends TestCase
             }
         }
 
-        // 18 legal edges (canonical pipeline + seller decline from packing
-        // states + rider cancellation after a second failed pickup).
-        $this->assertSame(18, $checked);
+        $this->assertSame(23, $checked);
     }
 
     public function test_every_illegal_pair_is_rejected_with_no_writes(): void
@@ -116,6 +134,9 @@ class OrderStatusGraphTest extends TestCase
                     $this->fail("Illegal hop {$from->value} → {$to->value} was accepted.");
                 } catch (\InvalidArgumentException) {
                     // Expected: graph gate rejected the pair.
+                } catch (ValidationException $error) {
+                    $this->assertSame(OrderStatus::Lost, $from);
+                    $this->assertNotEmpty($error->errors());
                 }
 
                 $this->assertSame(
@@ -132,8 +153,8 @@ class OrderStatusGraphTest extends TestCase
             }
         }
 
-        // 14×14 = 196 pairs − 14 self-transitions − 18 legal edges = 164.
-        $this->assertSame(164, $rejected);
+        // 17 statuses produce 272 distinct pairs, including 23 legal edges.
+        $this->assertSame(249, $rejected);
     }
 
     /** The specific skips called out in review must all be rejected. */

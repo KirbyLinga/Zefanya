@@ -13,6 +13,7 @@ use App\Models\Catalog\InventoryTransaction;
 use App\Models\Catalog\Product;
 use App\Models\Catalog\ProductVariant;
 use App\Models\Shared\Order;
+use App\Models\Shared\PaymentCancellationRefund;
 use App\Models\Shared\SellerOrder;
 use App\Models\Shared\StatusHistory;
 use App\Models\Shared\Voucher;
@@ -338,6 +339,7 @@ class SellerOrderStatusService
             }
 
             if ($to === OrderStatus::Cancelled) {
+                $this->recordPaidCancellationLiability($current, $note);
                 $this->restoreStock($current, 'cancel');
                 $this->cancelPendingPayment($current);
                 $this->returnVouchers($current);
@@ -460,7 +462,9 @@ class SellerOrderStatusService
         if ($from === $to) {
             return false; // A repeated scan records nothing.
         }
-        if (! OrderActor::Logistics->canTransition($from, $to) || ! in_array($to, self::ALLOWED[$from->value] ?? [], true)) {
+        // These hops are private to verified transfer callers. The generic
+        // Logistics transition map deliberately does not authorize them.
+        if (! in_array($to, self::ALLOWED[$from->value] ?? [], true)) {
             throw new StaleStateException(self::staleMessage($locked->id, $from, $to, $from));
         }
 
@@ -584,6 +588,28 @@ class SellerOrderStatusService
         }
     }
 
+    private function recordPaidCancellationLiability(SellerOrder $sellerOrder, ?string $reason): void
+    {
+        $payment = $sellerOrder->payment()->lockForUpdate()->first();
+        if ($payment === null || $payment->status !== PaymentStatus::Paid
+            || ! in_array($payment->method, [PaymentMethod::Ewallet, PaymentMethod::Card], true)) {
+            return;
+        }
+
+        $buyerId = $sellerOrder->order()->value('buyer_id');
+        if ($buyerId === null || $payment->amount_minor <= 0 || ! RuntimeSchema::hasTable('payment_cancellation_refunds')) {
+            throw ValidationException::withMessages(['payment' => 'The prepaid refund cannot be recorded. Cancellation was not saved.']);
+        }
+
+        PaymentCancellationRefund::query()->firstOrCreate(['payment_id' => $payment->id], [
+            'seller_order_id' => $sellerOrder->id,
+            'buyer_id' => $buyerId,
+            'amount_minor' => $payment->amount_minor,
+            'reason' => $reason ?: 'Shipment cancelled',
+            'status' => 'pending',
+        ]);
+    }
+
     /**
      * Give back the voucher usage consumed at checkout, whoever cancelled
      * (seller, buyer, or a failed pickup). A shop voucher belongs to this slice alone. Platform and shipping
@@ -612,7 +638,8 @@ class SellerOrderStatusService
                 }
 
                 $buyerId = $sellerOrder->order?->buyer_id;
-                if ($buyerId !== null) {
+                if ($buyerId !== null && ! $voucher->hasEnded()
+                    && ($voucher->expires_at === null || $voucher->expires_at->isFuture())) {
                     $voucher->claims()->firstOrCreate(['buyer_id' => $buyerId]);
                 }
             });

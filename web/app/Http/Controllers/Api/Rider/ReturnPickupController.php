@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Rider;
 
+use App\Enums\ParcelReturnStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\Traits\ApiResponses;
 use App\Models\Logistics\ParcelReturn;
@@ -13,11 +14,11 @@ use Illuminate\Http\Request;
 /**
  * Rider mobile return pickups: collecting an approved return from the buyer.
  *
- * Bearer-token twins of the Rider web Return Pickups page. Both read
- * ParcelReturnService::pendingBuyerCollectionsFor and collect through
+ * Bearer-token twins of the Rider web Return Pickups page. The API lists
+ * the rider's outstanding collections and collects through
  * ParcelReturnService::confirmBuyerCollection, which locks the parcel, checks
  * the assigned rider, verifies the parcel's tracking number, refuses a second
- * collection (409) and moves custody to the rider's station. Refund and
+ * collection (409) and records the rider's custody before the station scan. Refund and
  * restock decisions stay with the later seller-receipt step; nothing here
  * changes them.
  */
@@ -34,10 +35,16 @@ class ReturnPickupController extends Controller
     public function index(Request $request): JsonResponse
     {
         $rider = $request->user();
-        $this->operations->operationalCourier($rider);
+        $courier = $this->operations->operationalCourier($rider);
 
         return $this->success('Return pickups retrieved.', [
-            'returns' => $this->returns->pendingBuyerCollectionsFor($rider)
+            'returns' => ParcelReturn::query()
+                ->where('collection_courier_id', $courier->id)
+                ->where('status', ParcelReturnStatus::Requested)
+                ->whereNotNull('seller_response_due_at')->whereNotNull('seller_decision')
+                ->whereNull('collected_at')
+                ->with(['sellerOrder.order.buyer', 'sellerOrder.orderItems'])
+                ->orderBy('collection_assigned_at')->limit(50)->get()
                 ->map(fn (ParcelReturn $record): array => $this->present($record))
                 ->values(),
         ]);

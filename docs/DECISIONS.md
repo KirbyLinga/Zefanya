@@ -2,6 +2,53 @@
 
 This file records deviations from the repository's baseline instructions or decisions required during execution.
 
+## Phase 11.6.2: Voucher allocation and demo recovery
+
+- Apply workbook Assumptions A8 and A9 to new platform voucher allocations. Round proportional shares half up first, then reconcile any signed difference at the largest eligible store with room, with ascending Seller ID as the tie-break. Three independently rounded shares for the two-cent 100/99/98 fixture overshoot by one cent, so its exact expectation is now 0/1/1. Keep amount, capacity, funding and determinism checks. Existing settlement snapshots are not recalculated.
+- Restore only the demo seeders and original attributed assets needed for the marketplace from Git object `7fa5711`. Reject production and the live database even with its former override. Child seeders verify the target too. Use the recorded PSGC snapshot for demo station activation and the existing approval service for new demo products.
+- The restored network covers Del Carmen in Alaminos. The negative checkout test disables that coverage only in its isolated fixture, submits the actual reviewed checkout token, and verifies that an unavailable carrier leaves the cart and all order and payment records intact.
+
+## Phase 11.6.1: Remaining Laravel regressions
+
+- Restore the documented prepaid cancellation liability using the existing unique payment ledger, the recorded paid amount, and the original Buyer. The cancellation, stock, voucher, and liability writes commit together. Expired or ended vouchers do not regain a wallet claim. Buyer deletion continues to wait for unpaid obligations.
+- Test current disclosed 10% default commission for newly finalized orders and preserve 5% historical fixtures. Keep exact COD, settlement, replay, payout, and funding assertions. Checkout carrier and presentation tests explicitly set the old ₱50 test rate where the subject is independent of the production rate.
+- Financial scenario tests check the scenario seeder's actual rate cards and existing 40/60 cross-provider allocation. Shipping, commission, and voucher production calculations are unchanged.
+- Cross-provider assignment coverage checks that a verified receipt establishes destination custody, while sorting the parcel at that authorized hub is required before Rider reservation.
+- Update presentation coverage for the existing Money navigation label, terminal lost tracking, and pickup form attributes independent of markup whitespace. EdGaming fixture products must pass existing Admin approval before they become purchasable.
+
+## Phase 11.6: Laravel regression repair
+
+- Restore eight existing Rider API handlers under the existing bearer authorization and throttles. The Flutter contract recognizes them while the current production feature flags and verified-write list stay unchanged.
+- Pickup-stop fixtures reserve through the Logistics assignment service. Return collection asserts the destination station audit and verifies that only the later station scan records receipt.
+- Extend the independent status graph assertions to cover the already active hub transit states and verify the automatic sort audit follows verified station receipt. Preserve the Rider job cap while allowing confirmation of an existing reservation.
+- The checkout arithmetic, variant snapshots, and commission-integrity tests configure a ₱50 local rate through the active test configuration. Existing exact money assertions stay in place. No production rate, commission or voucher rounding rule changes.
+- Restore transfer alert audit stamps and parcel-loss records on disposable databases. Confirmation records an obligation and terminal custody evidence, with separate Admin recording of actual externally paid compensation.
+- A loss test checks preservation of the actual saved shipping snapshot instead of requiring the old flat-rate fixture. The transferred parcel’s saved merchandise remains the only compensation basis.
+
+## Phase 11.5: Laravel suite stabilization
+
+- Restore the existing Buyer checkout preview and review handlers behind Buyer bearer authorization. The release write policy keeps the optional preview and review writes out of its verified write list.
+- The optional submitted checkout total is compared to the authoritative integer-centavo total under the existing checkout transaction. It is never used to price or create a payment.
+- Shipping tests that previously set the unused flat-rate key now pin the active zone rate cards. Preserve exact fee, rounded weight, quoted snapshot, cross-province availability and order total assertions.
+- Restore provider-scoped transfer monitoring, read-only Admin transport, and scan-gated recovery evidence without changing custody on cancellation or scheduling any payment. The overdue alert scheduler and the missing parcel-loss compensation package remain separate dependencies.
+- Extend the exact handoff lifecycle and schema assertions to cover the restored cancellation state and cancellation/recovery audit fields. Retain every prior status and field assertion.
+- Cross-provider scan tests now assert the existing exact parcel statuses `IN_TRANSIT` on dispatch and `ARRIVED_AT_HUB` on verified receipt. Keep the provider, hub, tracking and replay checks and verify dispatch still resolves to the sender's custody.
+- Reconnect the existing Seller receipt-dispute form to its authorized recovery service and restore the database notification used by return recovery. Reporting the dispute keeps the parcel in Logistics custody and uses the existing Admin review.
+
+## Phase 11.4: ZefanyaWMII regression repair
+
+- Three internal manifest tests assert the current verified departure and receipt statuses and exact audit event counts. The tests still cover scan validation, custody, replay, and the public timeline.
+- Station receipt fixtures use the same approved hub for origin and delivery coverage when they expect an automatic sort. The persisted-origin test checks the hub and both audit events after the Rider's station link is removed.
+- Rider handover widget tests require a photo, physical handover, recipient acceptance, and representative details where applicable. Registration email OTP remains covered. Demo-only Google actions run with the demo configuration.
+- Recovery uses the same checkout-token row as placement. A committed order can be recovered only by its Buyer. Recovery atomically rejects an unclaimed token to prevent a later submission from using it, and an older used token with no order binding remains unknown.
+- The reviewed Live API snapshots capture the full login form, cart rows, product controls, Buyer header, Rider pickup cards, and the OTP-free tracker in both themes.
+
+## Phase 11.3: ZefanyaWMII integration repair
+
+- The current Web integration branch controls Courier dispatch and receipt. Courier Mobile reads transfers assigned to the account's existing Transfer Courier record.
+- Replace obsolete mobile OTP assertions with tests for verified custody, private proof and recipient acknowledgement. The production API snapshot drops the removed OTP route. Use explicit write flags in contract tests so they cover both the default and the release policy.
+- The release profile enables individually verified operations. Local migration verification uses a disposable MySQL instance, including a separate upgrade schema with preserved records. Courier account activation remains in the branch's explicit pending migration.
+
 ## Phase A: Baseline & Integration Setup
 
 1. **Base Branch Selection**:

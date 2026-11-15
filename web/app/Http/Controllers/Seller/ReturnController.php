@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Seller;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Seller\DisputeReturnReceiptRequest;
 use App\Models\Logistics\ParcelReturn;
 use App\Services\Logistics\ParcelReturnService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -67,5 +69,13 @@ class ReturnController extends Controller
         $service->receiveBySeller($return, $request->user('seller'), $data['condition'], $data['verification_token']);
 
         return back()->with('success', 'Physical receipt recorded. Inventory remains held unless the approved restoration policy permits it.');
+    }
+
+    public function disputeReceipt(DisputeReturnReceiptRequest $request, ParcelReturn $return, ParcelReturnService $service): RedirectResponse
+    {
+        $data = $request->validated();
+        $service->disputeReceiptBySeller($return, $request->user('seller'), $data['issue'], $data['note'], array_values($data['photos'] ?? []));
+
+        return back()->with('success', 'Receipt problem reported. The parcel stays with Logistics while an admin reviews it.');
     }
 }

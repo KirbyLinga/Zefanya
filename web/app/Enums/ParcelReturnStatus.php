@@ -11,6 +11,19 @@ enum ParcelReturnStatus: string
     case Completed = 'RETURNED_TO_SELLER';
     case Rejected = 'RETURN_REJECTED';
     case InDispute = 'RETURN_IN_DISPUTE';
+    case Cancelled = 'RETURN_CANCELLED';
+    case Lost = 'RETURN_LOST';
+    case Damaged = 'RETURN_DAMAGED';
+    case ReceiptDisputed = 'RETURN_RECEIPT_DISPUTED';
+    case Closed = 'RETURN_CLOSED';
+
+    public function isTerminal(): bool
+    {
+        return match ($this) {
+            self::Completed, self::Rejected, self::Cancelled, self::Lost, self::Damaged, self::Closed => true,
+            default => false,
+        };
+    }
 
     public function label(): string
     {

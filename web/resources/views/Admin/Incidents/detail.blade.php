@@ -3,10 +3,13 @@
 @section('title', 'Incident #'.$incident->id)
 
 @section('content')
+@php
+    $lossAvailable = class_exists(\App\Services\Logistics\ParcelLossService::class) && \App\Services\Logistics\ParcelLossService::available();
+@endphp
 <x-admin.tabs :tabs="[
     ['label' => 'Returns & disputes', 'route' => 'admin.returns.index'],
     ['label' => 'Parcel incidents', 'route' => 'admin.incidents.index'],
-    ...(\App\Services\Logistics\ParcelLossService::available() ? [['label' => 'Lost parcels', 'route' => 'admin.lost-parcels.index']] : []),
+    ...($lossAvailable ? [['label' => 'Lost parcels', 'route' => 'admin.lost-parcels.index']] : []),
 ]" />
     <x-flash type="success" :message="session('success')" spacing="mb-6" />
     <x-flash type="error" :message="session('error')" spacing="mb-6" />

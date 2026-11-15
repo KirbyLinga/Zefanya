@@ -78,6 +78,8 @@ Route::prefix('seller')->name('seller.')->group(function () {
         Route::get('/returns/{return}/photos/{index}', [ReturnController::class, 'photo'])->whereNumber('index')->name('returns.photo');
         Route::post('/returns/{return}/verify', [ReturnController::class, 'verify'])->name('returns.verify');
         Route::post('/returns/{return}/receive', [ReturnController::class, 'receive'])->name('returns.receive');
+        Route::post('/returns/{return}/dispute-receipt', [ReturnController::class, 'disputeReceipt'])
+            ->whereNumber('return')->middleware('throttle:10,1')->name('returns.dispute-receipt');
         Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
         Route::get('/orders/{sellerOrder}', [OrderController::class, 'show'])->name('orders.show');
         Route::post('/orders/{sellerOrder}/accept', [OrderController::class, 'acceptOrder'])->name('orders.accept');

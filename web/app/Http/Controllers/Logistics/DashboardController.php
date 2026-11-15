@@ -16,6 +16,7 @@ use App\Models\Seller\StoreSale;
 use App\Models\Shared\SellerOrder;
 use App\Models\Shared\StatusHistory;
 use App\Services\Logistics\LogisticsHubService;
+use App\Services\Logistics\StuckTransferService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -23,7 +24,7 @@ use Illuminate\Validation\Rule;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request, LogisticsHubService $hubService): View
+    public function index(Request $request, LogisticsHubService $hubService, StuckTransferService $transfers): View
     {
         $filters = $request->validate([
             'from' => ['nullable', 'date_format:Y-m-d'],
@@ -133,6 +134,7 @@ class DashboardController extends Controller
             ->get(['id', 'first_name', 'last_name', 'created_at']);
 
         return view('Logistics.Dashboard.index', [
+            ...$transfers->forProvider((int) $provider->id, $facilityHubIds),
             'actionQueues' => $actionQueues,
             'metric' => $metric,
             'metricResults' => $metricResults,

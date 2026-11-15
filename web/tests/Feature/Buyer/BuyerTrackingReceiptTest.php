@@ -80,11 +80,11 @@ class BuyerTrackingReceiptTest extends TestCase
         $this->assertSame(OrderStatus::Completed, $parcel->fresh()->status);
         $settlement->refresh();
         $this->assertNull($settlement->pending_reason);
-        $this->assertSame(9500, $settlement->seller_payout_minor);
-        $this->assertSame(500, $settlement->commission_minor);
+        $this->assertSame(9000, $settlement->seller_payout_minor);
+        $this->assertSame(1000, $settlement->commission_minor);
 
         $summary = app(SellerEarningsService::class)->summary($seller);
-        $this->assertSame(9500, $summary['availableMinor']);
+        $this->assertSame(9000, $summary['availableMinor']);
         $this->assertSame(0, $summary['pendingMinor']);
     }
 }

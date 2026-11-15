@@ -12,6 +12,7 @@ use App\Models\Shared\Incidents;
 use App\Models\Shared\Order;
 use App\Models\Shared\SellerOrder;
 use App\Policies\BuyerOrderPolicy;
+use App\Policies\CheckoutPolicy;
 use App\Policies\IncidentsPolicy;
 use App\Policies\SellerOrderFleetPolicy;
 use App\Policies\SellerOrderPolicy;
@@ -179,6 +180,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(SellerOrder::class, SellerOrderPolicy::class);
         Gate::define('remediate-shipment-address', [SellerOrderFleetPolicy::class, 'remediateAddress']);
         Gate::define('advance-shipment', [SellerOrderFleetPolicy::class, 'advance']);
+        Gate::define('quote-checkout', [CheckoutPolicy::class, 'quote']);
 
         // In production every generated URL (routes, assets, pagination, password
         // resets) must be https — proxy headers alone are not guaranteed when the

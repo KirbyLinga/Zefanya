@@ -30,7 +30,7 @@ class BuyerTrackingPresentationTest extends TestCase
 
         $response->assertOk()->assertSee('data-shipment-status="'.$status->value.'"', false)
             ->assertSeeText($status->buyerLabel())->assertDontSeeText('To Receive /')->assertDontSeeText('Cancelled / Returned');
-        if (in_array($status, [OrderStatus::Cancelled, OrderStatus::Returned, OrderStatus::DeliveryFailed], true)) {
+        if (in_array($status, [OrderStatus::Cancelled, OrderStatus::Returned, OrderStatus::DeliveryFailed, OrderStatus::Lost], true)) {
             $response->assertDontSee('aria-label="Delivery milestones"', false);
         } else {
             $response->assertSee('aria-label="Delivery milestones"', false)

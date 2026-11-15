@@ -3,10 +3,13 @@
 @section('content-width', 'max-w-none')
 @section('content')
 <section class="case-workspace" aria-labelledby="case-heading">
+@php
+    $lossAvailable = class_exists(\App\Services\Logistics\ParcelLossService::class) && \App\Services\Logistics\ParcelLossService::available();
+@endphp
 <x-admin.tabs :tabs="[
     ['label' => 'Returns & disputes', 'route' => 'admin.returns.index'],
     ['label' => 'Parcel incidents', 'route' => 'admin.incidents.index'],
-    ...(\App\Services\Logistics\ParcelLossService::available() ? [['label' => 'Lost parcels', 'route' => 'admin.lost-parcels.index']] : []),
+    ...($lossAvailable ? [['label' => 'Lost parcels', 'route' => 'admin.lost-parcels.index']] : []),
 ]" />
     <header class="case-heading">
         <div><p class="case-eyebrow">Returns &amp; disputes</p><h1 id="case-heading">Parcel incidents</h1><p class="case-description">Open and under-review lost or damaged parcel reports.</p></div>
@@ -28,7 +31,11 @@
                         @endphp
                         <tr>
                             @if ($lossAvailable)
-                                <td>@if (in_array(strtolower($incident->type), ['lost', 'missing', 'failed_transfer'], true))<input type="checkbox" name="incident_ids[]" value="{{ $incident->id }}" form="bulk-lost" aria-label="Select parcel {{ $incident->incident_seller_order_id }}" class="size-4">@endif</td>
+                                <td>
+                                    @if (in_array(strtolower($incident->type), ['lost', 'missing', 'failed_transfer'], true))
+                                        <input type="checkbox" name="incident_ids[]" value="{{ $incident->id }}" form="bulk-lost" aria-label="Select parcel {{ $incident->incident_seller_order_id }}" class="size-4">
+                                    @endif
+                                </td>
                             @endif
                             <td><strong>Parcel #{{ $incident->incident_seller_order_id }}</strong><small>{{ $incident->sellerOrder?->tracking_number ?? 'No tracking number' }}</small></td>
                             <td><span class="case-type"><i data-lucide="{{ $incident->type === 'lost' ? 'package-search' : 'package-x' }}" aria-hidden="true"></i>{{ $incident->typeLabel() }}</span></td>

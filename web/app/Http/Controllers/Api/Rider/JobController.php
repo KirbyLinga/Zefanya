@@ -2,14 +2,20 @@
 
 namespace App\Http\Controllers\Api\Rider;
 
+use App\Enums\DeliveryFailureReason;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\Rider\EnsureRiderActive;
 use App\Http\Middleware\Traits\ApiResponses;
 use App\Http\Resources\Mobile\RiderParcelResource;
+use App\Http\Resources\Mobile\RiderPickupStopResource;
 use App\Models\Logistics\ParcelReturn;
+use App\Models\Logistics\PickupSession;
 use App\Models\Rider\RiderEarning;
 use App\Models\Seller\StoreSale;
 use App\Models\Shared\SellerOrder;
+use App\Services\Logistics\PickupPolicy;
+use App\Services\Rider\PickupFailureService;
 use App\Services\Rider\RiderAvailabilityService;
 use App\Services\Rider\RiderCashService;
 use App\Services\Rider\RiderEarningService;
@@ -43,7 +49,11 @@ class JobController extends Controller
         // narrows itself to OUT_FOR_DELIVERY in that state.
         $pickups = $windingDown
             ? new EloquentCollection
-            : $operations->pickupAssignments($rider)->load(self::RELATIONS);
+            : $operations->pickupAssignments($rider)->load(self::RELATIONS)->loadCount('pickupAttempts');
+        $stops = PickupPolicy::sessionsAvailable() && $pickups->isNotEmpty()
+            ? PickupSession::query()->where('courier_id', $rider->courier->id)
+                ->whereKey($pickups->pluck('pickup_session_id')->filter()->unique()->all())->with('seller')->get()
+            : collect();
         $deliveries = $operations->deliveryAssignments($rider)->load(self::RELATIONS);
         $returns = $windingDown ? collect() : ParcelReturn::query()->collectionWorkForRider((int) $rider->id)
             ->with('sellerOrder:id,tracking_number')->get();
@@ -51,7 +61,16 @@ class JobController extends Controller
         return $this->success('Assigned jobs retrieved.', [
             'online' => (bool) $rider->fresh()->is_online,
             'winding_down' => $windingDown,
+            'winding_down_message' => $windingDown ? EnsureRiderActive::WIND_DOWN_MESSAGE : null,
             'pickups' => $pickups->map(fn (SellerOrder $p) => (new RiderParcelResource($p))->withLeg('pickup')->resolve($request))->values(),
+            'stops' => RiderPickupStopResource::collection($stops)->resolve($request),
+            'pickup_failure' => [
+                'max_attempts' => PickupFailureService::MAX_ATTEMPTS,
+                'reasons' => array_map(fn (DeliveryFailureReason $reason): array => [
+                    'value' => $reason->value,
+                    'label' => $reason->label(),
+                ], DeliveryFailureReason::cases()),
+            ],
             'deliveries' => $deliveries->map(fn (SellerOrder $p) => (new RiderParcelResource($p))->withLeg('delivery')->resolve($request))->values(),
             'return_pickups' => $returns->map(fn (ParcelReturn $return): array => [
                 'tracking_number' => $return->sellerOrder->tracking_number,
@@ -82,6 +101,7 @@ class JobController extends Controller
                 'returned' => $parcel->status === OrderStatus::Returned || $parcel->parcelReturn !== null,
                 'earning_minor' => $credited->has($parcel->id) ? (int) $credited->get($parcel->id) : null,
                 'delivered_at' => $parcel->deliveryProof?->created_at?->toIso8601String(),
+                'proof_id' => (int) $parcel->deliveryProof?->courier_id === (int) $courier->id ? $parcel->deliveryProof?->id : null,
             ])->values(),
         ]);
     }

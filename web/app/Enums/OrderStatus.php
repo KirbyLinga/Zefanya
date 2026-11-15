@@ -53,6 +53,13 @@ enum OrderStatus: string
     /** Statuses a parcel can hold while it waits at a hub for sorting or its next transfer. */
     public const AT_HUB = [self::AtSortingCenter, self::Sorted, self::ArrivedAtHub];
 
+    public const AWAITING_SORT = [self::AtSortingCenter, self::ArrivedAtHub];
+
+    public function canBuyerCancel(): bool
+    {
+        return $this === self::Placed;
+    }
+
     public function label(): string
     {
         return match ($this) {

@@ -349,7 +349,7 @@
                                 <span class="inline-flex rounded-full border px-2.5 py-1 font-sans text-[10px] font-semibold {{ $item->received_at ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : ($isDispatched ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-[var(--border-strong)] bg-[var(--bg-page)] text-[var(--text-muted)]') }}">{{ $item->custodyLabel() }}</span>
                                 @if ($isDispatched && ! $item->received_at)
                                     <p class="mt-2 max-w-[220px] font-sans text-[10px] leading-relaxed text-[var(--text-muted)]">Custody stays with {{ $manifest->originHub?->name }} until the destination verifies this parcel.</p>
-                                @elseif ($item->awaitsRecovery())
+                                @elseif ($recoveryHubs->isNotEmpty() && $item->awaitsRecovery())
                                     <p class="mt-2 max-w-[220px] font-sans text-[10px] leading-relaxed text-amber-800">Location not verified since the batch was cancelled. Held as an exception.</p>
                                 @elseif ($item->recovered_at)
                                     <p class="mt-2 max-w-[220px] font-sans text-[10px] leading-relaxed text-[var(--text-muted)]">Scanned {{ manila($item->recovered_at, 'M j, Y g:i A') }}. Resolve its exception to continue.</p>

@@ -37,9 +37,11 @@ class PlatformVoucherAllocationTest extends TestCase
     {
         return [
             'fractional rounding preserves total' => [[100, 99, 1], 2, [1, 1, 0]],
-            'largest fractional remainders' => [[100, 99, 98], 2, [1, 1, 0]],
+            'rounding surplus is removed from the largest store' => [[100, 99, 98], 2, [0, 1, 1]],
             'unequal stores' => [[10000, 20000], 1001, [334, 667]],
             'stable equal-subtotal tie' => [[101, 101, 98], 1, [1, 0, 0]],
+            'four equal stores leave a centavo for the first seller' => [[100, 100, 100, 100], 1, [1, 0, 0, 0]],
+            'four equal stores with half-cent shares' => [[100, 100, 100, 100], 2, [0, 0, 1, 1]],
             'full discount' => [[10000, 20000], 30000, [10000, 20000]],
         ];
     }
@@ -107,5 +109,7 @@ class PlatformVoucherAllocationTest extends TestCase
         $this->assertCount(3, $orders);
         $this->assertSame([1, 1, 0], $orders->pluck('platform_voucher_discount_minor')->all());
         $this->assertSame(2, $orders->sum('platform_voucher_discount_minor'));
+        $this->assertSame([1, 1, 0], $orders->pluck('marketplace_funded_discount_minor')->all());
+        $this->assertSame(0, $orders->sum('seller_funded_discount_minor'));
     }
 }

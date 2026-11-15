@@ -24,6 +24,10 @@ class ParcelHandoff extends Model
             'rejected_at' => 'datetime',
             'dispatched_at' => 'datetime',
             'received_at' => 'datetime',
+            'cancelled_at' => 'datetime',
+            'recovered_at' => 'datetime',
+            'transport_required' => 'boolean',
+            'transport_assigned_at' => 'datetime',
         ];
     }
 
@@ -60,6 +64,12 @@ class ParcelHandoff extends Model
         return $this->status === ParcelHandoffStatus::Rejected;
     }
 
+    public function awaitsRecovery(): bool
+    {
+        return $this->status === ParcelHandoffStatus::Cancelled && $this->dispatched_at !== null
+            && $this->recovered_at === null && $this->cancelled_by_type !== 'admin';
+    }
+
     public function isActive(): bool
     {
         return in_array($this->status, [
@@ -77,6 +87,7 @@ class ParcelHandoff extends Model
             ParcelHandoffStatus::InTransit => 'In transit',
             ParcelHandoffStatus::Rejected => 'Rejected',
             ParcelHandoffStatus::Received => 'Received',
+            ParcelHandoffStatus::Cancelled => 'Cancelled',
         };
     }
 

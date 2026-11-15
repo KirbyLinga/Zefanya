@@ -122,7 +122,7 @@ class CheckoutService
      * @param  Collection<int, CartItem>  $items  The buyer's validated selection
      * @param  array<int|string, mixed>  $notes  Seller id => the buyer's validated note
      */
-    public function placeOrder(Buyer $buyer, Collection $items, CartSummary $summary, ?string $formToken = null, array $carrierQuote = [], array $notes = [], ?BuyerAddress $address = null, ?VoucherSessionService $vouchers = null): Order
+    public function placeOrder(Buyer $buyer, Collection $items, CartSummary $summary, ?string $formToken = null, array $carrierQuote = [], array $notes = [], ?BuyerAddress $address = null, ?VoucherSessionService $vouchers = null, ?int $expectedTotalMinor = null): Order
     {
         $vouchers ??= app(VoucherSessionService::class);
 
@@ -135,7 +135,7 @@ class CheckoutService
             throw new CheckoutException('Checkout is temporarily unavailable. Please try again later.');
         }
 
-        return DB::transaction(function () use ($buyer, $items, $summary, $formToken, $carrierQuote, $notes, $address, $vouchers): Order {
+        return DB::transaction(function () use ($buyer, $items, $summary, $formToken, $carrierQuote, $notes, $address, $vouchers, $expectedTotalMinor): Order {
             // Establish per-buyer serialization before any consistent reads or token FK locks.
             $buyer = Buyer::query()->whereKey($buyer->id)->lockForUpdate()->firstOrFail();
 
@@ -284,6 +284,9 @@ class CheckoutService
 
             $summary = $lockedSummary;
             $totalMinor = $summary->totalCentavos + $carrierQuote['shipping_total_minor'] - $application->shippingDiscountCentavos;
+            if ($expectedTotalMinor !== null && $expectedTotalMinor !== $totalMinor) {
+                throw new CheckoutException('The order total changed. Review the updated total before placing your order.');
+            }
             if ($summary->subtotalCentavos > self::MAX_ORDER_MINOR
                 || $totalMinor < 0 || $totalMinor > self::MAX_ORDER_MINOR
                 || max([0, ...array_values($carrierQuote['fees'])]) > self::MAX_ORDER_MINOR) {
@@ -441,6 +444,11 @@ class CheckoutService
             // Phase 4: Plan multi-leg routes for all seller orders
             $this->planRoutesForOrder($order, $deliverTo, $lockedSellers);
             CartItem::query()->where('buyer_id', $buyer->id)->whereKey($items->modelKeys())->delete();
+
+            if (CheckoutToken::supportsRecovery()) {
+                CheckoutToken::query()->where('buyer_id', $buyer->id)->where('token', $formToken)
+                    ->update(['order_id' => $order->id]);
+            }
 
             return $order;
         });

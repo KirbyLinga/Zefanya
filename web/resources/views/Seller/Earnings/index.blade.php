@@ -90,7 +90,7 @@
         </div>
     </section>
 
-    @if ($lostCases->isNotEmpty())
+    @if (isset($lostCases) && $lostCases->isNotEmpty())
         <section id="lost-parcels" class="rounded-lg border border-[var(--border-input)] bg-[var(--bg-surface)] p-5" aria-labelledby="lostParcelsTitle" data-lost-parcels>
             <h2 id="lostParcelsTitle" class="font-serif text-xl text-[var(--text-ink)]">Lost parcels</h2>
             <p class="mt-1 mb-4 text-sm text-[var(--text-muted)]">When Admin confirms a parcel lost, the Logistics company responsible owes you its merchandise value. Shipping and commission are not part of it, and the order earns nothing else. The company pays you directly; Zefanya only records that it was paid. Compensation is not part of your Zefanya balance above.</p>

@@ -11,6 +11,7 @@ use App\Models\Logistics\ManifestItem;
 use App\Models\Shared\SellerOrder;
 use App\Services\Logistics\ManifestService;
 use App\Services\Logistics\ParcelHandoffVerification;
+use App\Services\Logistics\TransferCourierService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -28,6 +29,20 @@ use Illuminate\View\View;
  */
 class ManifestController extends Controller
 {
+    public function reportMissing(Request $request, Manifest $manifest, ManifestService $service): RedirectResponse
+    {
+        $provider = $request->user('logistics');
+        abort_unless((int) $manifest->logistics_provider_id === (int) $provider->id, 404);
+        $data = $request->validate([
+            'seller_order_ids' => ['required', 'array', 'min:1', 'max:100'],
+            'seller_order_ids.*' => ['required', 'integer', 'distinct', 'min:1'],
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
+        $service->reportMissingParcels($manifest, $provider, $data['seller_order_ids'], $data['reason']);
+
+        return back()->with('success', 'Missing parcel reports recorded.');
+    }
+
     public function __construct(private readonly ManifestService $manifests) {}
 
     public function index(Request $request): View
@@ -126,7 +141,7 @@ class ManifestController extends Controller
             ->with('success', 'Manifest created. Add parcels while it is still a draft.');
     }
 
-    public function show(Request $request, Manifest $manifest): View
+    public function show(Request $request, Manifest $manifest, TransferCourierService $couriers): View
     {
         $provider = $this->provider($request);
         $this->ownedManifest($provider->id, $manifest);
@@ -135,17 +150,38 @@ class ManifestController extends Controller
 
         $items = $this->visibleItems($manifest);
         $counts = $this->manifests->counts($manifest);
+        $recovering = ManifestService::recoverySchemaAvailable()
+            && $manifest->status === ManifestStatus::Cancelled && $manifest->dispatched_at !== null;
+        $recoveryHubs = $recovering ? $this->manifests->recoveryHubs($manifest) : collect();
 
         return view('Logistics.Manifests.show', [
+            ...$couriers->assignmentDetails($manifest, $provider),
             'provider' => $provider,
             'manifest' => $manifest,
             'items' => $items,
             'counts' => $counts,
+            'recoveryHubs' => $recoveryHubs,
+            'recoveryHub' => $recoveryHubs->firstWhere('id', (int) $request->query('hub')) ?? $recoveryHubs->first(),
+            'awaitingRecovery' => $recovering ? $items->whereNull('received_at')->whereNull('recovered_at')->count() : 0,
             'eligibleParcels' => $manifest->status === ManifestStatus::Draft
                 ? $this->manifests->eligibleParcels($manifest)
                 : collect(),
             'hubs' => $this->hubs($request),
         ]);
+    }
+
+    public function assignTransport(Request $request, Manifest $manifest, TransferCourierService $couriers): RedirectResponse
+    {
+        $provider = $this->provider($request);
+        $this->ownedManifest($provider->id, $manifest);
+        $data = $request->validate([
+            'transfer_courier_id' => ['required', 'integer'],
+            'transport_vehicle_type' => ['nullable', 'string', 'max:50'],
+            'transport_plate_number' => ['nullable', 'string', 'max:20'],
+        ]);
+        $couriers->assignToManifest($manifest, $provider, (int) $data['transfer_courier_id'], $data['transport_vehicle_type'] ?? null, $data['transport_plate_number'] ?? null, $request);
+
+        return back()->with('success', 'Courier assigned.');
     }
 
     public function addItem(Request $request, Manifest $manifest): RedirectResponse
@@ -202,16 +238,19 @@ class ManifestController extends Controller
 
         $data = $request->validate([
             'tracking_number' => ['required', 'string', 'max:64'],
-            'phase' => ['nullable', Rule::in([ManifestService::PHASE_DISPATCH, ManifestService::PHASE_RECEIVE])],
+            'phase' => ['nullable', Rule::in([ManifestService::PHASE_DISPATCH, ManifestService::PHASE_RECEIVE, ManifestService::PHASE_RECOVER])],
+            'hub' => ['nullable', 'integer', 'min:1'],
             'method' => ['nullable', Rule::in([
                 ParcelHandoffVerification::METHOD_CAMERA,
                 ParcelHandoffVerification::METHOD_MANUAL,
             ])],
         ]);
 
-        $phase = $data['phase'] ?? ($manifest->status === ManifestStatus::Dispatched
-            ? ManifestService::PHASE_RECEIVE
-            : ManifestService::PHASE_DISPATCH);
+        $phase = $data['phase'] ?? match ($manifest->status) {
+            ManifestStatus::Dispatched => ManifestService::PHASE_RECEIVE,
+            ManifestStatus::Cancelled => ManifestService::PHASE_RECOVER,
+            default => ManifestService::PHASE_DISPATCH,
+        };
 
         try {
             return response()->json($this->manifests->verifyScan(
@@ -220,6 +259,7 @@ class ManifestController extends Controller
                 (string) $data['tracking_number'],
                 (string) $phase,
                 (string) ($data['method'] ?? ParcelHandoffVerification::METHOD_MANUAL),
+                isset($data['hub']) ? (int) $data['hub'] : null,
             ));
         } catch (ValidationException $e) {
             return response()->json([
@@ -304,6 +344,21 @@ class ManifestController extends Controller
                     : 'Parcel received. The manifest stays open for the remaining parcels.',
             )
             ->with('nextStep', $nextStepMessage);
+    }
+
+    public function recover(Request $request, Manifest $manifest, ManifestItem $item): RedirectResponse
+    {
+        $provider = $this->provider($request);
+        $this->ownedManifest($provider->id, $manifest);
+        abort_unless(ManifestService::recoverySchemaAvailable(), 503);
+        $data = $request->validate([
+            'verification_token' => ['required', 'string', 'max:128'],
+            'hub' => ['required', 'integer', 'min:1'],
+        ]);
+        $this->manifests->recoverItem($manifest, $item, $provider, $data['verification_token'], (int) $data['hub'], $request);
+
+        return redirect()->route('logistics.manifests.show', [$manifest, 'hub' => $data['hub']])
+            ->with('success', 'Recovery scan recorded. The parcel remains held for exception review.');
     }
 
     public function destroy(Request $request, Manifest $manifest): RedirectResponse

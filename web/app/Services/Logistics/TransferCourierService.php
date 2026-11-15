@@ -141,6 +141,21 @@ class TransferCourierService
             ->with('courier')->latest('assigned_at')->latest('id')->get();
     }
 
+    public function assignmentDetails(Manifest|ParcelHandoff $transfer, LogisticsProvider $provider): array
+    {
+        $available = self::available();
+        $owner = $transfer instanceof Manifest ? $transfer->logistics_provider_id : $transfer->origin_provider_id;
+
+        return [
+            'transportAvailable' => $available,
+            'transportCourier' => $available && $transfer->transfer_courier_id !== null
+                ? TransferCourier::query()->where('logistics_provider_id', $owner)->find($transfer->transfer_courier_id)
+                : null,
+            'transportCandidates' => $available && (int) $owner === (int) $provider->id ? $this->couriersFor($provider, true) : collect(),
+            'transportHistory' => $available ? $this->historyFor($transfer) : collect(),
+        ];
+    }
+
     /**
      * @param  class-string<Manifest|ParcelHandoff>  $class
      */

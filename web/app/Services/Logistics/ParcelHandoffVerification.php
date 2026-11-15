@@ -50,9 +50,13 @@ class ParcelHandoffVerification
 
     public const ACTION_MANIFEST_RECEIVE = 'manifest_receive';
 
+    public const ACTION_MANIFEST_RECOVER = 'manifest_recover';
+
     public const ACTION_HANDOFF_DISPATCH = 'handoff_dispatch';
 
     public const ACTION_HANDOFF_RECEIVE = 'handoff_receive';
+
+    public const ACTION_HANDOFF_RECOVER = 'handoff_recover';
 
     public const ACTION_RETURN_ORIGIN = 'return_origin_receipt';
 

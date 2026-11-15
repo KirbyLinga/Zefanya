@@ -9,4 +9,6 @@ enum ParcelHandoffStatus: string
     case Rejected = 'REJECTED';
     case InTransit = 'IN_TRANSIT';
     case Received = 'RECEIVED';
+
+    case Cancelled = 'CANCELLED';
 }

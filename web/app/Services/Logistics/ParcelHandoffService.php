@@ -590,6 +590,8 @@ class ParcelHandoffService
                 return $locked; // Already recorded; a repeated submit changes nothing.
             }
             $this->conflict($locked->awaitsRecovery(), 'status', 'Only a handoff cancelled after dispatch needs a recovery scan.');
+            $this->require($parcel->currentCustodyProviderId() === (int) $origin->id, 'seller_order_id',
+                'Only the provider holding this parcel can record it.');
             $hub = $this->assertHandoffHub((int) $origin->id, (int) $locked->sending_hub_id, 'sending_hub_id');
             $this->verification->assertValidForHandoff($origin, $locked, ParcelHandoffVerification::ACTION_HANDOFF_RECOVER, $token, (int) $hub->id);
 

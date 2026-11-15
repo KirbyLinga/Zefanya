@@ -2,8 +2,10 @@
 
 namespace App\Services\Logistics;
 
+use App\Enums\ManifestStatus;
 use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
+use App\Enums\ParcelHandoffStatus;
 use App\Enums\ParcelIncidentStatus;
 use App\Enums\ParcelIncidentType;
 use App\Models\Admin\Admin;
@@ -400,7 +402,7 @@ class ParcelIncidentService
                 abort(403, 'Only Admin can close or return a lost/damaged parcel.');
             }
 
-            if (($action === 'CLOSE_LOST' && strtolower($locked->type) !== 'lost')
+            if (($action === 'CLOSE_LOST' && ! in_array(strtolower($locked->type), ['lost', 'missing', 'failed_transfer'], true))
                 || ($action === 'CLOSE_DAMAGED' && strtolower($locked->type) !== 'damaged')) {
                 throw ValidationException::withMessages(['resolution' => 'The closure must match the reported incident type.']);
             }
@@ -438,6 +440,9 @@ class ParcelIncidentService
 
             if (in_array($action, ['RESUME', self::RESUME], true)
                 && ($action === self::RESUME || in_array($locked->type, ['missing', 'wrong_hub', 'inactive_connection', 'failed_transfer'], true))) {
+                if (app(ParcelHandoffService::class)->awaitingRecovery($parcel) || app(ManifestService::class)->awaitingRecovery($parcel)) {
+                    throw ValidationException::withMessages(['resolution' => 'The parcel location must be verified before its route can resume.']);
+                }
                 $this->assertOriginalRouteValid($parcel);
             }
             if (in_array($action, [self::RESUME, self::REROUTE], true)
@@ -457,6 +462,13 @@ class ParcelIncidentService
                     $actor instanceof Admin ? 'admin' : 'logistics_provider',
                     $actor->id,
                 );
+            }
+
+            $loss = $action === 'CLOSE_LOST'
+                || ($action === 'CLOSE_DAMAGED' && $parcel->parcelReturn()->first()?->inReturnNetwork());
+            if ($loss && $actor instanceof Admin) {
+                app(ParcelLossService::class)->finalize($parcel, $locked, $actor,
+                    $action === 'CLOSE_LOST' ? 'lost' : 'damaged', $validated['reason']);
             }
 
             $from = $locked->status->value;
@@ -491,6 +503,21 @@ class ParcelIncidentService
                 ['reason' => $validated['reason'], 'context' => $context],
             );
 
+            if ($loss && $actor instanceof Admin) {
+                $siblings = Incidents::query()->where('incident_seller_order_id', $parcel->id)->whereKeyNot($locked->id)
+                    ->whereIn('status', [ParcelIncidentStatus::Open, ParcelIncidentStatus::UnderReview])
+                    ->lockForUpdate()->get();
+                foreach ($siblings as $sibling) {
+                    $previous = $sibling->status->value;
+                    $sibling->forceFill(['status' => ParcelIncidentStatus::Resolved, 'resolution' => $action,
+                        'resolved_at' => now(), 'resolved_by_type' => 'admin', 'resolved_by_id' => $actor->id])->save();
+                    $this->event($sibling, 'resolved', 'Exception resolved: '.$action, $action, 'admin',
+                        $actor->id, $previous, ParcelIncidentStatus::Resolved->value, ['reason' => $validated['reason']]);
+                }
+
+                return;
+            }
+
             if (in_array($action, ['RESUME', self::RESUME], true) && ! self::movementBlockers($parcel)->exists()
                 && app(ParcelLegService::class)->isReadyForNextLeg($parcel)) {
                 app(ParcelLegService::class)->advanceToNextLeg($parcel);
@@ -513,7 +540,7 @@ class ParcelIncidentService
             foreach ([$parcel->order?->buyer, $parcel->seller, $provider] as $recipient) {
                 $recipient?->notify(new IncidentResolved($locked, $action));
             }
-        });
+        }, 3);
     }
 
     private function assertOriginalRouteValid(SellerOrder $parcel): void
@@ -604,6 +631,37 @@ class ParcelIncidentService
         }
 
         return true;
+    }
+
+    public function recordCancelledHandoffRecovery(SellerOrder $parcel, ParcelHandoff $handoff, LogisticsHub $hub, int $providerId): void
+    {
+        if ($handoff->status !== ParcelHandoffStatus::Cancelled || $handoff->recovered_at === null
+            || (int) $handoff->seller_order_id !== (int) $parcel->id || (int) $handoff->recovered_by_id !== $providerId
+            || (int) $handoff->sending_hub_id !== (int) $hub->id || (int) $parcel->custody_hub_id !== (int) $hub->id) {
+            throw ValidationException::withMessages(['route' => 'Recovery requires verified custody at the sending hub.']);
+        }
+
+        $this->recordCancelledRecovery($parcel, $handoff, $hub, $providerId);
+    }
+
+    public function recordCancelledTransferRecovery(SellerOrder $parcel, ManifestItem $item, LogisticsHub $hub, int $providerId): void
+    {
+        if ($item->manifest?->status !== ManifestStatus::Cancelled || $item->recovered_at === null
+            || (int) $item->seller_order_id !== (int) $parcel->id || (int) $item->recovered_by_id !== $providerId
+            || (int) $item->recovered_hub_id !== (int) $hub->id || (int) $parcel->custody_hub_id !== (int) $hub->id) {
+            throw ValidationException::withMessages(['route' => 'Recovery requires verified custody at an authorized hub.']);
+        }
+
+        $this->recordCancelledRecovery($parcel, $item, $hub, $providerId);
+    }
+
+    private function recordCancelledRecovery(SellerOrder $parcel, ManifestItem|ParcelHandoff $transfer, LogisticsHub $hub, int $providerId): void
+    {
+        foreach (self::movementBlockers($parcel)->lockForUpdate()->get() as $incident) {
+            $this->event($incident, 'recovery_received', 'Verified recovery receipt', 'Parcel remains held for an authorized route decision.',
+                'logistics_provider', $providerId, $incident->status->value, $incident->status->value,
+                ['receipt_type' => $transfer->getTable(), 'receipt_id' => $transfer->id, 'hub_id' => $hub->id]);
+        }
     }
 
     public function hasOpenIncident(SellerOrder $parcel): bool

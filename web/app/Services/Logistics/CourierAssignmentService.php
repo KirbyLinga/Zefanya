@@ -921,7 +921,7 @@ class CourierAssignmentService
                 // A parcel already reserved for this Rider is part of their
                 // workload and weight; it must not be counted a second time.
                 $alreadyHeld = $courier->holdsActiveJob($sellerOrder);
-                if ($courier->isAtJobLimit($sellerOrder)) {
+                if (! $alreadyHeld && $courier->isAtJobLimit()) {
                     continue;
                 }
                 // Eligibility is cumulative: everything the Rider is already

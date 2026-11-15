@@ -14,6 +14,7 @@ export default defineConfig({
                 'resources/css/seller/products-index.css',
                 'resources/js/app.js',
                 'resources/js/submit-guard.js',
+                'resources/js/admin/auto-filters.js',
                 'resources/js/registration-resubmission.js',
                 'resources/js/buyer/buyer.js',
                 'resources/js/buyer/buyer-register-modal.js',

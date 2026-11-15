@@ -11,8 +11,10 @@ use App\Models\Buyer\CheckoutToken;
 use App\Models\Buyer\StoreFollow;
 use App\Models\Logistics\ParcelReturn;
 use App\Models\Shared\Order;
+use App\Models\Shared\PaymentCancellationRefund;
 use App\Models\Shared\SellerOrder;
 use App\Services\Shared\AccountSessionService;
+use App\Support\RuntimeSchema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -56,7 +58,9 @@ class BuyerAccountDeletionService
             return 'You have an open return. You can delete your account after it is resolved.';
         }
         // Only an established, unpaid refund obligation (the same rule as Admin reporting) holds the account.
-        if (ParcelReturn::query()->whereKey($returns->modelKeys())->awaitingRefundRecording()->exists()) {
+        if (ParcelReturn::query()->whereKey($returns->modelKeys())->awaitingRefundRecording()->exists()
+            || (RuntimeSchema::hasTable('payment_cancellation_refunds') && PaymentCancellationRefund::query()
+                ->where('buyer_id', $buyer->id)->where('status', 'pending')->exists())) {
             return 'You have a refund being processed. You can delete your account after you receive it.';
         }
 

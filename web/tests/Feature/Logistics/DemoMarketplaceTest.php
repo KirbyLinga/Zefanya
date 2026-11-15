@@ -4,11 +4,12 @@ namespace Tests\Feature\Logistics;
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Http\Controllers\Buyer\CheckoutController;
 use App\Models\Admin\Admin;
 use App\Models\Buyer\Buyer;
 use App\Models\Buyer\CartItem;
-use App\Models\Buyer\CheckoutToken;
 use App\Models\Catalog\Product;
+use App\Models\Logistics\Area;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\Manifest;
@@ -54,21 +55,30 @@ class DemoMarketplaceTest extends TestCase
         DemoMarketplaceSeeder::assertSafeTarget();
     }
 
-    public function test_safety_guard_accepts_a_named_database_only_when_the_process_confirms_its_exact_name(): void
+    public function test_safety_guard_refuses_live_database_even_with_the_old_override(): void
     {
         config(['database.default' => 'mysql', 'database.connections.mysql.driver' => 'mysql', 'database.connections.mysql.database' => 'Zefanya']);
 
-        putenv('DEMO_SEED_CONFIRM_LIVE=SomethingElse');
+        putenv('DEMO_SEED_CONFIRM_LIVE=Zefanya');
+        putenv('DEMO_SEED_DATABASE=Zefanya');
         try {
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('Refusing to seed database [Zefanya]');
             DemoMarketplaceSeeder::assertSafeTarget();
-            $this->fail('A different name must not confirm the database.');
-        } catch (RuntimeException) {
-            putenv('DEMO_SEED_CONFIRM_LIVE=Zefanya');
-            DemoMarketplaceSeeder::assertSafeTarget();
-            $this->addToAssertionCount(1);
         } finally {
             putenv('DEMO_SEED_CONFIRM_LIVE');
+            putenv('DEMO_SEED_DATABASE');
         }
+    }
+
+    public function test_safety_guard_refuses_even_a_demo_database_in_production(): void
+    {
+        $this->app->instance('env', 'production');
+        config(['database.default' => 'mysql', 'database.connections.mysql.database' => 'zefanya_demo']);
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('only run in local or testing environments');
+
+        DemoMarketplaceSeeder::assertSafeTarget();
     }
 
     public function test_safety_guard_accepts_demo_and_isolated_test_databases(): void
@@ -125,7 +135,12 @@ class DemoMarketplaceTest extends TestCase
         $this->assertSame('Del Carmen', $buyer->barangay_name);
         $this->assertSame('043401001', $buyer->barangay_code);
 
-        // No seller's carrier covers this barangay: checkout must not create an order.
+        // The restored network covers Alaminos. Disable only Del Carmen in this
+        // disposable fixture to test checkout after a loss of active coverage.
+        $coverage = Area::query()->where('barangay_code', $buyer->barangay_code)->where('is_active', true);
+        $this->assertTrue((clone $coverage)->exists());
+        $coverage->update(['is_active' => false]);
+
         $seller = Seller::query()->where('email', DemoNetwork::email('sellerlaguna01'))->firstOrFail();
         $origin = DemoNetwork::provider('laguna');
         $product = Product::query()->where('seller_id', $seller->id)->whereDoesntHave('variants', fn ($q) => $q->whereNotNull('sku'))->orderBy('id')->firstOrFail();
@@ -133,19 +148,22 @@ class DemoMarketplaceTest extends TestCase
         $this->actingAs($buyer, 'buyer')->get(route('buyer.products.show', $product->id))->assertOk()->assertSee('Add to Cart');
         $this->postJson(route('buyer.cart.add'), ['product_id' => $product->id, 'quantity' => 1])->assertOk()->assertJson(['success' => true]);
         $cart = CartItem::query()->where('buyer_id', $buyer->id)->where('product_id', $product->id)->sole();
-        $this->get(route('buyer.checkout.index', ['items' => [$cart->id]]))->assertOk();
+        $this->get(route('buyer.checkout.index', ['items' => [$cart->id]]))
+            ->assertOk()->assertViewHas('carriersAvailable', false);
 
         $response = $this->post(route('buyer.checkout.store'), [
-            'checkout_token' => CheckoutToken::issue($buyer->id)->token,
+            'checkout_token' => session(CheckoutController::TOKEN_KEY),
             'carriers' => [$seller->id => $origin->id],
         ]);
 
-        // Checkout must be blocked: redirect back to cart with error, no order created.
-        $response->assertRedirect('/buyer/cart');
+        // A reviewed but unsupported address cannot place an order.
+        $response->assertRedirect(route('buyer.checkout.index', ['items' => [$cart->id], 'address' => $buyer->addresses()->where('is_default', true)->sole()->id]))
+            ->assertSessionHasErrors('carriers.'.$seller->id)
+            ->assertSessionHas('error', 'Shipping is not available for one or more shops in your order. Review carrier options or your delivery address.');
         $this->assertDatabaseCount('orders', 0);
         $this->assertDatabaseCount('seller_orders', 0);
-        // Check that error flash message is in the session after redirect
-        $this->followingRedirects()->get('/buyer/cart')->assertSee('No shipping carrier serves this route');
+        $this->assertDatabaseCount('payments', 0);
+        $this->assertModelExists($cart);
     }
 
     /** @return array<string, int> */
@@ -346,9 +364,9 @@ class DemoMarketplaceTest extends TestCase
         $cart = CartItem::query()->where('buyer_id', $buyer->id)->where('product_id', $product->id)->sole();
         $this->get(route('buyer.checkout.index', ['items' => [$cart->id]]))->assertOk();
         $this->post(route('buyer.checkout.store'), [
-            'checkout_token' => CheckoutToken::issue($buyer->id)->token,
+            'checkout_token' => session(CheckoutController::TOKEN_KEY),
             'carriers' => [$seller->id => $origin->id],
-        ])->assertRedirect()->assertSessionHasNoErrors();
+        ])->assertRedirectContains('/buyer/checkout/success/')->assertSessionHasNoErrors();
 
         return SellerOrder::query()->where('seller_id', $seller->id)->latest('id')->firstOrFail();
     }

@@ -6,6 +6,7 @@ use App\Exceptions\CheckoutException;
 use App\Http\Controllers\Buyer\CheckoutController as WebCheckoutController;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\Traits\ApiResponses;
+use App\Http\Requests\Api\Buyer\ReconcileCheckoutRequest;
 use App\Http\Resources\Mobile\ShipmentResource;
 use App\Models\Buyer\Buyer;
 use App\Models\Buyer\CartItem;
@@ -19,6 +20,7 @@ use App\Services\Buyer\VoucherSessionService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
@@ -41,6 +43,37 @@ class CheckoutController extends Controller
     use ApiResponses;
 
     public function __construct(private readonly CheckoutService $checkout) {}
+
+    public function reconcile(ReconcileCheckoutRequest $request): JsonResponse
+    {
+        abort_unless(CheckoutToken::supportsRecovery(), 503);
+        $buyer = $this->buyer($request);
+        $result = DB::transaction(function () use ($buyer, $request): array {
+            $token = CheckoutToken::query()->where('buyer_id', $buyer->id)
+                ->where('token', $request->validated('checkout_token'))
+                ->lockForUpdate()->firstOrFail();
+
+            if ($token->order_id !== null) {
+                $order = Order::query()->where('buyer_id', $buyer->id)->findOrFail($token->order_id);
+
+                return ['status' => 'placed', 'order' => $this->present($order)];
+            }
+            if ($token->reconciled_rejected_at !== null) {
+                return ['status' => 'rejected'];
+            }
+            if ($token->used) {
+                return ['status' => 'unknown'];
+            }
+
+            // A concurrent placement holds this same lock until its order commits.
+            // Once recovery rejects an unclaimed token it can no longer be placed.
+            $token->forceFill(['used' => true, 'reconciled_rejected_at' => now()])->save();
+
+            return ['status' => 'rejected'];
+        }, 3);
+
+        return $this->success('Checkout checked.', $result);
+    }
 
     public function quote(Request $request, BuyerAddressBook $addresses, CheckoutCarrierService $carriers): JsonResponse
     {
@@ -183,7 +216,12 @@ class CheckoutController extends Controller
         }
 
         try {
-            $order = $this->checkout->placeOrder($buyer, $items, $summary, $data['checkout_token'], $carrierQuote, (array) ($data['notes'] ?? []), $address, $vouchers);
+            $expected = null;
+            if (isset($data['expected_total'])) {
+                [$pesos, $centavos] = array_pad(explode('.', (string) $data['expected_total'], 2), 2, '');
+                $expected = ((int) $pesos * 100) + (int) str_pad($centavos, 2, '0');
+            }
+            $order = $this->checkout->placeOrder($buyer, $items, $summary, $data['checkout_token'], $carrierQuote, (array) ($data['notes'] ?? []), $address, $vouchers, $expected);
         } catch (CheckoutException $e) {
             return $this->conflict($e->getMessage());
         }
@@ -208,6 +246,7 @@ class CheckoutController extends Controller
             'vouchers.*' => ['nullable', 'string', 'max:64'],
             ...($placing ? [
                 'checkout_token' => ['required', 'string', 'max:128'],
+                'expected_total' => ['nullable', 'regex:/\A\d{1,10}(?:\.\d{1,2})?\z/'],
                 'price_fingerprint' => ['required', 'string', 'max:128'],
                 'address_fingerprint' => ['required', 'string', 'max:128'],
                 'shipping_fingerprint' => ['required', 'string', 'max:128'],

@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\ParcelIncidentStatus;
 use App\Http\Controllers\Controller;
+use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\ParcelRouteRereoute;
 use App\Models\Shared\Incidents;
 use App\Services\Logistics\ParcelIncidentService;
 use App\Services\Logistics\ParcelLegService;
+use App\Services\Logistics\ParcelLossService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -50,6 +52,9 @@ class IncidentController extends Controller
 
         return view('Admin.Incidents.detail', [
             'incident' => $incident,
+            'liableProviders' => ParcelLossService::available()
+                ? LogisticsProvider::query()->whereNull('archived_at')->where('status', 'approved')->orderBy('business_name')->get()
+                : collect(),
             'eventCounts' => $incident->eventCounts(),
             'lastVerifiedHub' => app(ParcelLegService::class)
                 ->verifiedLocation($incident->sellerOrder),
@@ -82,6 +87,22 @@ class IncidentController extends Controller
         ]);
 
         return back()->with('success', 'Incident rejected. The delivery is unlocked.');
+    }
+
+    public function confirmLost(Request $request, ParcelLossService $loss): RedirectResponse
+    {
+        $admin = $request->user('admin');
+        ParcelLossService::authorize($admin);
+        $data = $request->validate([
+            'incident_ids' => ['required', 'array', 'min:1', 'max:50'],
+            'incident_ids.*' => ['required', 'integer', 'distinct', 'exists:incidents,id'],
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
+        $result = $loss->confirmMany($data['incident_ids'], $admin, $data['reason']);
+
+        $response = back()->with('success', count($result['confirmed']).' parcels confirmed lost.');
+
+        return $result['failed'] !== [] ? $response->withErrors($result['failed']) : $response;
     }
 
     public function destroy(Request $request, Incidents $incident): RedirectResponse

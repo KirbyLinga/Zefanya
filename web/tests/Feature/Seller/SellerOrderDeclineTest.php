@@ -466,12 +466,12 @@ class SellerOrderDeclineTest extends TestCase
         $seller = Seller::factory()->create(['status' => 'approved']);
         $order = SellerOrder::factory()->create(['seller_id' => $seller->id, 'status' => OrderStatus::Placed, 'tracking_number' => 'TRK-HIDDEN-123']);
         SellerOrder::factory()->create(['seller_id' => $seller->id, 'status' => OrderStatus::Confirmed]);
-        SellerOrder::factory()->create(['seller_id' => $seller->id, 'status' => OrderStatus::Preparing]);
+        $preparing = SellerOrder::factory()->create(['seller_id' => $seller->id, 'status' => OrderStatus::Preparing]);
         foreach (['Tulfone', 'Tulfone', 'Pixel Case', 'Charger'] as $name) {
             OrderItem::factory()->create(['seller_order_id' => $order->id, 'product_name' => $name, 'quantity' => 2]);
         }
 
-        $this->actingAs($seller, 'seller')->get(route('seller.orders.index'))->assertOk()
+        $response = $this->actingAs($seller, 'seller')->get(route('seller.orders.index'))->assertOk()
             ->assertSeeInOrder(['>Order</th>', '>Buyer</th>', '>Items</th>', '>Total</th>', '>Status</th>'], false)
             ->assertDontSee('>Tracking</th>', false)
             ->assertDontSee('TRK-HIDDEN-123')
@@ -483,10 +483,18 @@ class SellerOrderDeclineTest extends TestCase
             ->assertSee('type="submit" disabled data-confirm-enable', false)
             ->assertSee('data-submit-loading="Accepting', false)
             ->assertSee('data-submit-loading="Packing', false)
-            ->assertSee('disabled data-confirm-enable data-submit-loading="Requesting pickup', false)
+            ->assertSee('data-confirm-title="Request pickup"', false)
+            ->assertSee('data-submit-loading="Requesting pickup', false)
             ->assertDontSee('confirmAccept(this)', false)
             ->assertDontSee('this.form.submit()', false)
             ->assertSee('href="'.route('seller.orders.show', $order).'"', false);
+
+        $document = new \DOMDocument;
+        @$document->loadHTML($response->getContent());
+        $xpath = new \DOMXPath($document);
+        $pickupForm = route('seller.orders.markReady', $preparing);
+        $this->assertSame(1, $xpath->query('//form[@action="'.$pickupForm.'" and @data-app-confirm]'
+            .'/button[@type="submit" and @disabled and @data-confirm-enable and starts-with(@data-submit-loading, "Requesting pickup")]')->length);
 
         $this->get(route('seller.orders.show', $order))->assertOk()->assertSee('TRK-HIDDEN-123');
     }

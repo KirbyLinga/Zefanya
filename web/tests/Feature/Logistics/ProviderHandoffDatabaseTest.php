@@ -92,10 +92,11 @@ class ProviderHandoffDatabaseTest extends TestCase
             'receiving_hub_id',
             'status',
             'rejection_reason',
+            'cancellation_reason',
             'active_seller_order_id',
         ];
 
-        foreach (['requested', 'accepted', 'rejected', 'dispatched', 'received'] as $event) {
+        foreach (['requested', 'accepted', 'rejected', 'dispatched', 'received', 'cancelled', 'recovered'] as $event) {
             $handoffColumns[] = $event.'_at';
             $handoffColumns[] = $event.'_by_type';
             $handoffColumns[] = $event.'_by_id';
@@ -109,7 +110,7 @@ class ProviderHandoffDatabaseTest extends TestCase
     public function test_handoff_status_enum_covers_the_required_lifecycle(): void
     {
         $this->assertSame(
-            ['REQUESTED', 'ACCEPTED', 'REJECTED', 'IN_TRANSIT', 'RECEIVED'],
+            ['REQUESTED', 'ACCEPTED', 'REJECTED', 'IN_TRANSIT', 'RECEIVED', 'CANCELLED'],
             array_map(fn (ParcelHandoffStatus $status): string => $status->value, ParcelHandoffStatus::cases()),
         );
     }

@@ -111,7 +111,10 @@ class RiderReturnPickupApiTest extends TestCase
 
         $parcel = $f['parcel']->fresh();
         $this->assertNotNull($f['return']->fresh()->collected_at);
-        $this->assertSame($f['station']->id, (int) $parcel->custody_hub_id);
+        $this->assertNull($parcel->custody_hub_id, 'A separate station scan records physical receipt.');
+        $event = $f['return']->events()->where('event_key', 'collected_from_buyer')->sole();
+        $this->assertSame($f['station']->id, (int) $event->metadata['station_hub_id']);
+        $this->assertFalse($f['return']->events()->where('event_key', 'station_received')->exists());
         $this->assertSame($f['provider']->id, (int) $parcel->custody_provider_id);
         // Collection is custody only: no status change, refund or restock here.
         $this->assertSame(OrderStatus::Delivered, $parcel->status);

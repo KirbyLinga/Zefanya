@@ -27,6 +27,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 class SellerOrder extends Model
@@ -264,6 +265,12 @@ class SellerOrder extends Model
     public function statusHistories(): HasMany
     {
         return $this->hasMany(StatusHistory::class)->orderBy('created_at');
+    }
+
+    public function completionTime(): ?Carbon
+    {
+        return $this->statusHistories()->where('to_status', OrderStatus::Completed->value)
+            ->orderBy('id')->first()?->created_at;
     }
 
     /**
@@ -664,7 +671,7 @@ class SellerOrder extends Model
         }
 
         // A parcel found after it was confirmed lost: shown, but the order stays closed.
-        if ($this->status === OrderStatus::Lost && ($lossCase = app(ParcelLossService::class)->caseFor($this))?->recovered_at !== null) {
+        if ($this->status === OrderStatus::Lost && class_exists(ParcelLossService::class) && ($lossCase = app(ParcelLossService::class)->caseFor($this))?->recovered_at !== null) {
             $foundHub = LogisticsHub::query()->whereKey($lossCase->recovered_hub_id)->value('name');
             $events[] = [
                 'key' => 'loss-recovered', 'type' => 'status', 'title' => 'Parcel found',

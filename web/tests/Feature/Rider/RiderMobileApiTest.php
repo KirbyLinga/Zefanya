@@ -4,6 +4,7 @@ namespace Tests\Feature\Rider;
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Models\Logistics\CodRemittance;
 use App\Models\Logistics\DeliveryProof;
 use App\Models\Rider\Rider;
 use App\Models\Rider\RiderEarning;
@@ -142,11 +143,19 @@ class RiderMobileApiTest extends RiderTestCase
         $payment = Payment::query()->where('seller_order_id', $parcel->id)->firstOrFail();
         $this->assertSame(PaymentStatus::Paid, $payment->status);
         $this->assertSame(1, DeliveryProof::query()->where('seller_order_id', $parcel->id)->count());
+        $proof = DeliveryProof::query()->where('seller_order_id', $parcel->id)->sole();
+        $this->assertSame('buyer', $proof->recipient_acknowledgement['category']);
+        $this->assertTrue($proof->recipient_acknowledgement['physical_handover']);
+        $this->assertTrue($proof->recipient_acknowledgement['recipient_accepted']);
+        $this->assertTrue($proof->recipient_acknowledgement['cod_collected']);
 
         // Duplicate submission (e.g. retry after a lost response) writes nothing new.
         $this->api()->post("/api/rider/deliveries/{$parcel->id}/deliver", [
             'proof_photo' => UploadedFile::fake()->image('again.jpg'),
             'cod_amount' => '1500.00',
+            'physical_handover' => true,
+            'recipient_accepted' => true,
+            'recipient_category' => 'buyer',
         ])->assertOk();
         $this->assertSame(1, DeliveryProof::query()->where('seller_order_id', $parcel->id)->count());
 
@@ -158,6 +167,36 @@ class RiderMobileApiTest extends RiderTestCase
         $earning = RiderEarning::query()->where('seller_order_id', $parcel->id)->sole();
         $this->assertSame(RiderEarning::DELIVERY, $earning->job);
         $this->assertSame($this->courier->id, (int) $earning->courier_id);
+        $remittance = CodRemittance::query()->where('seller_order_id', $parcel->id)->sole();
+        $this->assertSame(150000, $remittance->amount_minor);
+        $this->assertSame(1, $parcel->statusHistories()->where('to_status', OrderStatus::Delivered->value)->count());
+    }
+
+    public function test_delivery_requires_a_named_representative_and_relationship(): void
+    {
+        $parcel = $this->outForDelivery();
+        $data = $this->withHandoff($parcel, ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY, [
+            'proof_photo' => UploadedFile::fake()->image('proof.jpg'),
+        ]);
+        $data['recipient_category'] = 'representative';
+
+        $this->api()->post("/api/rider/deliveries/{$parcel->id}/deliver", $data)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['received_by', 'recipient_relationship']);
+        $this->assertSame(OrderStatus::OutForDelivery, $parcel->fresh()->status);
+        $this->assertFalse(DeliveryProof::query()->where('seller_order_id', $parcel->id)->exists());
+
+        $this->api()->post("/api/rider/deliveries/{$parcel->id}/deliver", [
+            ...$data,
+            'received_by' => 'Rehearsal Recipient',
+            'recipient_relationship' => 'Household member',
+        ])->assertOk();
+
+        $proof = DeliveryProof::query()->where('seller_order_id', $parcel->id)->sole();
+        $acknowledgement = $proof->recipient_acknowledgement;
+        $this->assertSame('representative', $acknowledgement['category']);
+        $this->assertSame('Rehearsal Recipient', $proof->received_by);
+        $this->assertSame('Household member', $acknowledgement['relationship']);
     }
 
     public function test_deliver_rejects_tampered_cod_amount_and_bad_proof_without_state_change(): void

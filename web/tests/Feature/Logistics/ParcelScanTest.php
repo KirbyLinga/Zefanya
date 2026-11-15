@@ -75,6 +75,9 @@ class ParcelScanTest extends TestCase
         ]);
 
         $this->courier = $this->assignableCourier($this->provider, [], 'Quezon City', '137404000');
+        // These station receipt cases use the same hub for verified pickup
+        // receipt and validated destination coverage.
+        $this->courier->rider->forceFill(['station_hub_id' => $station->id])->save();
     }
 
     private function parcel(OrderStatus $status, ?Courier $courier = null, ?string $tracking = null): SellerOrder

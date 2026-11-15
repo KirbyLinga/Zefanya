@@ -6,7 +6,7 @@
 <x-admin.tabs :tabs="[
     ['label' => 'Returns & disputes', 'route' => 'admin.returns.index'],
     ['label' => 'Parcel incidents', 'route' => 'admin.incidents.index'],
-    ...(\App\Services\Logistics\ParcelLossService::available() ? [['label' => 'Lost parcels', 'route' => 'admin.lost-parcels.index']] : []),
+    ...(class_exists(\App\Services\Logistics\ParcelLossService::class) && \App\Services\Logistics\ParcelLossService::available() ? [['label' => 'Lost parcels', 'route' => 'admin.lost-parcels.index']] : []),
 ]" />
 <header class="case-heading"><div><p class="case-eyebrow">Case management</p><h1 id="case-heading">Returns &amp; disputes</h1><p class="case-description">Review return requests, resolve disputes and track return custody.</p></div><span class="case-total"><i data-lucide="undo-2" aria-hidden="true"></i><strong>{{ number_format($returns->total()) }}</strong> total returns</span></header>
 <div class="case-panel-heading case-directory-heading"><h2>Return directory</h2>@if ($only)<span>Return #{{ $only }} only · <a class="font-semibold text-primary-800 underline" href="{{ route('admin.returns.index') }}">Show all returns</a></span>@else<span>All return statuses</span>@endif</div>

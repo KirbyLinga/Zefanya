@@ -34,6 +34,7 @@ class ManifestItem extends Model
         return [
             'received_at' => 'datetime',
             'released_at' => 'datetime',
+            'recovered_at' => 'datetime',
             'issue_recorded_at' => 'datetime',
             'verified_for_dispatch_at' => 'datetime',
         ];
@@ -56,6 +57,11 @@ class ManifestItem extends Model
         return $this->belongsTo(Manifest::class);
     }
 
+    public function recoveredHub(): BelongsTo
+    {
+        return $this->belongsTo(LogisticsHub::class, 'recovered_hub_id');
+    }
+
     public function sellerOrder(): BelongsTo
     {
         return $this->belongsTo(SellerOrder::class);
@@ -64,6 +70,12 @@ class ManifestItem extends Model
     public function isReceived(): bool
     {
         return $this->received_at !== null;
+    }
+
+    public function awaitsRecovery(): bool
+    {
+        return $this->manifest?->status === ManifestStatus::Cancelled && $this->manifest->dispatched_at !== null
+            && $this->received_at === null && $this->recovered_at === null;
     }
 
     /**

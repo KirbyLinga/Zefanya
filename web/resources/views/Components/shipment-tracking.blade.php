@@ -59,7 +59,8 @@
             $description = 'Your parcel was delivered. An open return pauses receipt confirmation and automatic completion.';
         }
     }
-    $alert = app(\App\Services\Logistics\ParcelTransitAlertService::class)->for($shipment, $buyerFacing);
+    $alertService = \App\Services\Logistics\ParcelTransitAlertService::class;
+    $alert = class_exists($alertService) ? app($alertService)->for($shipment, $buyerFacing) : null;
     $alertTone = ['delayed' => 'border-amber-200 bg-amber-50 text-amber-900', 'investigating' => 'border-blue-200 bg-blue-50 text-blue-900',
         'lost' => 'border-red-200 bg-red-50 text-red-900', 'recovered' => 'border-emerald-200 bg-emerald-50 text-emerald-900'][$alert['key'] ?? ''] ?? '';
     $milestoneCount = count($milestones);

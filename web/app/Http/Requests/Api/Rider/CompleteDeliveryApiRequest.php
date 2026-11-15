@@ -20,6 +20,11 @@ class CompleteDeliveryApiRequest extends CompleteDeliveryRequest
         return [
             ...parent::rules(),
             'verification_token' => ['nullable', 'string', 'max:128'],
+            'physical_handover' => ['required', 'accepted'],
+            'recipient_accepted' => ['required', 'accepted'],
+            'recipient_category' => ['required', 'in:buyer,representative'],
+            'recipient_relationship' => ['nullable', 'required_if:recipient_category,representative', 'string', 'max:120'],
+            'received_by' => ['nullable', 'required_if:recipient_category,representative', 'string', 'max:120'],
         ];
     }
 

@@ -2,6 +2,7 @@
 
 use App\Console\Commands\AutoApproveOverdueReturnsCommand;
 use App\Console\Commands\AutoCompleteBuyerReceiptsCommand;
+use App\Console\Commands\FlagOverdueTransfersCommand;
 use App\Console\Commands\RollMissedPickupWindowsCommand;
 use App\Support\ScheduledTaskAlert;
 use Illuminate\Foundation\Inspiring;
@@ -25,6 +26,10 @@ $alert->apply(
 $alert->apply(
     Schedule::command(RollMissedPickupWindowsCommand::class)->everyFiveMinutes()->withoutOverlapping(),
     'pickups:roll-missed-windows',
+);
+$alert->apply(
+    Schedule::command(FlagOverdueTransfersCommand::class)->everyFifteenMinutes()->withoutOverlapping(),
+    'transfers:flag-overdue',
 );
 $alert->apply(
     Schedule::command('sanctum:prune-expired --hours=24')->daily(),

@@ -149,6 +149,10 @@ abstract class RiderTestCase extends TestCase
      */
     protected function withHandoff(SellerOrder $parcel, string $action, array $payload = [], ?Rider $rider = null): array
     {
+        if ($action === ParcelHandoffVerification::ACTION_COMPLETE_DELIVERY) {
+            $payload += ['physical_handover' => true, 'recipient_accepted' => true, 'recipient_category' => 'buyer'];
+        }
+
         return array_merge($payload, [
             'verification_token' => $this->handoffToken($parcel, $action, $rider),
         ]);

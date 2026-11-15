@@ -62,6 +62,7 @@ class PickupController extends Controller
         }
 
         $parcel = $result['parcel']->fresh(['order', 'seller', 'payment', 'orderItems']) ?? $result['parcel'];
+        $parcel->loadCount('pickupAttempts');
 
         return $this->success(
             $result['cancelled']

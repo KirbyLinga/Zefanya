@@ -164,6 +164,7 @@ class ParcelLossTest extends TestCase
     {
         $this->dispatchedHandoff();
         $saved = (int) $this->parcel->subtotal_minor;
+        $shipping = (int) $this->parcel->shipping_fee_minor;
         Product::query()->where('seller_id', $this->parcel->seller_id)->update(['price' => 999]);
         $this->parcel->forceFill([
             'voucher_discount_minor' => 8000,
@@ -178,7 +179,7 @@ class ParcelLossTest extends TestCase
         // Saved checkout merchandise only: not the new catalog price, not the voucher, not shipping.
         $this->assertSame($saved, $case->merchandise_minor);
         $this->assertSame(50000, $case->merchandise_minor);
-        $this->assertSame(5000, (int) $this->parcel->fresh()->shipping_fee_minor);
+        $this->assertSame($shipping, (int) $this->parcel->fresh()->shipping_fee_minor);
     }
 
     public function test_after_the_receiving_scan_the_receiver_is_liable(): void

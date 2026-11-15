@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Logistics;
 
 use App\Http\Controllers\Controller;
 use App\Models\Logistics\CodRemittance;
+use App\Models\Rider\Rider;
 use App\Services\Logistics\CodRemittanceService;
 use App\Services\Logistics\LogisticsRemittanceService;
 use Illuminate\Http\RedirectResponse;
@@ -14,21 +15,22 @@ class CodRemittanceController extends Controller
 {
     public function index(Request $request): View
     {
-        $ledger = CodRemittance::query()
-            ->where('logistics_provider_id', $request->user('logistics')->getKey());
-        $confirmedCash = 'CASE WHEN status = ? THEN COALESCE(received_amount_minor, 0) ELSE 0 END';
+        $provider = $request->user('logistics');
+        $ledger = CodRemittance::query()->where('logistics_provider_id', $provider->getKey());
+        $confirmedCash = 'CASE WHEN status IN (?, ?) THEN COALESCE(received_amount_minor, 0) ELSE 0 END';
+        $cashStatuses = [CodRemittance::REMITTED_TO_LOGISTICS, CodRemittance::PARTIALLY_REMITTED];
         $riderReconciliation = (clone $ledger)
             ->select('courier_id')
             ->selectRaw('SUM(amount_minor) AS collected_minor')
-            ->selectRaw("SUM({$confirmedCash}) AS remitted_minor", [CodRemittance::REMITTED_TO_LOGISTICS])
-            ->selectRaw("SUM(amount_minor) - SUM({$confirmedCash}) AS difference_minor", [CodRemittance::REMITTED_TO_LOGISTICS])
+            ->selectRaw("SUM({$confirmedCash}) AS remitted_minor", $cashStatuses)
+            ->selectRaw("SUM(amount_minor) - SUM({$confirmedCash}) AS difference_minor", $cashStatuses)
             ->groupBy('courier_id')
             ->with('courier.rider')
             ->orderByDesc('difference_minor')->orderBy('courier_id')
             ->paginate(20, ['*'], 'riders_page')->withQueryString();
         $reconciliationTotals = (clone $ledger)
             ->selectRaw('COALESCE(SUM(amount_minor), 0) AS collected_minor')
-            ->selectRaw("COALESCE(SUM({$confirmedCash}), 0) AS remitted_minor", [CodRemittance::REMITTED_TO_LOGISTICS])
+            ->selectRaw("COALESCE(SUM({$confirmedCash}), 0) AS remitted_minor", $cashStatuses)
             ->first();
 
         $remittances = (clone $ledger)
@@ -41,8 +43,12 @@ class CodRemittanceController extends Controller
         $overdueCutoff = now()->subDays($overdueDays);
         $overdueCount = (clone $ledger)->where('status', CodRemittance::PENDING_REMITTANCE)
             ->where('created_at', '<', $overdueCutoff)->count();
+        $shortages = (clone $ledger)->where('status', CodRemittance::PARTIALLY_REMITTED)
+            ->with(['courier.rider', 'sellerOrder', 'shortageRider'])
+            ->orderBy('id')->paginate(20, ['*'], 'shortages_page')->withQueryString();
+        $riders = Rider::query()->where('logistics_provider_id', $provider->getKey())->orderBy('id')->get();
 
-        return view('Logistics.CodRemittances.index', compact('remittances', 'riderReconciliation', 'reconciliationTotals', 'overdueDays', 'overdueCutoff', 'overdueCount'));
+        return view('Logistics.CodRemittances.index', compact('remittances', 'riderReconciliation', 'reconciliationTotals', 'overdueDays', 'overdueCutoff', 'overdueCount', 'shortages', 'riders'));
     }
 
     public function confirm(
@@ -60,20 +66,47 @@ class CodRemittanceController extends Controller
 
         $data = $request->validate([
             'received_amount' => ['required', 'string', 'regex:/\A\d{1,9}(?:\.\d{1,2})?\z/'],
+            'shortage_rider_id' => ['nullable', 'integer', 'min:1'],
+            'shortage_reason' => ['nullable', 'string', 'max:1000'],
         ], [
             'received_amount.required' => 'Enter the cash amount physically received.',
             'received_amount.regex' => 'Enter a non-negative peso amount with at most two decimal places.',
         ]);
 
         // Convert pesos to centavos using integers, matching delivery collection.
-        [$pesos, $centavos] = array_pad(explode('.', $data['received_amount'], 2), 2, '0');
-        $receivedAmountMinor = ((int) $pesos) * 100 + (int) str_pad($centavos, 2, '0');
-
-        $confirmed = $service->confirmReceipt($remittance, $provider, $receivedAmountMinor);
+        $confirmed = $service->confirmReceipt(
+            $remittance,
+            $provider,
+            $this->cashMinor($data['received_amount']),
+            isset($data['shortage_rider_id']) ? (int) $data['shortage_rider_id'] : null,
+            $data['shortage_reason'] ?? null,
+        );
 
         return redirect()->route('logistics.cod-remittances.index')->with(
             'success',
             $confirmed ? 'Cash receipt confirmed.' : 'This cash receipt was already confirmed.',
         );
+    }
+
+    public function recoverShortage(Request $request, CodRemittance $remittance, CodRemittanceService $service): RedirectResponse
+    {
+        $provider = $request->user('logistics');
+        abort_unless((int) $remittance->logistics_provider_id === (int) $provider->getKey(), 403);
+
+        $data = $request->validate([
+            'recovered_amount' => ['required', 'string', 'regex:/\A\d{1,9}(?:\.\d{1,2})?\z/'],
+            'reference' => ['required', 'string', 'max:255'],
+            'note' => ['nullable', 'string', 'max:1000'],
+        ]);
+        $service->recordShortageRecovery($remittance, $provider, $this->cashMinor($data['recovered_amount']), $data['reference'], $data['note'] ?? null);
+
+        return redirect()->route('logistics.cod-remittances.index')->with('success', 'Shortage recovery recorded.');
+    }
+
+    private function cashMinor(string $amount): int
+    {
+        [$pesos, $centavos] = array_pad(explode('.', $amount, 2), 2, '0');
+
+        return ((int) $pesos) * 100 + (int) str_pad($centavos, 2, '0');
     }
 }

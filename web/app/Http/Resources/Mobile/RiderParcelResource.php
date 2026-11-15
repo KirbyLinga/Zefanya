@@ -60,6 +60,7 @@ class RiderParcelResource extends JsonResource
             'cod_amount_minor' => $collect ? (int) $payment->amount_minor : 0,
             'delivery_attempts' => (int) ($parcel->delivery_attempts ?? 0),
             'pickup_session_id' => $parcel->pickup_session_id,
+            'pickup_attempts' => $this->whenCounted('pickupAttempts', fn ($count) => (int) $count),
             'updated_at' => $parcel->updated_at?->toIso8601String(),
         ];
     }

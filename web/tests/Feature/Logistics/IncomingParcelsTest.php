@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Models\Buyer\Buyer;
 use App\Models\Catalog\Product;
 use App\Models\Logistics\LogisticsProvider;
+use App\Models\Logistics\ParcelRoute;
 use App\Models\Rider\Courier;
 use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
@@ -176,6 +177,36 @@ class IncomingParcelsTest extends TestCase
 
         $ready->refresh();
         $this->assertSame(OrderStatus::ReadyForPickup, $ready->status);
+    }
+
+    public function test_verified_receipt_at_the_final_station_sorts_once(): void
+    {
+        $station = $this->stationForProvider($this->provider);
+        $courier = Courier::factory()->create(['logistics_provider_id' => $this->provider->id]);
+        $parcel = $this->order(OrderStatus::PickedUp, $courier);
+        $parcel->forceFill(['origin_station_hub_id' => $station->id, 'handover_at' => now()])->save();
+        $route = ParcelRoute::query()->create([
+            'seller_order_id' => $parcel->id,
+            'origin_hub_id' => $station->id,
+            'destination_hub_id' => $station->id,
+            'legs' => [],
+            'current_leg_index' => 0,
+        ]);
+        $url = route('logistics.incoming-parcels.toSortingCenter', $parcel);
+
+        $this->actingAs($this->provider, 'logistics')->post(
+            $url,
+            $this->withLogisticsHandoff($parcel, ParcelHandoffVerification::ACTION_STATION_RECEIPT),
+        )->assertRedirect()->assertSessionHasNoErrors();
+        $this->post($url)->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertTrue($route->fresh()->isCompleted());
+        $this->assertSame($station->id, (int) $parcel->fresh()->custody_hub_id);
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
+        $this->assertSame(
+            [OrderStatus::AtSortingCenter, OrderStatus::Sorted],
+            $parcel->statusHistories()->orderBy('id')->get()->pluck('to_status')->all(),
+        );
     }
 
     public function test_provider_cannot_claim_a_parcel_already_claimed_by_another_provider(): void

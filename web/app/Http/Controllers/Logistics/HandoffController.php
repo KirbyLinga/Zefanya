@@ -10,6 +10,8 @@ use App\Models\Logistics\ParcelHandoffException;
 use App\Models\Shared\SellerOrder;
 use App\Services\Logistics\ParcelHandoffService;
 use App\Services\Logistics\ParcelHandoffVerification;
+use App\Services\Logistics\TransferCourierService;
+use App\Support\RuntimeSchema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -104,7 +106,7 @@ class HandoffController extends Controller
             ->with('success', 'Handoff requested from '.$handoff->destinationProvider?->business_name.'. The parcel stays in your custody until the destination accepts and both scans complete.');
     }
 
-    public function show(Request $request, ParcelHandoff $handoff): View
+    public function show(Request $request, ParcelHandoff $handoff, TransferCourierService $couriers): View
     {
         $provider = $this->provider($request);
         $this->participant($provider, $handoff);
@@ -123,11 +125,27 @@ class HandoffController extends Controller
         ]);
 
         return view('Logistics.Handoffs.show', [
+            ...$couriers->assignmentDetails($handoff, $provider),
             'provider' => $provider,
             'handoff' => $handoff,
             'isOrigin' => (int) $handoff->origin_provider_id === (int) $provider->id,
             'isDestination' => (int) $handoff->destination_provider_id === (int) $provider->id,
+            'cancellationAvailable' => RuntimeSchema::hasColumn('parcel_handoffs', 'recovered_at'),
         ]);
+    }
+
+    public function assignCourier(Request $request, ParcelHandoff $handoff, TransferCourierService $couriers): RedirectResponse
+    {
+        $provider = $this->provider($request);
+        abort_unless((int) $handoff->origin_provider_id === (int) $provider->id, 404);
+        $data = $request->validate([
+            'transfer_courier_id' => ['required', 'integer'],
+            'transport_vehicle_type' => ['nullable', 'string', 'max:50'],
+            'transport_plate_number' => ['nullable', 'string', 'max:20'],
+        ]);
+        $couriers->assignToHandoff($handoff, $provider, (int) $data['transfer_courier_id'], $data['transport_vehicle_type'] ?? null, $data['transport_plate_number'] ?? null);
+
+        return back()->with('success', 'Courier assigned.');
     }
 
     public function accept(Request $request, ParcelHandoff $handoff): RedirectResponse
@@ -178,7 +196,7 @@ class HandoffController extends Controller
 
         $data = $request->validate([
             'tracking_number' => ['required', 'string', 'max:64'],
-            'phase' => ['nullable', Rule::in([ParcelHandoffService::PHASE_DISPATCH, ParcelHandoffService::PHASE_RECEIVE])],
+            'phase' => ['nullable', Rule::in([ParcelHandoffService::PHASE_DISPATCH, ParcelHandoffService::PHASE_RECEIVE, ParcelHandoffService::PHASE_RECOVER])],
             'method' => ['nullable', Rule::in([
                 ParcelHandoffVerification::METHOD_CAMERA,
                 ParcelHandoffVerification::METHOD_MANUAL,
@@ -237,6 +255,31 @@ class HandoffController extends Controller
         }
 
         return back()->with('success', 'Parcel received. Custody is now with your provider; delivery status and tracking were not changed.');
+    }
+
+    public function cancel(Request $request, ParcelHandoff $handoff): RedirectResponse
+    {
+        $provider = $this->provider($request);
+        $this->participant($provider, $handoff);
+        abort_unless((int) $handoff->origin_provider_id === (int) $provider->id, 403);
+        abort_unless(RuntimeSchema::hasColumn('parcel_handoffs', 'cancelled_at'), 503);
+        $data = $request->validate(['cancellation_reason' => ['required', 'string', 'max:1000']]);
+        $this->handoffs->cancel($handoff, $provider, $data['cancellation_reason']);
+
+        return redirect()->route('logistics.handoffs.show', $handoff)->with('success', 'Handoff cancelled.');
+    }
+
+    public function recover(Request $request, ParcelHandoff $handoff): RedirectResponse
+    {
+        $provider = $this->provider($request);
+        $this->participant($provider, $handoff);
+        abort_unless((int) $handoff->origin_provider_id === (int) $provider->id, 403);
+        abort_unless(RuntimeSchema::hasColumn('parcel_handoffs', 'recovered_at'), 503);
+        $data = $request->validate(['verification_token' => ['required', 'string', 'max:128']]);
+        $this->handoffs->recover($handoff, $provider, $data['verification_token']);
+
+        return redirect()->route('logistics.handoffs.show', $handoff)
+            ->with('success', 'Recovery scan recorded. The parcel remains held for exception review.');
     }
 
     private function provider(Request $request): LogisticsProvider

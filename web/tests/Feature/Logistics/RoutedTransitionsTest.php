@@ -294,7 +294,7 @@ class RoutedTransitionsTest extends TestCase
         $parcel = $this->placeOrder('seller-pila', 'buyer-pila', $provider);
 
         $this->actingAs($this->account(Buyer::class, 'buyer-pila'), 'buyer')->get(route('buyer.orders.show', $parcel->order))->assertOk()
-            ->assertSeeInOrder(['Subtotal', '₱500.00', 'Shipping', '₱50.00', 'Total', '₱550.00']);
+            ->assertSeeInOrder(['Subtotal', '₱500.00', 'Shipping', '₱49.00', 'Total', '₱549.00']);
     }
 
     public function test_checkout_has_no_developer_wording(): void

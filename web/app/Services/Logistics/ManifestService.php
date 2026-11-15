@@ -833,6 +833,23 @@ class ManifestService
         }
     }
 
+    public function reportMissingParcels(Manifest $manifest, LogisticsProvider $provider, array $ids, string $reason): void
+    {
+        DB::transaction(function () use ($manifest, $provider, $ids, $reason): void {
+            $locked = $this->lockManifest($manifest);
+            $this->assertManifestOwner($locked, $provider);
+            $items = $locked->items()->whereIn('seller_order_id', $ids)
+                ->whereNull('received_at')->whereNull('released_at')->orderBy('seller_order_id')->lockForUpdate()->get();
+            if ($locked->status !== ManifestStatus::Dispatched || $items->count() !== count($ids)) {
+                throw ValidationException::withMessages(['seller_order_ids' => 'Choose only parcels still waiting for receipt on this transfer.']);
+            }
+            foreach ($items as $item) {
+                $parcel = SellerOrder::query()->whereKey($item->seller_order_id)->lockForUpdate()->firstOrFail();
+                app(ParcelIncidentService::class)->recordRoutingBlocker($parcel, ParcelIncidentType::Missing, $reason, (int) $provider->id);
+            }
+        }, 3);
+    }
+
     /**
      * Delete a DRAFT manifest and release all its items.
      * The manifest row is hard-deleted.
@@ -1117,6 +1134,7 @@ class ManifestService
                 ]);
             }
 
+            $this->assertProviderCustodyForRecovery($parcel, $provider);
             $this->handoff->assertValidForManifestItem($provider, $lockedItem, ParcelHandoffVerification::ACTION_MANIFEST_RECOVER, $token, (int) $hub->id);
 
             $lockedItem->forceFill([
@@ -1151,6 +1169,13 @@ class ManifestService
         ));
 
         return $recovered->fresh(['recoveredHub', 'manifest']);
+    }
+
+    private function assertProviderCustodyForRecovery(SellerOrder $parcel, LogisticsProvider $provider): void
+    {
+        if ($parcel->currentCustodyProviderId() !== (int) $provider->id) {
+            throw ValidationException::withMessages(['tracking_number' => 'Only the provider holding this parcel can record it.']);
+        }
     }
 
     private function assertRecoveryHub(Manifest $manifest, ?int $hubId): LogisticsHub

@@ -4,6 +4,7 @@ namespace App\Models\Buyer;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * One-time token that guards buyer checkout against double-submits.
@@ -26,6 +27,7 @@ class CheckoutToken extends Model
         'shipping_rates_snapshot' => 'array',
         'used' => 'boolean',
         'expires_at' => 'datetime',
+        'reconciled_rejected_at' => 'datetime',
     ];
 
     public function buyer(): BelongsTo
@@ -39,10 +41,13 @@ class CheckoutToken extends Model
      */
     public static function issue(int $buyerId): self
     {
-        static::query()
+        $expired = static::query()
             ->where('buyer_id', $buyerId)
-            ->where('expires_at', '<', now())
-            ->delete();
+            ->where('expires_at', '<', now());
+        if (static::supportsRecovery()) {
+            $expired->whereNull('order_id')->whereNull('reconciled_rejected_at');
+        }
+        $expired->delete();
 
         return static::query()->create([
             'token' => bin2hex(random_bytes(32)),
@@ -50,6 +55,11 @@ class CheckoutToken extends Model
             'used' => false,
             'expires_at' => now()->addHours(6),
         ]);
+    }
+
+    public static function supportsRecovery(): bool
+    {
+        return Schema::hasColumns('checkout_tokens', ['order_id', 'reconciled_rejected_at']);
     }
 
     /**

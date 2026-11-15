@@ -54,6 +54,7 @@ enum OrderActor: string
             self::Logistics => [
                 [OrderStatus::PickedUp, OrderStatus::AtSortingCenter],
                 [OrderStatus::AtSortingCenter, OrderStatus::Sorted],
+                [OrderStatus::ArrivedAtHub, OrderStatus::Sorted],
                 [OrderStatus::Sorted, OrderStatus::AssignedToRider],
                 [OrderStatus::DeliveryFailed, OrderStatus::AssignedToRider],
                 [OrderStatus::DeliveryFailed, OrderStatus::Returned],

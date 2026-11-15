@@ -37,6 +37,7 @@ class CheckoutCarrierSelectionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        config(['buyer.shipping_rates.same_municipality.first_kg_minor' => 5000]);
 
         $this->buyer = Buyer::factory()->create();
         $this->sellerA = Seller::factory()->create(['status' => 'approved', 'business_name' => 'Shop Alpha']);

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\Buyer;
 
-use App\Enums\OrderStatus;
 use App\Exceptions\StaleStateException;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\Traits\ApiResponses;
@@ -158,6 +157,7 @@ class OrderActionController extends Controller
             'shipments' => $order->sellerOrders->map(function (SellerOrder $shipment) use ($withTracking): array {
                 $row = (new ShipmentResource($shipment))->resolve();
                 $row['return_status'] = $shipment->parcelReturn?->status?->value;
+                $row['refund_recorded'] = $shipment->parcelReturn?->refunded_at !== null;
                 $row['can_cancel'] = $shipment->status->canBuyerCancel();
                 if ($withTracking) {
                     $row['tracking'] = app(RouteExecutionService::class)->trackingSummary($shipment);

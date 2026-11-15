@@ -120,11 +120,12 @@
                             $riderCourier = $shipment->deliveryCourier;
                             $assignment = $shipment->deliveryAssignments->where('role', 'delivery')->last();
                             $isSorted = $shipment->status === OrderStatus::Sorted;
+                            $awaitsSorting = in_array($shipment->status, OrderStatus::AWAITING_SORT, true);
                             $needsAddress = blank($shipment->buyerBarangayCode()) && ! $riderCourier
-                                && in_array($shipment->status, [OrderStatus::AtSortingCenter, OrderStatus::Sorted], true);
+                                && ($awaitsSorting || $isSorted);
                             $canReportIncident = $shipment->handover_at !== null;
                             $look = match (true) {
-                                $shipment->status === OrderStatus::AtSortingCenter => ['tone' => 'ip-maroon', 'icon' => 'scan-line'],
+                                $awaitsSorting => ['tone' => 'ip-maroon', 'icon' => 'scan-line'],
                                 $needsAddress => ['tone' => 'ip-amber', 'icon' => 'map-pin'],
                                 $isSorted && ! $riderCourier => ['tone' => 'ip-amber', 'icon' => 'user-plus'],
                                 $isSorted => ['tone' => 'ip-maroon', 'icon' => 'package-open'],
@@ -168,7 +169,7 @@
 
                                     @if ($tab === 'sorting' && ($sortingBlocked[$shipment->id] ?? null))
                                         <p class="max-w-[260px] font-sans text-[12px] text-[var(--text-muted-2)] 2xl:text-right">{{ $sortingBlocked[$shipment->id] }}</p>
-                                    @elseif ($tab === 'sorting' && $shipment->status === OrderStatus::AtSortingCenter)
+                                    @elseif ($tab === 'sorting' && $awaitsSorting)
                                         <a href="{{ route('logistics.scan.index', array_filter(['tracking' => $shipment->tracking_number])) }}" class="{{ $needsAddress ? $quietButton : $primaryButton }}">Scan to confirm</a>
                                     @elseif ($tab === 'sorting' && $isSorted)
                                         <a href="{{ route('logistics.delivery-assignments.index') }}#stage-{{ $riderCourier ? 'dispatch' : 'rider' }}" class="{{ $needsAddress ? $quietButton : $primaryButton }}">

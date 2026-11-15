@@ -124,7 +124,7 @@ class InternalManifestFlowTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_dispatch_requires_a_valid_scan_for_every_parcel_and_never_changes_parcel_status(): void
+    public function test_dispatch_requires_a_valid_scan_for_every_parcel_and_records_departure_once(): void
     {
         $secondParcel = $this->createParcel('TRK-CALAMBA-0002', $this->calamba);
         $manifest = $this->manifests->create($this->provider, $this->calamba->id, $this->provinceHub->id);
@@ -173,10 +173,12 @@ class InternalManifestFlowTest extends TestCase
         $this->assertSame(ManifestStatus::Dispatched, $manifest->fresh()->status);
         $this->assertSame(2, ManifestItem::query()->where('manifest_id', $manifest->id)->count());
 
-        // Canonical parcel lifecycle is untouched by manifest handling.
-        $this->assertSame(OrderStatus::AtSortingCenter, $this->parcel->fresh()->status);
-        $this->assertSame(OrderStatus::AtSortingCenter, $secondParcel->fresh()->status);
-        $this->assertSame(0, $this->parcel->fresh()->statusHistories()->count());
+        foreach ([$this->parcel, $secondParcel] as $parcel) {
+            $this->assertSame(OrderStatus::InTransit, $parcel->fresh()->status);
+            $history = $parcel->statusHistories()->sole();
+            $this->assertSame(OrderStatus::AtSortingCenter, $history->from_status);
+            $this->assertSame(OrderStatus::InTransit, $history->to_status);
+        }
     }
 
     public function test_receiving_is_verified_partial_and_idempotent(): void
@@ -215,6 +217,8 @@ class InternalManifestFlowTest extends TestCase
         $this->assertSame($this->provider->id, (int) $first->received_by_id);
         $this->assertNull($second->received_at);
         $this->assertNull($manifest->received_at);
+        $this->assertSame(OrderStatus::ArrivedAtHub, $this->parcel->fresh()->status);
+        $this->assertSame(OrderStatus::InTransit, $secondParcel->fresh()->status);
 
         // Reusing the consumed receiving token is rejected without a second receipt.
         $this->post(route('logistics.manifests.receive.store', [$manifest, $first]), [
@@ -241,9 +245,13 @@ class InternalManifestFlowTest extends TestCase
         $this->assertSame($this->provider->id, (int) $manifest->received_by_id);
         $this->assertSame(0, $manifest->items()->whereNull('received_at')->count());
 
-        // Deliveries are never marked DELIVERED/RETURNED by manifest scanning.
-        $this->assertSame(OrderStatus::AtSortingCenter, $this->parcel->fresh()->status);
-        $this->assertSame(OrderStatus::AtSortingCenter, $secondParcel->fresh()->status);
+        foreach ([$this->parcel, $secondParcel] as $parcel) {
+            $this->assertSame(OrderStatus::ArrivedAtHub, $parcel->fresh()->status);
+            $this->assertSame(
+                [OrderStatus::InTransit, OrderStatus::ArrivedAtHub],
+                $parcel->statusHistories()->orderBy('id')->get()->pluck('to_status')->all(),
+            );
+        }
     }
 
     public function test_forged_expired_wrong_hub_and_wrong_action_tokens_are_rejected(): void
@@ -299,7 +307,7 @@ class InternalManifestFlowTest extends TestCase
         $this->assertNull($item->fresh()->received_at);
     }
 
-    public function test_multi_leg_movements_are_separate_from_delivery_status_and_visible_to_buyer_and_seller(): void
+    public function test_multi_leg_movements_record_transit_and_receipt_and_are_visible_to_buyer_and_seller(): void
     {
         $legOne = $this->manifests->create($this->provider, $this->calamba->id, $this->provinceHub->id);
         $this->manifests->addParcel($legOne, $this->parcel);
@@ -325,9 +333,11 @@ class InternalManifestFlowTest extends TestCase
         $this->assertSame('receipt', $events[3]['type']);
         $this->assertStringContainsString('Los Baños Station', $events[3]['title']);
 
-        // Canonical delivery status did not move through either hub transfer.
-        $this->assertSame(OrderStatus::AtSortingCenter, $this->parcel->fresh()->status);
-        $this->assertSame(0, $this->parcel->fresh()->statusHistories()->count());
+        $this->assertSame(OrderStatus::ArrivedAtHub, $this->parcel->fresh()->status);
+        $this->assertSame(
+            [OrderStatus::InTransit, OrderStatus::ArrivedAtHub, OrderStatus::InTransit, OrderStatus::ArrivedAtHub],
+            $this->parcel->statusHistories()->orderBy('id')->get()->pluck('to_status')->all(),
+        );
 
         $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.orders.show', $this->order))

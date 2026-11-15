@@ -41,6 +41,8 @@ class Manifest extends Model
             'dispatched_at' => 'datetime',
             'received_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'transport_required' => 'boolean',
+            'transport_assigned_at' => 'datetime',
         ];
     }
 

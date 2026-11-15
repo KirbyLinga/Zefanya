@@ -9,6 +9,7 @@ use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsProvider;
 use App\Models\Logistics\LogisticsProviderLink;
 use App\Models\Logistics\ParcelHandoff;
+use App\Models\Logistics\ParcelLossCase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -307,11 +308,20 @@ class ProviderHandoffSchemaService
             }
         }
 
-        $events = ['requested' => 'origin', 'accepted' => 'destination', 'rejected' => 'destination', 'dispatched' => 'origin', 'received' => 'destination'];
+        $events = ['requested' => 'origin', 'accepted' => 'destination', 'rejected' => 'destination', 'dispatched' => 'origin', 'received' => 'destination',
+            'cancelled' => 'origin', 'recovered' => 'origin'];
         foreach ($events as $event => $side) {
             $at = $handoff->{$event.'_at'};
             $id = $handoff->{$event.'_by_id'};
             $type = $handoff->{$event.'_by_type'};
+            if ($event === 'cancelled' && $type === 'admin') {
+                $this->require($at !== null && $handoff->status === ParcelHandoffStatus::Cancelled
+                    && ParcelLossService::available()
+                    && ParcelLossCase::query()->where('seller_order_id', $handoff->seller_order_id)
+                        ->where('confirmed_by', $id)->exists(), 'cancelled_by_id', 'Only the Admin who confirmed this loss can close the handoff.');
+
+                continue;
+            }
             $this->require(($at === null && $id === null && $type === null)
                 || ($at !== null && $type === 'logistics' && (int) $id === (int) $handoff->{$side.'_provider_id'}), $event.'_by_id', 'Handoff event requires its participating provider and timestamp.');
         }
@@ -321,11 +331,15 @@ class ProviderHandoffSchemaService
             ParcelHandoffStatus::Rejected => ['requested', 'rejected'],
             ParcelHandoffStatus::InTransit => ['requested', 'accepted', 'dispatched'],
             ParcelHandoffStatus::Received => ['requested', 'accepted', 'dispatched', 'received'],
+            ParcelHandoffStatus::Cancelled => ['requested', 'cancelled'],
         };
         foreach ($required as $event) {
             $this->require($handoff->{$event.'_at'} !== null, $event.'_at', 'The handoff status requires this audit event.');
         }
         $this->require($handoff->status !== ParcelHandoffStatus::Rejected || filled($handoff->rejection_reason), 'rejection_reason', 'Rejected handoffs require a reason.');
+        $this->require($handoff->status !== ParcelHandoffStatus::Cancelled || filled($handoff->cancellation_reason), 'cancellation_reason', 'Cancelled handoffs require a reason.');
+        $this->require($handoff->recovered_at === null || ($handoff->status === ParcelHandoffStatus::Cancelled
+            && $handoff->dispatched_at !== null && $handoff->received_at === null), 'recovered_at', 'Recovery requires an unreceived handoff cancelled after dispatch.');
     }
 
     private function requirePriority(int $priority): void

@@ -15,6 +15,18 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('transfer_couriers') || ! Schema::hasTable('transfer_courier_assignments')
+            || ! Schema::hasColumn('manifests', 'transfer_courier_id')
+            || ! Schema::hasColumn('parcel_handoffs', 'transfer_courier_id')) {
+            throw new RuntimeException('Apply the Web Transfer Courier prerequisites before enabling Courier accounts.');
+        }
+
+        if (Schema::hasTable('courier_accounts')) {
+            $this->completeExistingTable();
+
+            return;
+        }
+
         Schema::create('courier_accounts', function (Blueprint $table): void {
             $table->id();
             // One account per operational Courier record; the record cannot be
@@ -40,6 +52,37 @@ return new class extends Migration
             // so a partially created table is treated as not ready.
             $table->unsignedBigInteger('session_generation')->default(0);
         });
+    }
+
+    private function completeExistingTable(): void
+    {
+        if (! Schema::hasColumns('courier_accounts', [
+            'id', 'transfer_courier_id', 'login_id', 'password', 'status',
+            'activation_code_hash', 'activation_expires_at', 'activation_attempts',
+            'credential_generation', 'session_generation', 'current_token_id',
+            'activated_at', 'last_login_at', 'revoked_at', 'revoked_reason', 'created_at', 'updated_at',
+        ])) {
+            throw new RuntimeException('Courier accounts has an unexpected schema. Review it before enabling Courier access.');
+        }
+
+        foreach (['transfer_courier_id', 'login_id'] as $column) {
+            if (! Schema::hasIndex('courier_accounts', [$column], 'unique')) {
+                Schema::table('courier_accounts', fn (Blueprint $table) => $table->unique($column));
+            }
+        }
+
+        $foreignKey = collect(Schema::getForeignKeys('courier_accounts'))
+            ->firstWhere('columns', ['transfer_courier_id']);
+        if ($foreignKey === null) {
+            Schema::table('courier_accounts', fn (Blueprint $table) => $table->foreign('transfer_courier_id')->references('id')->on('transfer_couriers')->restrictOnDelete()
+            );
+
+            return;
+        }
+
+        if ($foreignKey['foreign_table'] !== 'transfer_couriers' || $foreignKey['foreign_columns'] !== ['id']) {
+            throw new RuntimeException('Courier accounts references an unexpected identity table.');
+        }
     }
 
     public function down(): void

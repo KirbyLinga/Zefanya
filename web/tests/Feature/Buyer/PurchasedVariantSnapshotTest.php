@@ -26,6 +26,12 @@ class PurchasedVariantSnapshotTest extends TestCase
     use BootstrapsCheckoutCarriers;
     use LazilyRefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['buyer.shipping_rates.same_municipality.first_kg_minor' => 5000]);
+    }
+
     private function shirt(?Seller $seller = null, string $name = 'Classic Cotton Shirt'): Product
     {
         $seller ??= Seller::factory()->create();

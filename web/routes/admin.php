@@ -20,6 +20,7 @@ use App\Http\Controllers\Admin\SellerSettlementController;
 use App\Http\Controllers\Admin\TransportOverviewController;
 use App\Http\Controllers\Admin\UserAccountController;
 use App\Http\Controllers\Admin\VoucherController;
+use App\Http\Controllers\PolicyController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -49,7 +50,7 @@ Route::middleware('auth:admin')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::middleware('admin.role:admin')->group(function (): void {
-        Route::get('/policies/internal-sop', [\App\Http\Controllers\PolicyController::class, 'internal'])->name('policies.internal-sop');
+        Route::get('/policies/internal-sop', [PolicyController::class, 'internal'])->name('policies.internal-sop');
         Route::get('/settings', [PlatformSettingController::class, 'index'])->name('settings.index');
         Route::patch('/settings/{platformSetting}', [PlatformSettingController::class, 'update'])->name('settings.update');
         // Read-only on purpose: the audit log has no edit or delete routes.
@@ -174,7 +175,7 @@ Route::middleware('auth:admin')->group(function () {
         // ── Lost/damaged incident management (new) ──────────────────────────
         Route::prefix('incidents')->group(function (): void {
             Route::get('/', [IncidentController::class, 'index'])->name('incidents.index');
-            Route::post('/confirm-lost', [IncidentController::class, 'confirmLost'])->name('incidents.confirm-lost');
+            Route::post('/confirm-lost', [IncidentController::class, 'confirmLost'])->middleware('throttle:10,1')->name('incidents.confirm-lost');
             Route::get('/{incident}', [IncidentController::class, 'show'])->name('incidents.detail');
             Route::post('/{incident}/resolve', [IncidentController::class, 'resolve'])->name('incidents.resolve');
             Route::post('/{incident}/reject', [IncidentController::class, 'reject'])->name('incidents.reject');
@@ -182,7 +183,7 @@ Route::middleware('auth:admin')->group(function () {
         });
 
         // Parcels confirmed lost: liability, the manual compensation confirmation, found parcels.
-        Route::prefix('lost-parcels')->group(function (): void {
+        Route::prefix('lost-parcels')->middleware('throttle:30,1')->group(function (): void {
             Route::get('/', [LostParcelController::class, 'index'])->name('lost-parcels.index');
             Route::post('/{case}/liability', [LostParcelController::class, 'assign'])->name('lost-parcels.assign');
             Route::post('/{case}/pay', [LostParcelController::class, 'pay'])->name('lost-parcels.pay');

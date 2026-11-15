@@ -64,7 +64,7 @@ class P1ShoppingPresentationTest extends TestCase
         $buyer = Buyer::factory()->create(['street' => '1 Test Street']);
         $seller = Seller::factory()->create();
         $this->bootstrapCheckoutCarriers($buyer, [$seller]);
-        config(['buyer.shipping_fee.base_minor' => 5000]);
+        config(['buyer.shipping_rates.same_municipality.first_kg_minor' => 5000]);
         $product = Product::factory()->create(['seller_id' => $seller->id, 'status' => 'active', 'price' => 100, 'weight_grams' => 500]);
         $variant = $product->variants()->firstOrFail();
         $variant->forceFill(['price' => 100, 'weight_grams' => null])->save();

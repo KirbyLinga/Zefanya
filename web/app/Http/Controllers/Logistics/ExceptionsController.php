@@ -12,6 +12,7 @@ use App\Models\Shared\SellerOrder;
 use App\Services\Logistics\ParcelIncidentService;
 use App\Services\Logistics\ParcelLegService;
 use App\Services\Logistics\RouteExecutionService;
+use App\Services\Logistics\StuckTransferService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -32,7 +33,7 @@ class ExceptionsController extends Controller
         private readonly RouteExecutionService $routes,
     ) {}
 
-    public function index(Request $request): View
+    public function index(Request $request, StuckTransferService $transfers): View
     {
         $provider = $this->provider($request);
         $request->validate([
@@ -67,6 +68,7 @@ class ExceptionsController extends Controller
             ->withQueryString();
 
         return view('Logistics.Exceptions.index', [
+            ...$transfers->forProvider((int) $provider->id),
             'exceptions' => $exceptions,
             'status' => $status,
             'types' => ParcelIncidentType::labels(),

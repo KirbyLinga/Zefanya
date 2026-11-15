@@ -305,11 +305,10 @@ final class VoucherApplication
     }
 
     /**
-     * Split a discount across weights. Platform discounts use subtotal weights
-     * and put the remainder on the largest store, subject to its remaining
-     * merchandise. Shipping uses the largest fractional remainder.
-     * The result always sums exactly to the discount and never exceeds a
-     * weight.
+     * Round platform shares half up to a centavo, then reconcile any signed
+     * difference starting with the largest eligible store (workbook A8).
+     * Each share is bounded by the merchandise left after shop vouchers.
+     * Shipping keeps its existing largest-fractional-remainder allocation.
      *
      * @param  array<int, int>  $weights
      * @param  array<int, int>|null  $capacities  Platform discount ceilings after shop discounts.
@@ -330,21 +329,24 @@ final class VoucherApplication
         foreach ($weights as $key => $weight) {
             $weight = max(0, (int) $weight);
             $weighted = bcmul((string) $discount, (string) $weight, 0);
-            $allocated[$key] = (int) bcdiv($weighted, (string) $total, 0);
+            $base = (int) bcdiv($weighted, (string) $total, 0);
+            $remainder = (int) bcmod($weighted, (string) $total);
             if ($capacities !== null) {
-                $allocated[$key] = min($allocated[$key], max(0, $capacities[$key] ?? 0));
+                $base += (int) ($remainder >= intdiv($total, 2) + $total % 2);
             }
-            $remainders[$key] = (int) bcmod($weighted, (string) $total);
+            $allocated[$key] = min($base, $capacities[$key] ?? $weight);
+            $remainders[$key] = $remainder;
         }
 
         $left = $discount - array_sum($allocated);
         if ($capacities !== null) {
-            // Platform shares use store subtotals. Give all leftover centavos
-            // to the largest store with room; seller id breaks equal-subtotal ties.
+            // Equal subtotals are reconciled in ascending seller-ID order.
             $keys = array_keys($weights);
             usort($keys, fn ($a, $b): int => ($weights[$b] <=> $weights[$a]) ?: ($a <=> $b));
             foreach ($keys as $key) {
-                $extra = min($left, max(0, ($capacities[$key] ?? 0) - $allocated[$key]));
+                $extra = $left < 0
+                    ? max($left, -$allocated[$key])
+                    : min($left, ($capacities[$key] ?? 0) - $allocated[$key]);
                 $allocated[$key] += $extra;
                 $left -= $extra;
                 if ($left === 0) {

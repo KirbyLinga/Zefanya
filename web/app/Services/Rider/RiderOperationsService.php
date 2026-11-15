@@ -293,7 +293,7 @@ class RiderOperationsService
      * all inside ONE transaction so a failed hop leaves neither evidence nor
      * a payment in a half-written state.
      *
-     * @param  array{photo: UploadedFile, received_by?: ?string, notes?: ?string, cod_amount_minor?: ?int, verification_method?: ?string}  $data
+     * @param  array{photo: UploadedFile, received_by?: ?string, notes?: ?string, cod_amount_minor?: ?int, verification_method?: ?string, recipient_acknowledgement?: array}  $data
      */
     public function completeDelivery(Rider $rider, SellerOrder $sellerOrder, array $data): SellerOrder
     {
@@ -328,7 +328,11 @@ class RiderOperationsService
                 if ($proof === null) {
                     /** @var UploadedFile $photo */
                     $photo = $data['photo'];
-                    $storedPath = $photo->store('delivery-proofs/'.$order->id, 'local');
+                    $path = $photo->store('delivery-proofs/'.$order->id, 'local');
+                    if ($path === false) {
+                        throw ValidationException::withMessages(['proof_photo' => 'The proof photo could not be saved. Attach it again and retry.']);
+                    }
+                    $storedPath = $path;
 
                     DeliveryProof::query()->create([
                         'seller_order_id' => $order->id,
@@ -339,6 +343,9 @@ class RiderOperationsService
                         'photo_size' => $photo->getSize(),
                         'received_by' => $data['received_by'] ?? null,
                         'notes' => $data['notes'] ?? null,
+                        ...(! isset($data['recipient_acknowledgement']) ? [] : [
+                            'recipient_acknowledgement' => $data['recipient_acknowledgement'] + ['cod_collected' => $collectedPayment !== null],
+                        ]),
                         'submitted_at' => now(),
                     ]);
                 }
