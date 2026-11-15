@@ -49,9 +49,10 @@ Route::prefix('buyer')->name('buyer.')->group(function () {
     Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');
     Route::get('/search', [SearchController::class, 'index'])->name('search.index');
     Route::get('/search/suggestions', [SearchController::class, 'suggestions'])->name('search.suggestions');
-    Route::get('/pages/shipping-returns', [PageController::class, 'shippingReturns'])->name('pages.shipping-returns');
-    Route::get('/pages/privacy-policy', [PageController::class, 'privacyPolicy'])->name('pages.privacy-policy');
-    Route::get('/pages/terms-of-service', [PageController::class, 'termsOfService'])->name('pages.terms-of-service');
+    // Legacy policy URLs now redirect to the single versioned policy pages.
+    Route::redirect('/pages/shipping-returns', '/policies/buyer-protection', 301)->name('pages.shipping-returns');
+    Route::redirect('/pages/privacy-policy', '/policies/privacy-policy', 301)->name('pages.privacy-policy');
+    Route::redirect('/pages/terms-of-service', '/policies/terms-of-service', 301)->name('pages.terms-of-service');
     Route::get('/pages/about', [PageController::class, 'about'])->name('pages.about');
     Route::get('/pages/contact', [PageController::class, 'contact'])->name('pages.contact');
     // Help is public — the landing footer and guest shop both link here.
@@ -88,11 +89,14 @@ Route::prefix('buyer')->name('buyer.')->group(function () {
         Route::post('/checkout/buy-now', [CartController::class, 'buyNow'])->name('checkout.buy-now');
 
         Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
+        Route::get('/orders/{order}/review', [OrderController::class, 'review'])->name('orders.review');
         Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
         Route::post('/orders/{order}/seller-orders/{sellerOrder}/return', [OrderController::class, 'requestReturn'])
             ->name('orders.requestReturn');
         Route::post('/orders/{order}/seller-orders/{sellerOrder}/return/escalate', [OrderController::class, 'escalateReturn'])
             ->name('orders.escalateReturn');
+        Route::post('/orders/{order}/seller-orders/{sellerOrder}/return/cancel', [OrderController::class, 'cancelReturn'])
+            ->name('orders.cancelReturn');
         Route::post('/orders/{order}/confirm-received', [OrderController::class, 'confirmReceived'])->name('orders.confirmReceived');
         Route::post('/orders/{order}/seller-orders/{sellerOrder}/cancel', [OrderController::class, 'cancelSellerOrder'])
             ->name('orders.cancelSellerOrder');

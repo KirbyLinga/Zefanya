@@ -27,13 +27,13 @@
                                 <a href="{{ route('buyer.help.index') }}" class="text-primary-800 hover:text-primary-900 font-semibold">Help & FAQ</a>
                             </li>
                             <li>
-                                <a href="{{ route('buyer.pages.shipping-returns') }}" class="text-primary-800 hover:text-primary-900 font-semibold">Shipping & Returns</a>
+                                <a href="{{ route('policies.show', 'buyer-protection') }}" class="text-primary-800 hover:text-primary-900 font-semibold">Shipping & Returns</a>
                             </li>
                             <li>
-                                <a href="{{ route('buyer.pages.privacy-policy') }}" class="text-primary-800 hover:text-primary-900 font-semibold">Privacy Policy</a>
+                                <a href="{{ route('policies.show', 'privacy-policy') }}" class="text-primary-800 hover:text-primary-900 font-semibold">Privacy Policy</a>
                             </li>
                             <li>
-                                <a href="{{ route('buyer.pages.terms-of-service') }}" class="text-primary-800 hover:text-primary-900 font-semibold">Terms of Service</a>
+                                <a href="{{ route('policies.show', 'terms-of-service') }}" class="text-primary-800 hover:text-primary-900 font-semibold">Terms of Service</a>
                             </li>
                         </ul>
                     </section>

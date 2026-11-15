@@ -45,15 +45,15 @@
         <h4 class="mt-0 mb-3.5 text-[13px] font-semibold tracking-[0.03em] text-white">Help</h4>
         <ul class="m-0 flex list-none flex-col gap-[9px] p-0">
           <li><a href="{{ route('buyer.pages.contact') }}" class="text-[12.5px] text-buyer-footer-muted hover:text-white transition-colors">Contact us</a></li>
-          <li><a href="{{ route('buyer.pages.shipping-returns') }}" class="text-[12.5px] text-buyer-footer-muted hover:text-white transition-colors">Shipping & Returns</a></li>
+          <li><a href="{{ route('policies.show', 'buyer-protection') }}" class="text-[12.5px] text-buyer-footer-muted hover:text-white transition-colors">Shipping & Returns</a></li>
           <li><a href="{{ route('buyer.help.index') }}" class="text-[12.5px] text-buyer-footer-muted hover:text-white transition-colors">Help & Support</a></li>
         </ul>
       </div>
       <div>
         <h4 class="mt-0 mb-3.5 text-[13px] font-semibold tracking-[0.03em] text-white">Legal</h4>
         <ul class="m-0 flex list-none flex-col gap-[9px] p-0">
-          <li><a href="{{ route('buyer.pages.privacy-policy') }}" class="text-[12.5px] text-buyer-footer-muted hover:text-white transition-colors">Privacy Policy</a></li>
-          <li><a href="{{ route('buyer.pages.terms-of-service') }}" class="text-[12.5px] text-buyer-footer-muted hover:text-white transition-colors">Terms of Service</a></li>
+          <li><a href="{{ route('policies.show', 'privacy-policy') }}" class="text-[12.5px] text-buyer-footer-muted hover:text-white transition-colors">Privacy Policy</a></li>
+          <li><a href="{{ route('policies.show', 'terms-of-service') }}" class="text-[12.5px] text-buyer-footer-muted hover:text-white transition-colors">Terms of Service</a></li>
         </ul>
       </div>
     </div>

@@ -1,6 +1,7 @@
 @extends('Layouts.seller')
 @section('title', 'Payout Requests')
 @section('content')
+@include('Policies._links', ['context' => 'seller-finance'])
 <div class="space-y-6">
     <div>
         <div class="flex flex-wrap items-center justify-between gap-3">

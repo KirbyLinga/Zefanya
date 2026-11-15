@@ -4,7 +4,7 @@
 @php
     $faqs = [
         ['How do I track my order?', 'Open My Orders and choose the order. Each Seller\'s parcel has its own status and timeline, with the steps recorded so far.'],
-        ['How do I pay?', 'Zefanya uses cash on delivery (COD). Pay the Rider when your parcel arrives, then give them the delivery code shown on your order page. Share the code only with the Rider at your door.'],
+        ['How do I pay?', 'Zefanya uses cash on delivery (COD). Pay the Rider when your parcel arrives.'],
         ['How much is shipping? Can I use vouchers?', 'Shipping is calculated at checkout from the route and parcel weight. Vouchers are applied in your cart. A shipping voucher reduces the shipping fee. Shop and platform vouchers give the discount stated on the voucher. There is no automatic free shipping.'],
         ['How do I request a return?', 'Open the order in My Orders and choose the parcel. If the item is defective, damaged, wrong or not as described, request a return with the reason, a short description and photos.'],
         ['How long do I have to request a return?', 'The standard in-app window is seven days from delivery, while the shipment is not yet completed. If you do not confirm receipt, the shipment completes automatically after seven days. This window does not remove any rights you have under Philippine consumer law.'],
@@ -57,16 +57,16 @@
                 <section class="rounded-2xl bg-white border border-buyer-line p-6" aria-labelledby="resources-heading">
                     <h2 id="resources-heading" class="font-serif text-[18px] text-buyer-ink mb-4">Resources</h2>
                     <div class="space-y-2">
-                        <a href="{{ route('buyer.pages.shipping-returns') }}" class="block text-[13px] font-semibold text-primary-800 hover:text-primary-900">
+                        <a href="{{ route('policies.show', 'buyer-protection') }}" class="block text-[13px] font-semibold text-primary-800 hover:text-primary-900">
                             Shipping & Returns →
                         </a>
-                        <a href="{{ route('buyer.pages.privacy-policy') }}" class="block text-[13px] font-semibold text-primary-800 hover:text-primary-900">
+                        <a href="{{ route('policies.show', 'privacy-policy') }}" class="block text-[13px] font-semibold text-primary-800 hover:text-primary-900">
                             Privacy Policy →
                         </a>
-                        <a href="{{ route('buyer.pages.terms-of-service') }}" class="block text-[13px] font-semibold text-primary-800 hover:text-primary-900">
+                        <a href="{{ route('policies.show', 'terms-of-service') }}" class="block text-[13px] font-semibold text-primary-800 hover:text-primary-900">
                             Terms of Service →
                         </a>
-                        <a href="{{ route('buyer.pages.terms-of-service') }}#buyers" class="block text-[13px] font-semibold text-primary-800 hover:text-primary-900">
+                        <a href="{{ route('policies.show', 'terms-of-service') }}" class="block text-[13px] font-semibold text-primary-800 hover:text-primary-900">
                             Buyer terms and protection →
                         </a>
                     </div>

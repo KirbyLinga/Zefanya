@@ -139,9 +139,6 @@ class HomepageTest extends TestCase
     public function test_all_page_routes_exist(): void
     {
         $pages = [
-            'shipping-returns',
-            'privacy-policy',
-            'terms-of-service',
             'about',
             'contact',
         ];
@@ -150,6 +147,13 @@ class HomepageTest extends TestCase
             $this->get(route('buyer.pages.'.$page))
                 ->assertOk();
         }
+    }
+
+    public function test_legacy_policy_urls_redirect_to_the_versioned_policy_pages(): void
+    {
+        $this->get(route('buyer.pages.privacy-policy'))->assertRedirect('/policies/privacy-policy')->assertStatus(301);
+        $this->get(route('buyer.pages.terms-of-service'))->assertRedirect('/policies/terms-of-service');
+        $this->get(route('buyer.pages.shipping-returns'))->assertRedirect('/policies/buyer-protection');
     }
 
     public function test_guest_cannot_access_wishlist_page(): void

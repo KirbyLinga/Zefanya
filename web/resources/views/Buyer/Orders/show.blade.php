@@ -10,6 +10,7 @@
 @php($overallStatus = $order->computeRollupStatus())
     <div class="bg-[var(--bg-page)] py-8 sm:py-10">
         <div class="mx-auto w-full max-w-[1240px] break-words px-4 sm:px-6 lg:px-8">
+            @include('Policies._links', ['context' => 'buyer-order'])
             <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div class="min-w-0">
                     <p class="mb-2 font-sans text-sm font-semibold text-[var(--brand)]">Order details</p>
@@ -102,19 +103,6 @@
                                     </button>
                                 @endif
                             </div>
-                            @if ($sellerOrder->status === \App\Enums\OrderStatus::OutForDelivery)
-                                @php($deliveryCode = $deliveryCodes[$sellerOrder->id] ?? null)
-                                <div class="mb-5 rounded-xl border border-primary-200 bg-primary-50 p-4">
-                                    <h3 class="font-sans text-sm font-semibold text-primary-900">Delivery code</h3>
-                                    @if ($deliveryCode)
-                                        <p class="mt-2 font-mono text-3xl font-semibold tracking-widest text-primary-900">{{ $deliveryCode['code'] }}</p>
-                                        <p class="mt-2 text-xs leading-relaxed text-[var(--text-ink)]">Give this code to your rider only after you have your parcel and have checked any cash payment. It expires at {{ $deliveryCode['expires_at']->timezone('Asia/Manila')->format('g:i A') }}.</p>
-                                    @else
-                                        <p class="mt-1 text-xs leading-relaxed text-[var(--text-ink)]">When your rider arrives, they will request a code and it will appear here.</p>
-                                        <a href="{{ route('buyer.orders.show', $order) }}" class="mt-2 inline-block text-xs font-semibold text-primary-900 underline">Refresh this page</a>
-                                    @endif
-                                </div>
-                            @endif
                             <x-shipment-tracking :shipment="$sellerOrder" buyer-facing />
                             <details class="group mt-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3">
                                 <summary class="flex min-h-9 cursor-pointer items-center justify-between gap-3 rounded-md px-1 text-xs font-semibold text-[var(--link)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--link)]">

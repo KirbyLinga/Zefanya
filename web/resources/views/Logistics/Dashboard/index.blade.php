@@ -3,6 +3,7 @@
 @section('title', 'Dashboard')
 
 @section('content')
+@include('Policies._links', ['context' => 'logistics'])
     @php
         $quietAction = 'inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-[7px] border border-[var(--border-btn-outline)] bg-[var(--bg-surface)] px-3 font-sans text-xs font-semibold text-[var(--text-ink)] no-underline shadow-sm transition-colors hover:bg-[var(--bg-raised)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700';
         $waitingQueues = collect($actionQueues)->where('count', '>', 0);

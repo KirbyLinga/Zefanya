@@ -182,12 +182,12 @@
                                class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded-sm border-neutral-300 text-[#9c5c68] accent-[#9c5c68] focus:ring-2 focus:ring-[#E2B4BD]/30">
                         <p class="font-sans text-xs leading-5 text-neutral-700">
                             <label for="buyerTerms" class="cursor-pointer">I agree to the</label>
-                            <a href="{{ Route::has('buyer.pages.terms-of-service') ? route('buyer.pages.terms-of-service').'#buyers' : '#' }}"
+                            <a href="{{ route('policies.show', 'terms-of-service') }}"
                                target="_blank"
                                rel="noopener noreferrer"
-                               class="font-semibold text-[#9c5c68] underline-offset-2 hover:underline">Terms of Service for Buyers</a>
-                            <label for="buyerTerms" class="cursor-pointer">and</label>
-                            <a href="{{ Route::has('buyer.pages.privacy-policy') ? route('buyer.pages.privacy-policy') : '#' }}"
+                               class="font-semibold text-[#9c5c68] underline-offset-2 hover:underline">Terms of Service</a>
+                            <label for="buyerTerms" class="cursor-pointer">and have read the</label>
+                            <a href="{{ route('policies.show', 'privacy-policy') }}"
                                target="_blank"
                                rel="noopener noreferrer"
                                class="font-semibold text-[#9c5c68] underline-offset-2 hover:underline">Privacy Policy</a>.

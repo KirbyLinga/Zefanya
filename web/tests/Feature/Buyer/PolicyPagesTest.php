@@ -29,9 +29,6 @@ class PolicyPagesTest extends TestCase
     public static function pages(): array
     {
         return [
-            'shipping and returns' => ['buyer.pages.shipping-returns', ['within seven days of delivery', 'three days', 'review a rejection once', 'Cash on delivery', 'does not remove any rights']],
-            'privacy policy' => ['buyer.pages.privacy-policy', ['Republic Act No. 10173', 'Logistics Providers:', 'Riders:', 'Delivery evidence:', 'Financial records:', 'National Privacy Commission', 'Deleted buyer']],
-            'terms of service' => ['buyer.pages.terms-of-service', ['Buyer terms and protection', 'Seller terms and protection', 'Logistics Provider agreement', 'Rider code of conduct', 'Disputes and account enforcement', 'no automatic fraud score']],
             'help' => ['buyer.help.index', ['My Orders', 'seven days from delivery', 'review the rejection once', 'cash on delivery', 'support@zefanya.shop']],
             'contact' => ['buyer.pages.contact', ['support@zefanya.shop', 'Go to My Orders']],
             'about' => ['buyer.pages.about', ['within 7 days of delivery']],
@@ -52,31 +49,19 @@ class PolicyPagesTest extends TestCase
         }
     }
 
-    public function test_terms_has_a_table_of_contents_with_a_target_for_every_role(): void
-    {
-        $html = $this->get(route('buyer.pages.terms-of-service'))->assertOk()->getContent();
-
-        foreach (['general', 'buyers', 'sellers', 'logistics', 'riders', 'disputes', 'contact'] as $anchor) {
-            $this->assertStringContainsString('id="'.$anchor.'"', $html);
-            $this->assertStringContainsString('href="#'.$anchor.'"', $html);
-        }
-        $this->assertStringContainsString('aria-label="On this page"', $html);
-    }
-
-    public function test_each_registration_form_links_its_own_terms_section_and_the_privacy_policy(): void
+    public function test_each_registration_form_links_its_own_policy_and_the_privacy_policy(): void
     {
         $html = $this->get(route('register.type'))->assertOk()->getContent();
-        $terms = route('buyer.pages.terms-of-service');
 
         foreach ([
-            'buyers' => 'Terms of Service for Buyers',
-            'sellers' => 'Terms of Service for Sellers',
-            'logistics' => 'Logistics Provider Agreement',
-            'riders' => 'Rider Terms and Code of Conduct',
-        ] as $anchor => $label) {
-            $this->assertMatchesRegularExpression('#href="'.preg_quote($terms.'#'.$anchor, '#').'"[^>]*>'.preg_quote($label, '#').'</a>#', $html, $label);
+            'terms-of-service' => 'Terms of Service',
+            'seller-agreement' => 'Seller Agreement',
+            'logistics-agreement' => 'Logistics Provider Agreement',
+            'rider-courier-rules' => 'Rider and Transport Courier Rules',
+        ] as $slug => $label) {
+            $this->assertMatchesRegularExpression('#href="'.preg_quote(route('policies.show', $slug), '#').'"[^>]*>'.preg_quote($label, '#').'</a>#', $html, $label);
         }
-        $this->assertGreaterThanOrEqual(4, substr_count($html, 'href="'.route('buyer.pages.privacy-policy').'"'));
+        $this->assertGreaterThanOrEqual(4, substr_count($html, 'href="'.route('policies.show', 'privacy-policy').'"'));
         // The acceptance checkboxes are unchanged.
         foreach (['buyerTerms', 'sellerTerms', 'logisticsTerms', 'riderTerms'] as $checkbox) {
             $this->assertStringContainsString('id="'.$checkbox.'"', $html);

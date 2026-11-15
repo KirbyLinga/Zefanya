@@ -3,6 +3,7 @@
 @section('title', 'Store Profile')
 
 @section('content')
+@include('Policies._links', ['context' => 'seller-account'])
 @php
     $value = function (string $field) use ($seller) {
         $value = old($field, $seller->{$field});

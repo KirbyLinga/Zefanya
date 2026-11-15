@@ -37,6 +37,13 @@ use Illuminate\Support\Facades\Route;
  * asserts the token has the buyer ability.
  * -------------------------------------------------------------------------- */
 
+// Public policy content for the mobile apps. No token; internal documents are never listed.
+Route::middleware('throttle:120,1')->prefix('policies')->name('api.policies.')->group(function (): void {
+    Route::get('/', [\App\Http\Controllers\PolicyController::class, 'index'])->name('index');
+    Route::get('/{slug}', [\App\Http\Controllers\PolicyController::class, 'showJson'])
+        ->where('slug', '[a-z0-9-]+')->name('show');
+});
+
 // Guests authenticate with these routes; NO token required.
 Route::prefix('buyer')->name('api.buyer.')->group(function (): void {
     Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:api-login')->name('login');
@@ -133,7 +140,7 @@ Route::prefix('rider')->name('api.rider.')->group(function (): void {
 Route::prefix('rider')->name('api.rider.')->group(function (): void {
     // Open to a rider in an Admin-granted wind-down as well: the same set the
     // web's EnsureRiderActive allows (account, deliveries out for delivery,
-    // scan, proof/OTP, failed delivery, money, notifications, incidents). The
+    // scan, proof of delivery, failed delivery, money, notifications, incidents). The
     // services still refuse anything but finishing a parcel already out.
     Route::middleware(['auth:sanctum', 'api.role:rider,wind-down'])->group(function (): void {
         Route::get('/profile', [RiderProfileController::class, 'index'])->name('profile');
@@ -153,9 +160,6 @@ Route::prefix('rider')->name('api.rider.')->group(function (): void {
             Route::post('/deliveries/{sellerOrder}/failed', [RiderParcelActionController::class, 'failDelivery'])->name('deliveries.failed');
             Route::post('/jobs/{sellerOrder}/incidents', [RiderIncidentController::class, 'store'])->name('jobs.incidents.store');
         });
-        // Same limit as the web route: the buyer receives a new code each time.
-        Route::post('/deliveries/{sellerOrder}/otp', [RiderParcelActionController::class, 'sendOtp'])
-            ->middleware('throttle:5,1')->name('deliveries.otp');
     });
 
     // Fully operational riders only.

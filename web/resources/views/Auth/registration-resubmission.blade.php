@@ -73,7 +73,7 @@
                 @endforeach
             </div>
         </section>
-        <label class="flex items-start gap-3 font-sans text-sm"><input type="checkbox" name="terms" value="1" required class="mt-1"><span>I confirm these corrected details and accept the <a href="{{ route('buyer.pages.terms-of-service') }}" class="underline">Terms of Service</a>.</span></label>
+        <label class="flex items-start gap-3 font-sans text-sm"><input type="checkbox" name="terms" value="1" required class="mt-1"><span>I confirm these corrected details and accept the <a href="{{ route('policies.show', 'terms-of-service') }}" class="underline">Terms of Service</a>.</span></label>
         <button type="submit" class="rounded-sm bg-primary-800 px-6 py-3 font-sans text-sm font-semibold text-white">Resubmit for review</button>
         <p id="resubmissionLookupError" role="alert" class="font-sans text-sm text-primary-800"></p>
     </form>

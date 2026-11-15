@@ -49,6 +49,7 @@ Route::middleware('auth:admin')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::middleware('admin.role:admin')->group(function (): void {
+        Route::get('/policies/internal-sop', [\App\Http\Controllers\PolicyController::class, 'internal'])->name('policies.internal-sop');
         Route::get('/settings', [PlatformSettingController::class, 'index'])->name('settings.index');
         Route::patch('/settings/{platformSetting}', [PlatformSettingController::class, 'update'])->name('settings.update');
         // Read-only on purpose: the audit log has no edit or delete routes.

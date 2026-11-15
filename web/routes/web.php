@@ -18,6 +18,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingPageController::class, 'index'])->name('home');
 
+// Public policy pages (readable without login). Content: config/policies.php + docs/Policy.
+Route::get('/policies/{slug}', [\App\Http\Controllers\PolicyController::class, 'show'])
+    ->where('slug', '[a-z0-9-]+')->name('policies.show');
+
 // Guest-only auth surfaces: any signed-in role is redirected to their dashboard.
 // Logout stays outside this group.
 Route::middleware('guest.role')->group(function (): void {

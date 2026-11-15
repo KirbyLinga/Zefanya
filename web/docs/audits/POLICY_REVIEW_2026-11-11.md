@@ -76,3 +76,8 @@ Scope: Privacy Policy, Terms of Service (with Buyer, Seller, Logistics and Rider
 - ITA IRR (JAO 24-03), DTI — https://dti.gov.ph/sdm_downloads/implementing-rules-and-regulations-of-the-internet-transactions-act-of-2023
 - RA 7394 Consumer Act — https://lawphil.net/statutes/repacts/ra1992/ra_7394_1992.html
 - DPA IRR, as amended (NPC) — https://privacy.gov.ph/wp-content/uploads/2023/06/IRR_RA-10173-as-amended.pdf
+
+## 7. Post-review implementation update (2026-11-15)
+
+- Buyer delivery OTP was removed from Rider web and mobile completion, buyer order pages, shipment API, notifications, service layer and storage. Delivery completion still uses the rider handoff scan, required photo proof and exact COD collection when applicable. Registration and account-security OTP remain in place.
+- Database cleanup is provided by `2026_11_15_000000_drop_delivery_otps_table`; it has not been applied to a database in this work session. Findings above describe the 2026-11-11 audit snapshot.

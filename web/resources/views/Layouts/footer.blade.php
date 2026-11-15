@@ -56,7 +56,7 @@
                     <h4 class="m-0 font-sans text-xs font-semibold uppercase leading-[14.4px] tracking-[1.2px] text-neutral-950">Customer Service</h4>
                     <ul class="m-0 flex list-none flex-col gap-3 p-0">
                         <li><a href="{{ route('buyer.help.index') }}" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Help Center</a></li>
-                        <li><a href="{{ route('buyer.pages.shipping-returns') }}" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Return &amp; Refund</a></li>
+                        <li><a href="{{ route('policies.show', 'buyer-protection') }}" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Return &amp; Refund</a></li>
                         <li><a href="{{ route('buyer.pages.contact') }}" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Contact Us</a></li>
                     </ul>
                 </div>
@@ -65,8 +65,8 @@
                     <h4 class="m-0 font-sans text-xs font-semibold uppercase leading-[14.4px] tracking-[1.2px] text-neutral-950">About Zefanya</h4>
                     <ul class="m-0 flex list-none flex-col gap-3 p-0">
                         <li><a href="{{ route('buyer.pages.about') }}" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">About Us</a></li>
-                        <li><a href="{{ route('buyer.pages.privacy-policy') }}" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Privacy Policy</a></li>
-                        <li><a href="{{ route('buyer.pages.terms-of-service') }}" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Terms of Service</a></li>
+                        <li><a href="{{ route('policies.show', 'privacy-policy') }}" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Privacy Policy</a></li>
+                        <li><a href="{{ route('policies.show', 'terms-of-service') }}" class="font-sans text-[15px] leading-[22px] text-muted-ink transition-colors duration-150 hover:text-primary-800">Terms of Service</a></li>
                     </ul>
                 </div>
 

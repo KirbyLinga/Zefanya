@@ -359,9 +359,9 @@
                                 <span data-checkout-place-label class="text-white">Place Order — ₱{{ number_format(($payableTotalMinor ?? $summary->totalCentavos) / 100, 2) }}</span>
                             </button>
 
-                            <p class="mt-3 text-center text-[11px] text-buyer-ink-soft">
-                                By placing your order, you agree to our Terms of Service and Privacy Policy.
-                            </p>
+                            <div class="mt-4">
+                                @include('Policies._links', ['context' => 'checkout'])
+                            </div>
                         </div>
                     </div>
                 </form>

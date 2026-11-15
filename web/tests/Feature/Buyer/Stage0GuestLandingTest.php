@@ -42,10 +42,10 @@ class Stage0GuestLandingTest extends TestCase
         $html = $this->get(route('register.type'))->assertOk()->getContent();
 
         $this->assertStringContainsString(route('buyer.help.index', absolute: false), $html);
-        $this->assertStringContainsString(route('buyer.pages.privacy-policy', absolute: false), $html);
-        $this->assertStringContainsString(route('buyer.pages.terms-of-service', absolute: false), $html);
+        $this->assertStringContainsString(route('policies.show', 'privacy-policy', absolute: false), $html);
+        $this->assertStringContainsString(route('policies.show', 'terms-of-service', absolute: false), $html);
         $this->assertStringContainsString(route('buyer.pages.contact', absolute: false), $html);
-        $this->assertStringContainsString(route('buyer.pages.shipping-returns', absolute: false), $html);
+        $this->assertStringContainsString(route('policies.show', 'buyer-protection', absolute: false), $html);
     }
 
     public function test_categories_index_renders_category_grid(): void
