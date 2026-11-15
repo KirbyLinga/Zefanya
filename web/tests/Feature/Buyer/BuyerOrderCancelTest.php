@@ -293,7 +293,7 @@ class BuyerOrderCancelTest extends TestCase
 
         $this->actingAs($buyer, 'buyer')
             ->postJson(route('buyer.orders.cancelSellerOrder', [$order, $soA]), [
-                'reason' => 'Only cancel A',
+                'reason' => 'Changed my mind',
             ])
             ->assertOk();
 
@@ -318,7 +318,7 @@ class BuyerOrderCancelTest extends TestCase
             ->assertDontSee(route('buyer.orders.cancelSellerOrder', [$order, $soB]), false);
 
         $this->actingAs($buyer, 'buyer')
-            ->postJson(route('buyer.orders.cancelSellerOrder', [$order, $soB]), ['reason' => 'Too late'])
+            ->postJson(route('buyer.orders.cancelSellerOrder', [$order, $soB]), ['reason' => 'Changed my mind'])
             ->assertStatus(409);
         $this->assertSame(OrderStatus::Confirmed, $soB->fresh()->status);
     }

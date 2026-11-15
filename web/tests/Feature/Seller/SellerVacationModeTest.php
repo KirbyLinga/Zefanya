@@ -232,10 +232,11 @@ class SellerVacationModeTest extends TestCase
         app(SellerVacationService::class)->set($vacation, true);
         $this->actingAs($buyer, 'buyer')->get(route('buyer.cart.index'))->assertViewHas('summary', fn ($summary) => $summary->subtotalCentavos === 20000 && $summary->unavailableItems->contains('id', $line->id));
         $this->get(route('buyer.checkout.index', ['items' => [$line->id, $openLine->id]]))->assertRedirect(route('buyer.cart.index'))->assertSessionHas('error', Seller::VACATION_MESSAGE);
-        $this->get(route('buyer.checkout.index', ['items' => [$openLine->id]]))->assertOk();
-        $token = CheckoutToken::issue($buyer->id);
-        $this->withSession([CheckoutController::SESSION_KEY => [$openLine->id]])->post(route('buyer.checkout.store'), [
-            'checkout_token' => $token->token, ...$this->checkoutCarrierPayload([$open]),
+        $page = $this->get(route('buyer.checkout.index', ['items' => [$openLine->id]]))->assertOk();
+        // Submit the token bound to the actual reviewed page, not a replacement token.
+        $token = $page->viewData('checkoutToken');
+        $this->post(route('buyer.checkout.store'), [
+            'checkout_token' => $token, ...$this->checkoutCarrierPayload([$open]),
         ])->assertSessionMissing('error');
         $this->assertSame([$open->id], Order::query()->sole()->sellerOrders()->pluck('seller_id')->all());
         $this->assertSame(5, $variant->fresh()->stock_quantity);

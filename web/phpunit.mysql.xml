@@ -6,8 +6,15 @@
   <testsuite name="Isolated MySQL concurrency">
    <file>tests/MySql/CheckoutConcurrencyTest.php</file>
    <file>tests/MySql/SellerVacationConcurrencyTest.php</file>
+   <file>tests/MySql/SellerPayoutConcurrencyTest.php</file>
+   <file>tests/MySql/RiderPayoutConcurrencyTest.php</file>
+   <file>tests/MySql/CodRemittanceConcurrencyTest.php</file>
+   <file>tests/MySql/FinancialCalculationConcurrencyTest.php</file>
    <file>tests/MySql/InventoryOversellingConcurrencyTest.php</file>
    <file>tests/MySql/LowStockAlertConcurrencyTest.php</file>
+   <file>tests/MySql/DemoNetworkSeedersTest.php</file>
+   <file>tests/MySql/DemoMarketplaceTest.php</file>
+   <file>tests/MySql/DeliveryScenarioSeederTest.php</file>
   </testsuite>
  </testsuites>
  <php>

@@ -22,13 +22,7 @@
                     </p>
                 </div>
 
-                {{-- Success Message --}}
-                @if (session('success'))
-                    <div class="mb-6 flex items-center gap-2.5 rounded-lg border border-[var(--pill-success-border)] bg-[var(--pill-success-bg)] px-3.5 py-2.5 font-sans text-[12.5px] font-medium text-[var(--status-success)]" role="status">
-                        <i data-lucide="check-circle-2" width="15" height="15" class="shrink-0"></i>
-                        <span class="text-[var(--status-success)]">{{ session('success') }}</span>
-                    </div>
-                @endif
+                <x-flash type="success" :message="session('success')" spacing="mb-6" />
 
                 {{-- Settings Sections --}}
                 <div class="space-y-6">
@@ -245,12 +239,19 @@
                 <label for="password" class="block font-sans text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-2">
                     Confirm your password
                 </label>
-                <input type="password"
-                       name="password"
-                       id="password"
-                       placeholder="Enter your password"
-                       required
-                       class="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-3.5 py-2.5 font-sans text-[13px] text-[var(--text-ink)] outline-none transition-colors placeholder:text-[var(--text-placeholder)] focus:border-red-400 focus:ring-2 focus:ring-red-200">
+                <div class="relative">
+                    <input type="password"
+                           name="password"
+                           id="password"
+                           placeholder="Enter your password"
+                           required
+                           autocomplete="current-password"
+                           class="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-3.5 py-2.5 pr-10 font-sans text-[13px] text-[var(--text-ink)] outline-none transition-colors placeholder:text-[var(--text-placeholder)] focus:border-red-400 focus:ring-2 focus:ring-red-200">
+                    <button type="button" data-toggle-visibility="password" aria-label="Show password" aria-pressed="false" aria-controls="password"
+                            class="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-ink)]">
+                        <i data-lucide="eye" width="16" height="16"></i>
+                    </button>
+                </div>
             @else
                 <label for="confirm_email" class="block font-sans text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-2">
                     Type your email to confirm
@@ -301,4 +302,7 @@
     <script>document.getElementById('deleteAccountModal').showModal();</script>
 @endif
 
+@push('scripts')
+    @include('Components.password-toggle-script')
+@endpush
 @endsection

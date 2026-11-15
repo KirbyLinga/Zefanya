@@ -28,7 +28,7 @@ class BuyerWorkflowGuidanceTest extends TestCase
 
         $this->actingAs($parcel->seller, 'seller')->get(route('seller.orders.show', $parcel))
             ->assertOk()->assertSeeText('Sorted')
-            ->assertSeeTextInOrder(['Order placed', 'Ready for pickup', 'In transit', 'Delivered', 'Completed']);
+            ->assertSeeTextInOrder(['Order placed', 'Pickup Requested', 'In transit', 'Delivered', 'Completed']);
     }
 
     public function test_unknown_shipment_filter_falls_back_to_all_shipments(): void

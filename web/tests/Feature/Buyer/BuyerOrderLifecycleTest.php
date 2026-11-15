@@ -347,7 +347,7 @@ class BuyerOrderLifecycleTest extends TestCase
 
     // ── COD settlement ───────────────────────────────────────────────────
 
-    public function test_cod_payment_is_settled_when_buyer_confirms_received(): void
+    public function test_buyer_receipt_does_not_settle_cod_without_collection_evidence(): void
     {
         $order = $this->fullOrder();
         $so = $order->sellerOrders->first();
@@ -361,8 +361,7 @@ class BuyerOrderLifecycleTest extends TestCase
         $this->assertSame(PaymentStatus::Pending, $payment->status);
         $this->assertNull($payment->paid_at);
 
-        // Set the seller_order to Delivered (bypass the full pipeline —
-        // we are testing the COD-settlement-on-confirm path, not the courier flow).
+        // A delivered status alone supplies no evidence of cash collection.
         $so->forceFill(['status' => OrderStatus::Delivered->value])->save();
 
         $this->actingAs($this->buyer, 'buyer')
@@ -371,8 +370,10 @@ class BuyerOrderLifecycleTest extends TestCase
             ->assertSessionHas('success');
 
         $payment = $payment->fresh();
-        $this->assertSame(PaymentStatus::Paid, $payment->status);
-        $this->assertNotNull($payment->paid_at);
+        $this->assertSame(OrderStatus::Completed, $so->fresh()->status);
+        $this->assertSame(PaymentStatus::Pending, $payment->status);
+        $this->assertNull($payment->paid_at);
+        $this->assertNull($payment->collected_at);
     }
 
     public function test_cod_payment_not_re_settled_when_already_paid(): void
@@ -407,11 +408,8 @@ class BuyerOrderLifecycleTest extends TestCase
         $this->assertEqualsWithDelta($paidAt->timestamp, $payment->fresh()->paid_at->timestamp, 1, 'paid_at unchanged');
     }
 
-    public function test_cod_payment_not_settled_for_non_cod_method_if_any(): void
+    public function test_buyer_receipt_does_not_settle_a_mismatched_collection_snapshot(): void
     {
-        // The only PaymentMethod is Cod; this test documents that the service
-        // only settles payments that are currently Pending (guard against
-        // future payment methods that may have different settlement rules).
         $order = $this->fullOrder();
         $so = $order->sellerOrders->first();
 
@@ -420,6 +418,8 @@ class BuyerOrderLifecycleTest extends TestCase
             'amount_minor' => $so->subtotal_minor,
             'method' => PaymentMethod::Cod->value,
             'status' => PaymentStatus::Pending->value,
+            'collected_at' => now(),
+            'collected_amount_minor' => $so->subtotal_minor - 1,
         ]);
 
         $so->forceFill(['status' => OrderStatus::Delivered->value])->save();
@@ -429,7 +429,8 @@ class BuyerOrderLifecycleTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertSame(PaymentStatus::Paid, $payment->fresh()->status);
+        $this->assertSame(PaymentStatus::Pending, $payment->fresh()->status);
+        $this->assertNull($payment->fresh()->paid_at);
     }
 
     // ── Two-seller rollup (OutForDelivery + Delivered) ───────────────────
@@ -465,9 +466,9 @@ class BuyerOrderLifecycleTest extends TestCase
         $this->assertSame(OrderStatus::Delivered, $order->fresh()->status);
     }
 
-    // ── Mixed Completed + Delivered: confirm + settle all payments ──────
+    // ── Mixed Completed + Delivered ─────────────────────────────────────
 
-    public function test_mixed_completed_and_delivered_confirms_and_settles_all_payments(): void
+    public function test_mixed_completed_and_delivered_confirms_receipt_and_preserves_payment_evidence(): void
     {
         $order = Order::factory()->create(['buyer_id' => $this->buyer->id]);
 
@@ -505,7 +506,8 @@ class BuyerOrderLifecycleTest extends TestCase
 
         $this->assertSame(OrderStatus::Completed, $soA->fresh()->status);
         $this->assertSame(OrderStatus::Completed, $soB->fresh()->status);
-        $this->assertSame(PaymentStatus::Paid, $paymentB->fresh()->status);
+        $this->assertSame(PaymentStatus::Pending, $paymentB->fresh()->status);
+        $this->assertNull($paymentB->fresh()->paid_at);
         $this->assertSame(PaymentStatus::Paid, $soA->payment->fresh()->status);
         $this->assertSame(OrderStatus::Completed, $order->fresh()->status);
     }
@@ -557,7 +559,7 @@ class BuyerOrderLifecycleTest extends TestCase
         $this->assertDatabaseCount('status_histories', $historyCount);
     }
 
-    public function test_cod_payment_settled_on_delivered_transition(): void
+    public function test_delivered_transition_reconciles_an_exact_pending_cod_snapshot(): void
     {
         $order = $this->fullOrder();
         $so = $order->sellerOrders->first();
@@ -565,6 +567,10 @@ class BuyerOrderLifecycleTest extends TestCase
         $payment = Payment::factory()->create([
             'seller_order_id' => $so->id,
             'amount_minor' => $so->subtotal_minor,
+            'collected_at' => now(),
+            'collected_amount_minor' => $so->subtotal_minor,
+            'collected_by_type' => 'rider',
+            'collected_by_id' => 1,
         ]);
 
         $this->assertSame(PaymentStatus::Pending, $payment->status);
@@ -582,7 +588,6 @@ class BuyerOrderLifecycleTest extends TestCase
             source: 'web',
         );
 
-        // COD settled at the door (Delivered), not at confirmation.
         $this->assertSame(PaymentStatus::Paid, $payment->fresh()->status);
         $this->assertNotNull($payment->fresh()->paid_at);
     }
@@ -597,7 +602,9 @@ class BuyerOrderLifecycleTest extends TestCase
             'amount_minor' => $so->subtotal_minor,
         ]);
 
-        // Delivered — settles COD.
+        $payment->recordCodCollection($payment->amount_minor, 'rider', 1);
+        $paidAt = $payment->fresh()->paid_at;
+
         $so->forceFill(['status' => OrderStatus::OutForDelivery->value])->save();
 
         $service = new SellerOrderStatusService;
@@ -610,7 +617,7 @@ class BuyerOrderLifecycleTest extends TestCase
 
         $payment->refresh();
         $this->assertSame(PaymentStatus::Paid, $payment->status);
-        $paidAt = $payment->paid_at;
+        $this->assertEquals($paidAt, $payment->paid_at);
 
         // Completed — must NOT overwrite paid_at.
         $service->transition(
@@ -685,6 +692,10 @@ class BuyerOrderLifecycleTest extends TestCase
         $payment = Payment::factory()->create([
             'seller_order_id' => $so->id,
             'amount_minor' => $so->subtotal_minor,
+            'collected_at' => now(),
+            'collected_amount_minor' => $so->subtotal_minor,
+            'collected_by_type' => 'rider',
+            'collected_by_id' => 1,
         ]);
 
         $so->forceFill(['status' => OrderStatus::Delivered->value])->save();

@@ -124,7 +124,8 @@ class _FlightLayer extends StatefulWidget {
   State<_FlightLayer> createState() => _FlightLayerState();
 }
 
-class _FlightLayerState extends State<_FlightLayer> with SingleTickerProviderStateMixin {
+class _FlightLayerState extends State<_FlightLayer>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 620),
@@ -170,6 +171,9 @@ class _FlightLayerState extends State<_FlightLayer> with SingleTickerProviderSta
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
+      // Stable key for the integration test: the overlay is the one place
+      // the flight exists, so finding it proves the arc actually started.
+      key: const ValueKey('cart-flight-layer'),
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, child) {
@@ -218,7 +222,8 @@ class CartAnchor extends StatefulWidget {
   State<CartAnchor> createState() => _CartAnchorState();
 }
 
-class _CartAnchorState extends State<CartAnchor> with SingleTickerProviderStateMixin {
+class _CartAnchorState extends State<CartAnchor>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 460),
@@ -255,7 +260,9 @@ class _CartAnchorState extends State<CartAnchor> with SingleTickerProviderStateM
         builder: (context, child) {
           // 1 -> 1.32 -> 1, with a little elastic settle on the way back.
           final t = _controller.value;
-          final scale = t == 0 ? 1.0 : 1 + 0.32 * math.sin(t * math.pi) * (1 - t * 0.35);
+          final scale = t == 0
+              ? 1.0
+              : 1 + 0.32 * math.sin(t * math.pi) * (1 - t * 0.35);
           return Transform.scale(scale: scale, child: child);
         },
         child: widget.child,

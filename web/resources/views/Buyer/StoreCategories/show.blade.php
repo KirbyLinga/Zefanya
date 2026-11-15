@@ -82,7 +82,7 @@
                             </span>
                             <span class="inline-flex items-center gap-1.5">
                                 <i data-lucide="calendar-days" width="14" height="14"></i>
-                                Joined {{ $seller->created_at?->format('M Y') ?? '—' }}
+                                Joined {{ manila($seller->created_at, 'M Y', '—') }}
                             </span>
                         </div>
 
@@ -156,7 +156,7 @@
                     </div>
                     <div class="col-span-2 bg-white px-4 py-4 text-center sm:col-span-1">
                         <dt class="text-[11px] font-semibold uppercase tracking-[0.08em] text-buyer-ink-soft">Joined</dt>
-                        <dd class="mt-1 font-serif text-xl font-semibold text-buyer-ink">{{ $seller->created_at?->format('M Y') ?? '—' }}</dd>
+                        <dd class="mt-1 font-serif text-xl font-semibold text-buyer-ink">{{ manila($seller->created_at, 'M Y', '—') }}</dd>
                     </div>
                 </dl>
             </div>
@@ -345,7 +345,7 @@
                         </p>
                         <p class="flex items-center justify-between gap-3">
                             <span>Joined</span>
-                            <span class="font-semibold text-buyer-ink">{{ $seller->created_at?->format('M Y') ?? '—' }}</span>
+                            <span class="font-semibold text-buyer-ink">{{ manila($seller->created_at, 'M Y', '—') }}</span>
                         </p>
                     </div>
                 </aside>
@@ -383,7 +383,7 @@
                                         @endfor
                                     </div>
                                     <time datetime="{{ $review->created_at?->toDateString() }}" class="text-[11px] text-buyer-ink-soft">
-                                        {{ $review->created_at?->format('M j, Y') }}
+                                        {{ manila($review->created_at, 'M j, Y') }}
                                     </time>
                                 </div>
                             </div>
@@ -480,7 +480,7 @@
                             </div>
                             <div class="flex items-start justify-between gap-4">
                                 <dt class="text-buyer-ink-soft">Joined</dt>
-                                <dd class="font-semibold text-buyer-ink">{{ $seller->created_at?->format('M j, Y') ?? '—' }}</dd>
+                                <dd class="font-semibold text-buyer-ink">{{ manila($seller->created_at, 'M j, Y', '—') }}</dd>
                             </div>
                             @if ($location)
                                 <div class="flex items-start justify-between gap-4">

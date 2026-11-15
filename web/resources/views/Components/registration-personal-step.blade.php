@@ -127,7 +127,7 @@
                        data-validate-rule="password"
                        data-password-level="{{ $config['passwordReqsLevel'] }}">
                 <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 transition-colors hover:text-[#9c5c68]" 
-                        data-toggle-visibility="{{ $passwordId }}" aria-label="Show password">
+                        data-toggle-visibility="{{ $passwordId }}" aria-label="Show password" aria-pressed="false">
                     <i data-lucide="eye" width="16" height="16"></i>
                 </button>
             </div>
@@ -160,7 +160,7 @@
                        data-validate-rule="password-confirm"
                        data-password-confirm-for="{{ $passwordId }}">
                 <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 transition-colors hover:text-[#9c5c68]" 
-                        data-toggle-visibility="{{ $passwordConfirmationId }}" aria-label="Show password">
+                        data-toggle-visibility="{{ $passwordConfirmationId }}" aria-label="Show password" aria-pressed="false">
                     <i data-lucide="eye" width="16" height="16"></i>
                 </button>
             </div>

@@ -30,20 +30,25 @@
 //   3. Buyers get a strip of what they've actually been looking at, so
 //      the screen reads as this person rather than as a settings form.
 
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../state/auth_state.dart';
 import '../../state/courier_state.dart';
 import '../../state/order_state.dart';
 import '../../state/recently_viewed_state.dart';
+import '../../state/wishlist_state.dart';
 import '../../theme/app_theme.dart';
-import '../../utils/image_picker_helper.dart';
+import '../../utils/money_format.dart';
+import '../../widgets/avatar_picker.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../buyer/product_details_screen.dart';
-import '../buyer/widgets/product_card.dart' show ProductImage, productTint;
+import '../buyer/widgets/product_card.dart' show ProductImage;
 import 'edit_profile_screen.dart';
 import '../../widgets/app_page_route.dart';
+import '../../widgets/motion/ease_in_frame.dart';
+import '../buyer/address_book_screen.dart';
+import '../courier/rider_profile_section.dart';
+import 'settings_screen.dart';
 
 /// Profile screen reused by both BuyerShell and CourierShell. Reads
 /// name/email/phone/address from the shared AuthState and edits them
@@ -65,12 +70,18 @@ class ProfileScreen extends StatelessWidget {
       backgroundColor: Colors.transparent, // the app-wide gradient in main.dart paints this
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s16, AppSpacing.s20, AppSpacing.s24),
           children: [
-            _buildHeroCard(context, theme, ext, auth, isCourier),
-            const SizedBox(height: 26),
+            EaseInFrame(
+              index: 0,
+              child: _buildHeroCard(context, theme, ext, auth, isCourier),
+            ),
+            const SizedBox(height: AppSpacing.s24),
             if (!isCourier) ...[
-              const _RecentlyLookedAt(),
+              const EaseInFrame(
+                index: 1,
+                child: _RecentlyLookedAt(),
+              ),
             ],
             // Curve transitions from the hero into the record zone —
             // without it the drop from the gradient card to the plain
@@ -80,25 +91,56 @@ class ProfileScreen extends StatelessWidget {
               color: AppColors.surfaceMuted.withValues(alpha: 0.7),
               height: 36,
             ),
-            const SizedBox(height: 8),
-            Text('ACCOUNT DETAILS', style: AppType.eyebrow),
-            const SizedBox(height: 12),
-            _LedgerCard(
-              rows: [
-                _LedgerRow(Icons.phone_outlined, 'Phone', auth.phone),
-                _LedgerRow(Icons.wc_outlined, 'Sex', auth.sex),
-                _LedgerRow(Icons.location_on_outlined, 'Address', auth.addressSummary),
-              ],
-            ),
-            const SizedBox(height: 26),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => _logout(context),
-                icon: const Icon(Icons.logout, size: 18),
-                label: const Text('Log Out'),
+            const SizedBox(height: AppSpacing.s8),
+            EaseInFrame(
+              index: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('ACCOUNT DETAILS', style: AppType.eyebrow),
+                  const SizedBox(height: AppSpacing.s12),
+                  _LedgerCard(
+                    rows: [
+                      _LedgerRow(
+                        Icons.phone_outlined,
+                        'Phone',
+                        auth.phone,
+                        emptyPrompt: 'Add phone',
+                        onTap: () => Navigator.of(context).push(
+                          AppPageRoute(builder: (_) => const EditProfileScreen()),
+                        ),
+                      ),
+                      _LedgerRow(
+                        Icons.wc_outlined,
+                        'Sex',
+                        auth.sex,
+                        emptyPrompt: 'Add sex',
+                        onTap: () => Navigator.of(context).push(
+                          AppPageRoute(builder: (_) => const EditProfileScreen()),
+                        ),
+                      ),
+                      _LedgerRow(
+                        Icons.location_on_outlined,
+                        'Address',
+                        auth.defaultAddress?.summary ?? auth.addressSummary,
+                        emptyPrompt: 'Add address',
+                        onTap: () => Navigator.of(context).push(
+                          AppPageRoute(
+                            builder: (_) => isCourier
+                                ? const EditProfileScreen()
+                                : const AddressBookScreen(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
+            if (isCourier) ...[
+              const SizedBox(height: AppSpacing.s24),
+              const EaseInFrame(index: 3, child: RiderProfileSection()),
+            ],
           ],
         ),
       ),
@@ -116,9 +158,9 @@ class ProfileScreen extends StatelessWidget {
       // Asymmetric corners instead of the old uniform heroRadius — the
       // one feature surface on this screen picks up the same "leaf"
       // shape language as Home's cover story and feature tiles.
-      borderRadius: editorialRadius(0, big: ext.heroRadius * 1.4, small: 8),
+      borderRadius: editorialRadiusRaw(0, big: ext.heroRadius * 1.4, small: 8),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.s16, AppSpacing.s16, AppSpacing.s16, AppSpacing.s16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -152,11 +194,17 @@ class ProfileScreen extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildAvatar(context, auth),
-                    const SizedBox(width: 16),
+                    AvatarDisplay(
+                      onTap: () => Navigator.of(context).push(
+                        AppPageRoute(
+                          builder: (_) => const EditProfileScreen(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.s16),
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.only(top: 6),
+                        padding: const EdgeInsets.only(top: AppSpacing.s4),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -166,7 +214,7 @@ class ProfileScreen extends StatelessWidget {
                                 color: AppColors.secondary,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: AppSpacing.s8),
                             Text(
                               auth.name ?? 'Guest',
                               style: theme.textTheme.titleLarge?.copyWith(
@@ -174,7 +222,7 @@ class ProfileScreen extends StatelessWidget {
                                 height: 1.15,
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: AppSpacing.s4),
                             Text(
                               auth.email ?? '',
                               style: theme.textTheme.bodySmall?.copyWith(
@@ -185,18 +233,41 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).push(
-                        AppPageRoute(builder: (_) => const EditProfileScreen()),
-                      ),
-                      icon: const Icon(Icons.edit_outlined, color: AppColors.textOnDark),
-                      tooltip: 'Edit Profile',
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          key: const ValueKey('open-settings'),
+                          onPressed: () => Navigator.of(context).push(
+                            AppPageRoute(
+                              builder: (_) => const SettingsScreen(),
+                            ),
+                          ),
+                          icon: Icon(
+                            Icons.settings_outlined,
+                            color: AppColors.textOnDark,
+                          ),
+                          tooltip: 'Settings',
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(context).push(
+                            AppPageRoute(
+                              builder: (_) => const EditProfileScreen(),
+                            ),
+                          ),
+                          icon: Icon(
+                            Icons.edit_outlined,
+                            color: AppColors.textOnDark,
+                          ),
+                          tooltip: 'Edit Profile',
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.s16),
                 Divider(color: AppColors.textOnDark.withValues(alpha: 0.18), height: 1),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.s16),
                 _StatStrip(isCourier: isCourier, auth: auth),
               ],
             ),
@@ -206,75 +277,6 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAvatar(BuildContext context, AuthState auth) {
-    final hasRealPhoto = auth.avatarPath != null && File(auth.avatarPath!).existsSync();
-
-    return Semantics(
-      button: true,
-      label: 'Change profile photo',
-      child: InkWell(
-        onTap: () async {
-          final picked = await pickAndSaveImage(context, filenamePrefix: 'avatar');
-          if (picked != null) {
-            // ignore: use_build_context_synchronously
-            context.read<AuthState>().updateProfile(avatarPath: picked.path);
-          }
-        },
-        customBorder: const CircleBorder(),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // Arch, not ClipOval. This is the app's "important photo"
-          // silhouette and the avatar is the most important photo on
-          // the screen — a plain circle here was the one place the
-          // shape language didn't reach.
-          Arch(
-            footRadius: 10,
-            child: SizedBox(
-              width: 68,
-              height: 84,
-              child: hasRealPhoto
-                  ? Image.file(File(auth.avatarPath!), fit: BoxFit.cover)
-                  : _placeholderAvatar(auth),
-            ),
-          ),
-          Positioned(
-            right: -4,
-            bottom: -4,
-            child: Container(
-              padding: const EdgeInsets.all(5),
-              decoration: const BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
-              child: const Icon(Icons.camera_alt, size: 12, color: AppColors.primaryDark),
-            ),
-          ),
-        ],
-      ),
-      ),
-    );
-  }
-
-  Widget _placeholderAvatar(AuthState auth) {
-    // Same "placeholder, not a licensing shortcut" caveat as
-    // ProductImage in widgets/product_card.dart — shown only until the
-    // user picks a real photo via the camera badge above.
-    final seed = auth.email ?? auth.name ?? 'guest';
-    return Image.network(
-      'https://picsum.photos/seed/$seed/160/200',
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => Container(
-        color: AppColors.tertiary,
-        alignment: Alignment.center,
-        child: const Icon(Icons.person, color: AppColors.textOnDark, size: 30),
-      ),
-    );
-  }
-
-  void _logout(BuildContext context) {
-    context.read<AuthState>().logout();
-    // AuthGate (in main.dart) rebuilds to LoginScreen once the state
-    // changes — this just unwinds back to that root route.
-    Navigator.of(context).popUntil((route) => route.isFirst);
-  }
 }
 
 // ---------------------------------------------------------------------
@@ -301,23 +303,27 @@ class _StatStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final String primaryValue;
     final String primaryLabel;
     final String secondValue;
     final String secondLabel;
+    String? followingCount;
 
     if (isCourier) {
       final courier = context.watch<CourierState>();
       primaryValue = '${courier.completedJobs.length}';
       primaryLabel = 'DELIVERIES DONE';
-      secondValue = '\u20b1${courier.totalEarnings.toStringAsFixed(0)}';
+      secondValue = formatPeso(courier.totalEarnings);
       secondLabel = 'EARNED';
     } else {
       final viewed = context.watch<RecentlyViewedState>().items.length;
+      final following = context.watch<WishlistState>().followedSellers.length;
       primaryValue = '${context.watch<OrderState>().orders.length}';
       primaryLabel = 'ORDERS PLACED';
       secondValue = '$viewed';
       secondLabel = 'PIECES VIEWED';
+      followingCount = '$following';
     }
 
     return Row(
@@ -335,13 +341,17 @@ class _StatStrip extends StatelessWidget {
         Expanded(
           flex: 4,
           child: Padding(
-            padding: const EdgeInsets.only(left: 16),
+            padding: const EdgeInsets.only(left: AppSpacing.s16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _stat(secondLabel, secondValue, 20),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.s12),
                 _stat('MEMBER SINCE', _memberSinceLabel(auth.memberSince), 20),
+                if (followingCount != null) ...[
+                  const SizedBox(height: AppSpacing.s12),
+                  _stat('FOLLOWING', followingCount, 20),
+                ],
               ],
             ),
           ),
@@ -358,10 +368,10 @@ class _StatStrip extends StatelessWidget {
           label,
           style: AppType.eyebrow.copyWith(
             color: AppColors.textOnDark.withValues(alpha: 0.65),
-            letterSpacing: 2.0,
+            letterSpacing: 1.2,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: AppSpacing.s4),
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
@@ -383,12 +393,20 @@ class _StatStrip extends StatelessWidget {
 /// Buyer-only. Same rule RecentlyViewedRail set: if there's no real
 /// history, this renders nothing rather than showing a placeholder —
 /// an empty "here's what you've been up to" is worse than no section.
+///
+/// Deliberately does NOT filter out what's already been bought, unlike
+/// Home's "pick up where you left off" rail (see `unpurchased` in
+/// recently_viewed_rail.dart). This one is a *record* of what this person
+/// looked at; a record that quietly edited out the purchases would be a
+/// worse lie than a slightly redundant strip. The merchandising surface
+/// filters because it's making a suggestion. A history doesn't.
 class _RecentlyLookedAt extends StatelessWidget {
   const _RecentlyLookedAt();
 
   @override
   Widget build(BuildContext context) {
     final products = context.watch<RecentlyViewedState>().items;
+    AppColors.watch(context);
     if (products.isEmpty) return const SizedBox.shrink();
 
     final shown = products.take(8).toList(growable: false);
@@ -397,14 +415,14 @@ class _RecentlyLookedAt extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('RECENTLY LOOKED AT', style: AppType.eyebrow),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.s12),
         SizedBox(
           height: 96,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.zero,
             itemCount: shown.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.s8),
             itemBuilder: (context, i) {
               final product = shown[i];
               return GestureDetector(
@@ -415,22 +433,18 @@ class _RecentlyLookedAt extends StatelessWidget {
                   // Alternating lean, same as any other row of these —
                   // a line of identical shapes is a uniform pattern
                   // again, which is what editorialRadius exists to break.
-                  borderRadius: editorialRadius(i, big: 20, small: 5),
+                  borderRadius: editorialRadius(i, ShapeTier.accent),
                   child: SizedBox(
                     width: 74,
                     height: 96,
-                    child: ProductImage(
-                      productId: product.id,
-                      tint: productTint(product.category),
-                      iconSize: 24,
-                    ),
+                    child: ProductImage(product: product, iconSize: 24),
                   ),
                 ),
               );
             },
           ),
         ),
-        const SizedBox(height: 26),
+        const SizedBox(height: AppSpacing.s24),
       ],
     );
   }
@@ -441,15 +455,22 @@ class _RecentlyLookedAt extends StatelessWidget {
 // ---------------------------------------------------------------------
 
 class _LedgerRow {
-  const _LedgerRow(this.icon, this.label, this.value);
+  const _LedgerRow(
+    this.icon,
+    this.label,
+    this.value, {
+    this.onTap,
+    this.emptyPrompt,
+  });
   final IconData icon;
   final String label;
   final String? value;
+  final VoidCallback? onTap;
+  final String? emptyPrompt;
 }
 
-/// A record card, not a merchandising band: a thin left spine ties the
-/// rows together like entries on a form, each icon sitting on the
-/// spine instead of floating loose in front of its own text.
+/// Opaque surface token card hosting account details rows.
+/// Meets WCAG AA contrast (>=4.5:1) in both light and dark modes.
 class _LedgerCard extends StatelessWidget {
   const _LedgerCard({required this.rows});
 
@@ -457,53 +478,104 @@ class _LedgerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    AppColors.watch(context);
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      decoration: const BoxDecoration(
-        border: Border(left: BorderSide(color: AppColors.divider, width: 2)),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var i = 0; i < rows.length; i++) ...[
-            _rowTile(theme, rows[i]),
+            _rowTile(context, rows[i]),
             if (i < rows.length - 1)
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 14),
-                child: Divider(height: 1, color: AppColors.divider),
-              ),
+              Divider(height: 1, thickness: 1, color: AppColors.divider),
           ],
         ],
       ),
     );
   }
 
-  Widget _rowTile(ThemeData theme, _LedgerRow row) {
-    final hasValue = row.value != null && row.value!.isNotEmpty;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+  Widget _rowTile(BuildContext context, _LedgerRow row) {
+    final hasValue = row.value != null && row.value!.trim().isNotEmpty;
+    final prompt = row.emptyPrompt ?? "Add ${row.label.toLowerCase()}";
+
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s12),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(row.icon, size: 18, color: AppColors.textSecondary),
-          const SizedBox(width: 12),
+          Icon(row.icon, size: 20, color: AppColors.textSecondary),
+          const SizedBox(width: AppSpacing.s12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(row.label, style: theme.textTheme.labelSmall),
                 Text(
-                  hasValue ? row.value! : 'Not set',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: hasValue ? AppColors.textPrimary : AppColors.textSecondary,
+                  row.label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
                   ),
                 ),
+                const SizedBox(height: AppSpacing.s4),
+                if (hasValue)
+                  Text(
+                    row.value!,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  )
+                else
+                  Text(
+                    prompt,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.accent,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
               ],
             ),
           ),
+          if (!hasValue && row.onTap != null)
+            Icon(Icons.add_circle_outline, size: 18, color: AppColors.accent),
         ],
       ),
+    );
+
+    if (!hasValue && row.onTap != null) {
+      return Semantics(
+        label: prompt,
+        button: true,
+        child: InkWell(
+          onTap: row.onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: content,
+          ),
+        ),
+      );
+    }
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 48),
+      child: content,
     );
   }
 }

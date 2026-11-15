@@ -95,12 +95,12 @@
 .html-body .login-modal__error {
   margin-top: var(--space-4);
   padding: var(--space-3) var(--space-4);
-  background-color: #fbe9e7;
-  border: 1px solid #e8a49c;
+  background-color: var(--pill-danger-bg);
+  border: 1px solid var(--pill-danger-border);
   border-radius: var(--radius-sm);
   font-family: var(--font-sans);
   font-size: 12.5px;
-  color: #a5333d;
+  color: var(--status-danger);
 }
 
 .html-body .login-modal__form {
@@ -145,6 +145,28 @@
   border-color: var(--border-focus);
 }
 
+.html-body .login-modal__input:focus-visible,
+.html-body .login-modal__close:focus-visible,
+.html-body .login-modal__forgot:focus-visible,
+.html-body .login-modal__submit:focus-visible,
+.html-body .login-modal__google:focus-visible,
+.html-body .login-modal__guest:focus-visible,
+.html-body .login-modal__footer a:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.html-body .login-modal__input[aria-invalid="true"] {
+  border-color: var(--status-danger);
+}
+
+.html-body .login-modal__field-error {
+  margin-top: var(--space-2);
+  color: var(--status-danger);
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+
 .html-body .login-modal__password-wrap {
   position: relative;
 }
@@ -169,6 +191,11 @@
 
 .html-body .login-modal__toggle-visibility:hover {
   color: var(--color-primary-800);
+}
+
+.html-body .login-modal__toggle-visibility:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
 }
 
 .html-body .login-modal__row {

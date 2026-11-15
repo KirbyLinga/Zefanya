@@ -10,12 +10,22 @@ use App\Models\Seller\Seller;
 use App\Models\Seller\StoreSale;
 use App\Models\Shared\OrderItem;
 use App\Models\Shared\SellerOrder;
+use App\Models\Shared\Voucher;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
 class HomeControllerTest extends TestCase
 {
     use LazilyRefreshDatabase;
+
+    public function test_home_advertises_public_platform_codes_without_disclosing_code_only_vouchers(): void
+    {
+        Product::factory()->create()->images()->create(['path' => 'products/featured.jpg', 'is_primary' => true, 'sort_order' => 1]);
+        Voucher::factory()->platform()->fixed(1000)->create(['code' => 'PUBLICOFFER', 'is_claimable' => true]);
+        Voucher::factory()->platform()->fixed(1000)->create(['code' => 'PRIVATEOFFER', 'is_claimable' => false]);
+
+        $this->get(route('buyer.home'))->assertOk()->assertSee('PUBLICOFFER')->assertDontSee('PRIVATEOFFER');
+    }
 
     public function test_guests_can_view_the_buyer_home_page_layout(): void
     {

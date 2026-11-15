@@ -27,6 +27,7 @@
         var merchandise = parseInt(root.getAttribute('data-merchandise-minor') || '0', 10) || 0;
         var shippingVoucherType = root.getAttribute('data-shipping-voucher-type') || '';
         var shippingVoucherValue = parseInt(root.getAttribute('data-shipping-voucher-value') || '0', 10) || 0;
+        var shippingVoucherCap = parseInt(root.getAttribute('data-shipping-voucher-cap'), 10);
         var shippingEl = document.querySelector('[data-checkout-shipping-total]');
         var shippingDiscountRow = document.querySelector('[data-checkout-shipping-discount-row]');
         var shippingDiscountEl = document.querySelector('[data-checkout-shipping-discount]');
@@ -34,8 +35,18 @@
         var placeButtons = document.querySelectorAll('[data-checkout-place-order]');
         var blockNotice = document.querySelector('[data-checkout-shipping-block]');
 
+        var itemDetails = root.querySelector('[data-checkout-items]');
+        if (itemDetails) {
+            var desktop = window.matchMedia('(min-width: 1024px)');
+            var syncDetails = function () { itemDetails.open = desktop.matches; };
+            syncDetails();
+            desktop.addEventListener('change', syncDetails);
+        }
+
+
         function selectedShippingMinor() {
             var total = 0;
+            var eligible = 0;
             var groups = root.querySelectorAll('[data-carrier-group]');
             for (var i = 0; i < groups.length; i++) {
                 var group = groups[i];
@@ -46,9 +57,11 @@
                 if (!checked) {
                     return null;
                 }
-                total += parseInt(checked.getAttribute('data-fee-minor') || '0', 10) || 0;
+                var fee = parseInt(checked.getAttribute('data-fee-minor') || '0', 10) || 0;
+                total += fee;
+                if (group.getAttribute('data-voucher-eligible') !== '0') eligible += fee;
             }
-            return total;
+            return { total: total, eligible: eligible };
         }
 
         // Mirrors Money::percentage() (half-up) on the server. The submitted
@@ -57,19 +70,21 @@
             if (fee <= 0 || shippingVoucherValue <= 0) {
                 return 0;
             }
+            var cap = Number.isNaN(shippingVoucherCap) ? fee : Math.min(fee, shippingVoucherCap);
             if (shippingVoucherType === 'fixed') {
-                return Math.min(fee, shippingVoucherValue);
+                return Math.min(cap, shippingVoucherValue);
             }
             if (shippingVoucherType === 'percent') {
-                return Math.min(fee, Math.floor((fee * shippingVoucherValue + 50) / 100));
+                return Math.min(cap, Math.floor((fee * shippingVoucherValue + 50) / 100));
             }
             return 0;
         }
 
         function refresh() {
-            var grossShipping = selectedShippingMinor();
-            var blocked = grossShipping === null;
-            var discount = blocked ? 0 : shippingDiscount(grossShipping);
+            var shipping = selectedShippingMinor();
+            var blocked = shipping === null;
+            var grossShipping = blocked ? 0 : shipping.total;
+            var discount = blocked ? 0 : shippingDiscount(shipping.eligible);
             var netShipping = blocked ? 0 : Math.max(0, grossShipping - discount);
             if (shippingEl) {
                 shippingEl.textContent = blocked ? 'Select a carrier' : pesos(grossShipping);

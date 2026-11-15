@@ -6,7 +6,7 @@
 @php
     // Shared with profile/address (Components/buyer-register-modal).
     $labelCls = 'mb-2 block font-sans text-[11px] font-semibold uppercase tracking-[0.8px] text-[var(--text-label)]';
-    $inputCls = 'h-11 w-full rounded-md border border-neutral-300 px-4 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--hover-rose)]';
+    $inputCls = 'h-11 w-full rounded-md border border-neutral-300 px-4 pr-10 font-sans text-sm text-neutral-900 outline-none transition-colors focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--hover-rose)]';
     $errorCls = 'mt-1 block font-sans text-[11.5px] text-[var(--status-danger)]';
 @endphp
 
@@ -30,12 +30,7 @@
                     </p>
                 </div>
 
-                @if (session('success'))
-                    <div class="mb-6 flex items-center gap-2.5 rounded-lg border border-[var(--pill-success-border)] bg-[var(--pill-success-bg)] px-3.5 py-2.5 font-sans text-[12.5px] font-medium text-[var(--status-success)]" role="status">
-                        <i data-lucide="check-circle-2" width="15" height="15" class="shrink-0"></i>
-                        <span class="text-[var(--status-success)]">{{ session('success') }}</span>
-                    </div>
-                @endif
+                <x-flash type="success" :message="session('success')" spacing="mb-6" />
 
                 <section class="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm sm:p-7">
                     @if ($buyer->pending_password)
@@ -78,7 +73,7 @@
                                        class="{{ $inputCls }}" autocomplete="current-password">
                                 <button type="button"
                                         class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 transition-colors hover:text-[var(--brand)]"
-                                        data-toggle-visibility="current_password" aria-label="Show password">
+                                        data-toggle-visibility="current_password" aria-label="Show password" aria-pressed="false" aria-controls="current_password">
                                     <i data-lucide="eye" width="16" height="16"></i>
                                 </button>
                             </div>
@@ -93,7 +88,7 @@
                                        class="{{ $inputCls }}" autocomplete="new-password" minlength="8">
                                 <button type="button"
                                         class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 transition-colors hover:text-[var(--brand)]"
-                                        data-toggle-visibility="new_password" aria-label="Show password">
+                                        data-toggle-visibility="new_password" aria-label="Show password" aria-pressed="false" aria-controls="new_password">
                                     <i data-lucide="eye" width="16" height="16"></i>
                                 </button>
                             </div>
@@ -108,7 +103,7 @@
                                        class="{{ $inputCls }}" autocomplete="new-password" minlength="8">
                                 <button type="button"
                                         class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 transition-colors hover:text-[var(--brand)]"
-                                        data-toggle-visibility="new_password_confirmation" aria-label="Show password">
+                                        data-toggle-visibility="new_password_confirmation" aria-label="Show password" aria-pressed="false" aria-controls="new_password_confirmation">
                                     <i data-lucide="eye" width="16" height="16"></i>
                                 </button>
                             </div>
@@ -130,17 +125,6 @@
 </div>
 
 @push('scripts')
-<script>
-    document.querySelectorAll('[data-toggle-visibility]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var target = document.getElementById(btn.getAttribute('data-toggle-visibility'));
-            if (!target) return;
-            var isHidden = target.type === 'password';
-            target.type = isHidden ? 'text' : 'password';
-            btn.innerHTML = '<i data-lucide="' + (isHidden ? 'eye-off' : 'eye') + '" width="16" height="16"></i>';
-            if (window.lucide) lucide.createIcons();
-        });
-    });
-</script>
+    @include('Components.password-toggle-script')
 @endpush
 @endsection

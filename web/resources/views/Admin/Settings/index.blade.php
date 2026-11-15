@@ -20,9 +20,14 @@
         recorded and sessions already open keep the rate they were created with. Every change is recorded below.</span>
     </div>
 
-    @if (session('success'))
-        <div role="status" class="mb-6 rounded-lg border border-tertiary-300 bg-tertiary-50 p-4 text-sm text-tertiary-800">{{ session('success') }}</div>
+    @if (blank($settings->firstWhere('key', 'remittance_payment_details')?->value))
+        <div role="alert" data-payment-details-missing class="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+            <p class="font-semibold">Payment instructions for Logistics companies are empty.</p>
+            <p class="mt-1">Companies cannot see where to send Zefanya its cash share. <a href="#setting-remittance_payment_details" class="font-semibold underline">Add them below</a>.</p>
+        </div>
     @endif
+
+    <x-flash type="success" :message="session('success')" spacing="mb-6" />
 
     @if ($errors->any())
         <div role="alert" class="mb-6 rounded-lg border border-error bg-white p-4 text-sm text-error">
@@ -81,7 +86,7 @@
                             <td class="max-w-xs break-words px-5 py-4">{{ $entry->previous_value }}</td>
                             <td class="max-w-xs break-words px-5 py-4">{{ $entry->new_value }}</td>
                             <td class="px-5 py-4">{{ $entry->admin->name }} <span class="text-xs">(ID {{ $entry->admin_id }})</span></td>
-                            <td class="whitespace-nowrap px-5 py-4">{{ $entry->created_at->format('Y-m-d H:i:s') }}</td>
+                            <td class="whitespace-nowrap px-5 py-4">{{ manila($entry->created_at, 'Y-m-d H:i:s') }}</td>
                         </tr>
                     @empty
                         <tr><td colspan="5" class="px-5 py-8 text-center text-neutral-600">No settings have been changed.</td></tr>

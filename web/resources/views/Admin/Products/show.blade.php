@@ -4,16 +4,8 @@
 
 @section('content')
 
-@if (session('success'))
-    <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-        {{ session('success') }}
-    </div>
-@endif
-@if (session('error'))
-    <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-        {{ session('error') }}
-    </div>
-@endif
+<x-flash type="success" :message="session('success')" spacing="mb-6" />
+<x-flash type="error" :message="session('error')" spacing="mb-6" />
 
 <div class="mb-6 flex items-center justify-between">
     <div>
@@ -22,6 +14,32 @@
     </div>
     <a href="{{ route('admin.products.index') }}" class="text-sm font-medium text-primary-700 hover:text-primary-900">&larr; Back to product list</a>
 </div>
+
+@php($pendingEdit = \Illuminate\Support\Facades\Schema::hasTable('product_revisions') && $product->relationLoaded('latestRevision') && $product->latestRevision !== null && $product->latestRevision->status === 'pending')
+@if ($product->status === 'pending' || $product->status === 'rejected' || $pendingEdit)
+    <section class="mb-6 rounded-lg border border-neutral-200 bg-white p-5">
+        <h2 class="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-600">Approval</h2>
+        <p class="mb-4 text-sm text-neutral-700">{{ $pendingEdit ? 'A seller edit is waiting. The live listing does not change until you approve it.' : 'This product is not visible to buyers.' }}</p>
+        @if ($product->rejection_reason)
+            <p class="mb-4 text-sm text-neutral-700"><span class="font-semibold">Last reason:</span> {{ $product->rejection_reason }}</p>
+        @endif
+        <div class="flex flex-wrap items-end gap-3">
+            <form method="POST" action="{{ route('admin.products.approve', $product) }}">@csrf<button type="submit" class="rounded bg-primary-700 px-4 py-2 text-sm font-semibold text-white">Approve</button></form>
+            <form method="POST" action="{{ route('admin.products.reject', $product) }}" class="flex flex-1 flex-wrap items-end gap-2">
+                @csrf
+                <label class="min-w-[16rem] flex-1 text-sm">Rejection reason<input name="reason" required maxlength="1000" class="mt-1 w-full rounded border border-neutral-300 px-3 py-2"></label>
+                <button type="submit" class="rounded border border-red-300 px-4 py-2 text-sm font-semibold text-red-700">Reject</button>
+            </form>
+        </div>
+        @if ($product->relationLoaded('approvalEvents') && $product->approvalEvents->isNotEmpty())
+            <ul class="mt-4 space-y-1 text-sm text-neutral-600">
+                @foreach ($product->approvalEvents as $event)
+                    <li>{{ $event->created_at?->timezone(\App\Models\Seller\StoreSale::TIMEZONE)->format('M j, Y g:i A') }} — {{ ucfirst($event->decision) }} by {{ $event->admin_name }}@if ($event->reason) — {{ $event->reason }}@endif</li>
+                @endforeach
+            </ul>
+        @endif
+    </section>
+@endif
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
     <div class="bg-white border border-neutral-200 rounded-lg p-5">
@@ -87,7 +105,7 @@
             </div>
             <div class="flex justify-between border-b border-neutral-50 pb-2">
                 <dt class="text-neutral-500">Created</dt>
-                <dd class="text-neutral-900">{{ $product->created_at?->format('M d, Y H:i') ?? '—' }}</dd>
+                <dd class="text-neutral-900">{{ manila($product->created_at, 'M d, Y H:i', '—') }}</dd>
             </div>
         </dl>
     </div>
@@ -112,6 +130,7 @@
     @if ($product->variants->count() > 0)
         <div class="bg-white border border-neutral-200 rounded-lg p-5">
             <h2 class="text-[13px] font-semibold text-neutral-600 uppercase tracking-[0.5px] mb-4">Variants ({{ $product->variants->count() }})</h2>
+            <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="text-neutral-500 border-b border-neutral-100">
@@ -137,6 +156,7 @@
                     @endforeach
                 </tbody>
             </table>
+            </div>
         </div>
     @endif
 </div>

@@ -361,7 +361,7 @@ class SellerOrderDeclineTest extends TestCase
 
         $this->get(route('seller.orders.index', ['bucket' => 'cancelled']))
             ->assertSeeInOrder([
-                '>All orders</span>', '>8</span>', '>To ship</span>', '>3</span>', '>Ready for pickup</span>', '>1</span>',
+                '>All orders</span>', '>8</span>', '>To ship</span>', '>3</span>', '>Pickup Requested</span>', '>1</span>',
                 '>Shipped</span>', '>1</span>', '>Delivered</span>', '>1</span>', '>Cancelled</span>', '>2</span>',
             ], false);
     }
@@ -465,6 +465,8 @@ class SellerOrderDeclineTest extends TestCase
         $this->withoutVite();
         $seller = Seller::factory()->create(['status' => 'approved']);
         $order = SellerOrder::factory()->create(['seller_id' => $seller->id, 'status' => OrderStatus::Placed, 'tracking_number' => 'TRK-HIDDEN-123']);
+        SellerOrder::factory()->create(['seller_id' => $seller->id, 'status' => OrderStatus::Confirmed]);
+        SellerOrder::factory()->create(['seller_id' => $seller->id, 'status' => OrderStatus::Preparing]);
         foreach (['Tulfone', 'Tulfone', 'Pixel Case', 'Charger'] as $name) {
             OrderItem::factory()->create(['seller_order_id' => $order->id, 'product_name' => $name, 'quantity' => 2]);
         }
@@ -476,6 +478,14 @@ class SellerOrderDeclineTest extends TestCase
             ->assertSee('Tulfone +2 more')
             ->assertSee('Qty 8')
             ->assertSee('Accept order')
+            ->assertSee('data-confirm-label="Accept Order"', false)
+            ->assertSee('data-confirm-message="Accept this order? You can pack it in the next step."', false)
+            ->assertSee('type="submit" disabled data-confirm-enable', false)
+            ->assertSee('data-submit-loading="Accepting', false)
+            ->assertSee('data-submit-loading="Packing', false)
+            ->assertSee('disabled data-confirm-enable data-submit-loading="Requesting pickup', false)
+            ->assertDontSee('confirmAccept(this)', false)
+            ->assertDontSee('this.form.submit()', false)
             ->assertSee('href="'.route('seller.orders.show', $order).'"', false);
 
         $this->get(route('seller.orders.show', $order))->assertOk()->assertSee('TRK-HIDDEN-123');

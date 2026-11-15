@@ -34,20 +34,22 @@
 @endphp
 <article class="buyer-product-card group flex h-full min-w-0 w-full flex-col bg-white group-data-[layout=list]/products:sm:flex-row" @if($product) data-product-id="{{ $product->id }}" @endif>
     <div class="relative aspect-square w-full shrink-0 overflow-hidden bg-blush group-data-[layout=list]/products:sm:w-44">
+        {{-- A stored path whose file cannot be loaded falls back to the package placeholder, never to broken alt text. --}}
+        @php
+            $imageFallback = "this.hidden = true; this.closest('.buyer-product-card').querySelector('[data-image-fallback]').hidden = false";
+        @endphp
         @if ($url)
             <a href="{{ $url }}" class="block h-full w-full" aria-label="View {{ $name }}">
                 @if ($imageUrl)
-                    <img src="{{ $imageUrl }}" alt="{{ $name }}" loading="lazy" decoding="async" class="h-full w-full object-cover object-top">
+                    <img src="{{ $imageUrl }}" alt="{{ $name }}" loading="lazy" decoding="async" class="h-full w-full object-cover object-top" onerror="{{ $imageFallback }}">
                 @endif
             </a>
         @elseif ($imageUrl)
-            <img src="{{ $imageUrl }}" alt="{{ $name }}" loading="lazy" decoding="async" class="h-full w-full object-cover object-top">
+            <img src="{{ $imageUrl }}" alt="{{ $name }}" loading="lazy" decoding="async" class="h-full w-full object-cover object-top" onerror="{{ $imageFallback }}">
         @endif
-        @unless ($imageUrl)
-            <div class="pointer-events-none absolute inset-0 flex items-center justify-center text-primary-800/40">
-                <i data-lucide="package" width="28" height="28"></i>
-            </div>
-        @endunless
+        <div data-image-fallback class="pointer-events-none absolute inset-0 flex items-center justify-center text-primary-800/40" @if ($imageUrl) hidden @endif>
+            <i data-lucide="package" width="28" height="28"></i>
+        </div>
         @if ($product)
             @include('Components.buyer.wishlist-heart')
         @endif

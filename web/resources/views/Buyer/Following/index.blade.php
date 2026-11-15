@@ -5,9 +5,7 @@
     <div class="mx-auto max-w-3xl px-4 py-8 sm:px-8">
         @include('Components.buyer.account-tabs', ['active' => 'following'])
         <h1 class="mb-6 font-serif text-[32px] font-semibold text-buyer-ink">Following</h1>
-        @if (session('success'))
-            <p role="status" class="mb-4 text-sm text-buyer-ink">{{ session('success') }}</p>
-        @endif
+        <x-flash type="success" :message="session('success')" />
         <ul class="space-y-3">
             @forelse ($follows as $follow)
                 <li class="flex items-center justify-between gap-4 rounded-2xl border border-buyer-line bg-white p-5">

@@ -11,7 +11,8 @@ use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Backfill command: re-derive orders.status from seller_orders and settle
- * pending COD payments for Delivered/Completed seller_orders.
+ * pending COD payments with existing exact collection snapshots for
+ * Delivered/Completed seller_orders. Status alone never proves Buyer payment.
  *
  * Idempotent and safe to re-run. Use --dry-run first to preview changes.
  */
@@ -57,6 +58,8 @@ class OrdersResyncCommand extends Command
                         if ($payment === null
                             || $payment->method !== PaymentMethod::Cod
                             || $payment->status !== PaymentStatus::Pending
+                            || $payment->collected_at === null
+                            || $payment->collected_amount_minor !== $payment->amount_minor
                         ) {
                             continue;
                         }

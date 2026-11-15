@@ -10,7 +10,7 @@
         <div class="sm:col-span-2 rounded-lg bg-[var(--bg-page)] p-3"><dt class="text-[var(--text-muted)]">Next step</dt><dd class="mt-1 font-semibold text-[var(--text-ink)]">{{ $details['next_step'] }}</dd></div>
         <div class="sm:col-span-2"><dt class="text-[var(--text-muted)]">Last scan</dt><dd class="mt-1 text-[var(--text-ink)]">
             @if ($details['last_scan'] ?? null)
-                {{ $details['last_scan']['label'] }} &middot; <time datetime="{{ $details['last_scan']['at']->toIso8601String() }}">{{ $details['last_scan']['at']->format('M d, Y h:i A') }}</time>
+                {{ $details['last_scan']['label'] }} &middot; <time datetime="{{ $details['last_scan']['at']->toIso8601String() }}">{{ $details['last_scan']['at']->copy()->timezone(config('app.schedule_timezone'))->format('M d, Y h:i A') }}</time>
             @else
                 No verified scan recorded yet
             @endif
@@ -28,7 +28,7 @@
         <h4 class="mt-4 text-xs font-semibold text-[var(--text-ink)]">Verified receiving history</h4>
         <ul class="mt-2 space-y-1 text-xs text-[var(--text-muted)]">
             @foreach ($details['receipts'] as $receipt)
-                <li>{{ $receipt['at']->format('M d, Y H:i') }} &middot; Received at {{ $receipt['hub'] }}</li>
+                <li>{{ $receipt['at']->copy()->timezone(config('app.schedule_timezone'))->format('M d, Y H:i') }} &middot; Received at {{ $receipt['hub'] }}</li>
             @endforeach
         </ul>
     @endif

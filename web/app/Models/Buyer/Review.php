@@ -58,11 +58,16 @@ class Review extends Model
         return $this->hasMany(ReviewPhoto::class)->orderBy('sort_order')->orderBy('id');
     }
 
-    /** BUY-RATE-005: at most one buyer edit, within 30 days of submission. */
+    /** At most one buyer edit, within 30 days of trusted completion. */
     public function isEditableByBuyer(): bool
     {
+        $shipment = $this->orderItem?->sellerOrder;
+        $completedAt = $shipment?->completionTime();
+
         return $this->buyer_edited_at === null
-            && $this->created_at !== null
-            && $this->created_at->greaterThanOrEqualTo(now()->subDays(self::BUYER_EDIT_WINDOW_DAYS));
+            && $shipment?->status === \App\Enums\OrderStatus::Completed
+            && $completedAt !== null
+            && $completedAt->lessThanOrEqualTo(now())
+            && $completedAt->greaterThan(now()->subDays(self::BUYER_EDIT_WINDOW_DAYS));
     }
 }

@@ -119,7 +119,7 @@
                                         </a>
                                     @elseif ($shipment->status === OrderStatus::PickedUp)
                                         <p class="font-sans text-[11.5px] font-semibold text-emerald-700">
-                                            Collected{{ $shipment->handover_at ? ' '.$shipment->handover_at->format('M j, g:i A') : '' }}. Hand over at your Station Hub.
+                                            Collected{{ $shipment->handover_at ? ' '.$shipment->handover_at->timezone(config('app.schedule_timezone'))->format('M j, g:i A') : '' }}. Hand over at your Station Hub.
                                         </p>
                                     @endif
                                 </div>

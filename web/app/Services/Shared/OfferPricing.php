@@ -83,7 +83,7 @@ final class OfferPricing
                 ? SellerPromotion::query()->ongoing()->where('seller_id', $sellerId)->with('products:id')->get()
                 : collect();
             $productIds = $lines->pluck('product_id')->unique();
-            $bundle = $promotions
+            $bundles = $promotions
                 ->filter(function (SellerPromotion $promotion) use ($productIds): bool {
                     $members = $promotion->products->pluck('id');
 
@@ -91,8 +91,7 @@ final class OfferPricing
                         && $members->count() >= 2
                         && $members->diff($productIds)->isEmpty();
                 })
-                ->sortByDesc('percent')
-                ->first();
+                ->sortByDesc('percent');
             $bxgy = $promotions
                 ->filter(fn (SellerPromotion $promotion): bool => $promotion->kind === PromotionKind::BuyXGetY)
                 ->keyBy(fn (SellerPromotion $promotion): int => (int) $promotion->products->first()?->id);
@@ -100,6 +99,7 @@ final class OfferPricing
             $claimed = [];
 
             foreach ($lines->sortBy('id') as $line) {
+                $bundle = $bundles->first(fn (SellerPromotion $promotion): bool => $promotion->products->contains('id', $line->product_id));
                 $result[$line->id] = $this->linePortions($line, $claimed, $bxgy->get($line->product_id), $bundle);
             }
         }

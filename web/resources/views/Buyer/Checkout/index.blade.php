@@ -8,21 +8,14 @@
             {{-- Page heading --}}
             <div class="mb-6">
                 <h1 class="font-serif text-[32px] font-semibold text-buyer-ink sm:text-[38px]">Checkout</h1>
-                <p class="mt-1 text-[13px] text-neutral-400">Enter shipping details and confirm your order.</p>
+                <p class="mt-1 text-[13px] text-buyer-ink-soft">Enter shipping details and confirm your order.</p>
             </div>
 
-            @if (session('error'))
-                <div role="alert" class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-900">
-                    <p>{{ session('error') }}</p>
-                    <p class="mt-2 text-xs">Before retrying, <a href="{{ route('buyer.orders.index') }}" class="font-semibold underline">check My Orders</a> if you already submitted an order. Review the details below, <a href="{{ route('buyer.account.address') }}" class="font-semibold underline">check your address</a>, or <a href="{{ route('buyer.cart.index') }}" class="font-semibold underline">return to your cart</a>.</p>
-                </div>
-            @endif
+            <x-flash type="error" :message="session('error')" spacing="mb-4">
+                <p class="mt-2 text-xs">Before retrying, <a href="{{ route('buyer.orders.index') }}" class="font-semibold underline">check My Orders</a> if you already submitted an order. Review the details below, <a href="{{ route('buyer.account.address') }}" class="font-semibold underline">check your address</a>, or <a href="{{ route('buyer.cart.index') }}" class="font-semibold underline">return to your cart</a>.</p>
+            </x-flash>
 
-            @if (! empty($voucherNotice))
-                <div role="status" class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
-                    {{ $voucherNotice }}
-                </div>
-            @endif
+            <x-flash type="warning" :message="$voucherNotice" spacing="mb-4" />
 
             @if ($errors->any())
                 <div role="alert" class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-900">
@@ -44,7 +37,8 @@
                       data-merchandise-minor="{{ $merchandiseTotalMinor ?? $summary->totalCentavos }}"
                       data-merchandise-savings-minor="{{ $summary->discountCentavos }}"
                       data-shipping-voucher-type="{{ $shippingVoucher?->type->value }}"
-                      data-shipping-voucher-value="{{ $shippingVoucher?->value }}">
+                      data-shipping-voucher-value="{{ $shippingVoucher?->value }}"
+                      data-shipping-voucher-cap="{{ $shippingVoucher?->max_discount }}">
                     @csrf
                     @isset($checkoutToken)
                         <input type="hidden" name="checkout_token" value="{{ $checkoutToken }}">
@@ -55,7 +49,7 @@
                         <input type="hidden" name="address_fingerprint" value="{{ $addressFingerprint }}">
                     @endisset
 
-                    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_420px]">
+                    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
                         {{-- Left column: address + payment --}}
                         <div class="flex min-w-0 flex-col gap-4">
                             {{-- Shipping address --}}
@@ -91,12 +85,12 @@
                                     <div class="flex items-start justify-between gap-3">
                                         <div class="min-w-0">
                                             <p class="text-[13.5px] font-semibold text-buyer-ink">{{ $buyer->fullName() }}</p>
-                                            <p class="mt-0.5 text-[12.5px] text-neutral-500">{{ $buyer->contact_no }}</p>
+                                            <p class="mt-0.5 text-[12.5px] text-buyer-ink-soft">{{ $buyer->contact_no }}</p>
                                             <p class="mt-2 text-[13px] text-buyer-ink">{{ $confirmFull ?: '— no address on file —' }}</p>
                                         </div>
                                         <a href="{{ route('buyer.account.address') }}" class="shrink-0 text-[12.5px] font-semibold text-primary-800 underline">Manage addresses</a>
                                     </div>
-                                    <p class="mt-3 text-[11.5px] text-neutral-400">
+                                    <p class="mt-3 text-[11.5px] text-buyer-ink-soft">
                                         Deliver to this saved address. Your order is frozen to this address once placed.
                                     </p>
                                 </div>
@@ -113,10 +107,10 @@
                                                 <li>
                                                     <a href="{{ route('buyer.checkout.index', ['items' => $checkoutItemIds, 'address' => $option->id]) }}"
                                                        @if ($isSelected) aria-current="true" @endif
-                                                       class="block rounded-xl border px-4 py-3 text-[12.5px] {{ $isSelected ? 'border-primary-800 bg-secondary-50/40 font-semibold text-buyer-ink' : 'border-buyer-line text-neutral-500 hover:border-primary-800' }}">
+                                                       class="block rounded-xl border px-4 py-3 text-[12.5px] {{ $isSelected ? 'border-primary-800 bg-secondary-50/40 font-semibold text-buyer-ink' : 'border-buyer-line text-buyer-ink-soft hover:border-primary-800' }}">
                                                         {{ $option->summary() }}
                                                         @if ($option->is_default)
-                                                            <span class="ml-1 text-[11.5px] font-normal text-neutral-400">(Default)</span>
+                                                            <span class="ml-1 text-[11.5px] font-normal text-buyer-ink-soft">(Default)</span>
                                                         @endif
                                                     </a>
                                                 </li>
@@ -129,7 +123,7 @@
                             {{-- Shipping carriers (one selection per seller group) --}}
                             <section class="rounded-2xl border border-buyer-line bg-white p-5">
                                 <h2 class="font-serif text-[18px] font-semibold text-buyer-ink mb-1">Shipping</h2>
-                                <p class="mb-4 text-[12.5px] text-neutral-400">Choose one carrier for each shop. Fees are calculated for your delivery address.</p>
+                                <p class="mb-4 text-[12.5px] text-buyer-ink-soft">Choose one carrier for each shop. Fees are calculated for your delivery address.</p>
 
                                 <p data-checkout-shipping-block class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900" @if($carriersAvailable ?? false) hidden @endif>
                                     Shipping must be available for every shop before you can place this order. Check each shop below for the issue and next step.
@@ -139,12 +133,13 @@
                                     @foreach (($carrierOptions ?? []) as $carrierGroup)
                                         <div class="rounded-xl border border-buyer-line p-4"
                                              data-carrier-group
+                                             data-voucher-eligible="{{ ($summary->voucherApplication->shippingEligibility[$carrierGroup['seller_id']] ?? false) ? '1' : '0' }}"
                                              data-seller-id="{{ $carrierGroup['seller_id'] }}"
                                              data-available="{{ $carrierGroup['available'] ? '1' : '0' }}">
                                             <div class="mb-3 flex flex-wrap items-start justify-between gap-2">
                                                 <div>
                                                     <p class="text-[13.5px] font-semibold text-buyer-ink">{{ $carrierGroup['seller_name'] }}</p>
-                                                    <p class="mt-0.5 text-[11.5px] text-neutral-400">
+                                                    <p class="mt-0.5 text-[11.5px] text-buyer-ink-soft">
                                                         @if ($carrierGroup['route'] === 'same_province')
                                                             Same-province delivery
                                                         @elseif ($carrierGroup['route'] === 'cross_province')
@@ -204,7 +199,7 @@
                                                                        class="h-4 w-4 shrink-0 accent-primary-800">
                                                                 <span class="truncate text-[13px] font-medium text-buyer-ink">{{ $carrier['name'] }}</span>
                                                                  @if (! empty($carrier['destination_name']))
-                                                                     <span class="ml-1 truncate text-[10.5px] text-neutral-400">via {{ $carrier['destination_name'] }}</span>
+                                                                     <span class="ml-1 truncate text-[10.5px] text-buyer-ink-soft">via {{ $carrier['destination_name'] }}</span>
                                                                  @endif
                                                             </span>
                                                             <span class="shrink-0 text-[12.5px] font-semibold text-buyer-ink">{{ $carrier['fee_formatted'] }}</span>
@@ -240,31 +235,22 @@
                                                 class="mt-0.5 h-4 w-4 cursor-pointer accent-primary-800">
                                             <div class="flex-1">
                                                 <span class="block font-semibold text-buyer-ink">Cash on Delivery (COD)</span>
-                                                <p class="text-[12.5px] text-neutral-400 mt-0.5">Pay cash when your order is delivered.</p>
+                                                <p class="text-[12.5px] text-buyer-ink-soft mt-0.5">Pay cash when your order is delivered.</p>
                                             </div>
                                         </label>
                                 </div>
                             </section>
 
-                            {{-- Place order button --}}
-                            <button type="submit"
-                                    data-checkout-place-order
-                                    class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-800 px-6 py-4 text-[14px] font-semibold text-white transition-opacity enabled:cursor-pointer enabled:hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-800 disabled:cursor-not-allowed disabled:opacity-40"
-                                    @disabled($summary->subtotalCentavos === 0 || ! ($carriersAvailable ?? false))>
-                                <i data-lucide="shopping-bag" width="18" height="18" aria-hidden="true"></i>
-                                <span data-checkout-place-label class="text-white">Place Order — ₱{{ number_format(($payableTotalMinor ?? $summary->totalCentavos) / 100, 2) }}</span>
-                            </button>
-
-                            <p class="mt-3 text-center text-[11px] text-neutral-400">
-                                By placing your order, you agree to our Terms of Service and Privacy Policy.
-                            </p>
                         </div>
 
                         {{-- Right column: order summary (read-only) --}}
-                        <aside class="lg:sticky lg:top-6 lg:h-fit">
+                        <aside class="min-w-0 lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-fit">
                             <section class="rounded-2xl border border-buyer-line bg-white p-5">
                                 <h2 class="font-serif text-[20px] font-semibold text-buyer-ink mb-4">Order Summary <span class="text-[13px]">{{ $summary->selectedLineCount() }} {{ Str::plural('item', $summary->selectedLineCount()) }}</span></h2>
 
+                                <details data-checkout-items class="mb-4">
+                                    <summary class="cursor-pointer text-sm font-semibold text-primary-800">View items</summary>
+                                    <div class="mt-3">
                                 {{-- Seller groups (items) --}}
                                 @foreach ($summary->sellerGroups as $group)
                                     <div class="border-b border-buyer-line pb-4 mb-4 last:border-0 last:pb-0 last:mb-0">
@@ -280,16 +266,16 @@
                                                              alt="{{ $item->product->name }}" class="h-12 w-12 rounded object-cover shrink-0">
                                                     @else
                                                         <div class="h-12 w-12 rounded bg-secondary-100 flex items-center justify-center shrink-0">
-                                                            <i data-lucide="package" width="16" height="16" class="text-neutral-400"></i>
+                                                            <i data-lucide="package" width="16" height="16" class="text-buyer-ink-soft"></i>
                                                         </div>
                                                     @endif
                                                     <div class="min-w-0">
                                                         <p class="font-medium text-buyer-ink truncate">{{ $item->product->name }}</p>
                                                         @if ($variantLabels[$item->id] !== '')
-                                                            <p class="text-[11.5px] text-neutral-400">{{ $variantLabels[$item->id] }}</p>
+                                                            <p class="text-[11.5px] text-buyer-ink-soft">{{ $variantLabels[$item->id] }}</p>
                                                         @endif
-                                                        <p class="text-[11.5px] text-neutral-400">Qty: {{ $item->quantity }}</p>
-                                                        <p class="text-[11.5px] text-neutral-400">Unit Price: ₱{{ number_format($item->unitPriceCentavos() / 100, 2) }}@if ($regularPrice = $item->resolvedPrice()?->formattedRegular()) <span class="line-through">{{ $regularPrice }}</span>@endif</p>
+                                                        <p class="text-[11.5px] text-buyer-ink-soft">Qty: {{ $item->quantity }}</p>
+                                                        <p class="text-[11.5px] text-buyer-ink-soft">Unit Price: ₱{{ number_format($item->unitPriceCentavos() / 100, 2) }}@if ($regularPrice = $item->resolvedPrice()?->formattedRegular()) <span class="line-through">{{ $regularPrice }}</span>@endif</p>
                                                     </div>
                                                 </div>
                                                 <span class="font-semibold text-buyer-ink shrink-0">Subtotal: {{ $item->formattedLineTotal() }}</span>
@@ -297,6 +283,9 @@
                                         @endforeach
                                     </div>
                                 @endforeach
+
+                                    </div>
+                                </details>
 
                                 {{-- Unavailable items notice --}}
                                 @if ($summary->unavailableItems->isNotEmpty())
@@ -308,21 +297,21 @@
                                 {{-- Totals --}}
                                 <div class="flex flex-col gap-2.5 border-t border-buyer-line pt-4">
                                     <div class="flex items-center justify-between text-[12.5px]">
-                                        <span class="text-neutral-400">Subtotal</span>
+                                        <span class="text-buyer-ink-soft">Subtotal</span>
                                         <span class="font-serif text-[14px] font-semibold text-buyer-ink">{{ $summary->formattedSubtotal() }}</span>
                                     </div>
 
                                     @foreach (($vouchers ?? []) as $applied)
                                         @if ($applied['scope'] !== 'shipping')
                                             <div class="flex items-center justify-between gap-3 text-[12.5px] text-tertiary-700">
-                                                <span class="min-w-0 truncate">{{ $applied['code'] }} <span class="text-[10.5px] text-neutral-400">({{ $applied['scope'] }})</span></span>
+                                                <span class="min-w-0 truncate">{{ $applied['code'] }} <span class="text-[10.5px] text-buyer-ink-soft">({{ $applied['scope'] }})</span></span>
                                                 <span class="shrink-0 font-semibold">{{ $applied['discount_minor'] > 0 ? $applied['discount_formatted'] : 'Applied' }}</span>
                                             </div>
                                         @endif
                                     @endforeach
 
                                     <div class="flex items-center justify-between text-[12.5px]">
-                                        <span class="text-neutral-400">Shipping</span>
+                                        <span class="text-buyer-ink-soft">Shipping</span>
                                         <span class="font-semibold text-buyer-ink" data-checkout-shipping-total>
                                             @if ($shippingTotalMinor ?? 0)
                                                 ₱{{ number_format(($shippingTotalMinor ?? 0) / 100, 2) }}
@@ -351,15 +340,29 @@
                                             ₱{{ number_format(($payableTotalMinor ?? $summary->totalCentavos) / 100, 2) }}
                                         </span>
                                     </div>
-                                    <p class="mt-2 text-[11px] text-neutral-400">Items minus product vouchers, plus shipping minus any shipping voucher. Only the final total is due. You can track your parcel from My Orders once your order is placed.</p>
+                                    <p class="mt-2 text-[11px] text-buyer-ink-soft">Items minus product vouchers, plus shipping minus any shipping voucher. Only the final total is due. You can track your parcel from My Orders once your order is placed.</p>
                                 </div>
 
-                                <p class="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-neutral-400">
+                                <p class="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-buyer-ink-soft">
                                     <i data-lucide="lock" width="12" height="12"></i>
                                     Secure 256-bit SSL encrypted checkout
                                 </p>
                             </section>
                         </aside>
+                        <div class="min-w-0 lg:col-start-1 lg:row-start-2 lg:self-start">
+                            {{-- Place order button --}}
+                            <button type="submit"
+                                    data-checkout-place-order
+                                    class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-800 px-6 py-4 text-[14px] font-semibold text-white transition-opacity enabled:cursor-pointer enabled:hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-800 disabled:cursor-not-allowed disabled:opacity-40"
+                                    @disabled($summary->subtotalCentavos === 0 || ! ($carriersAvailable ?? false))>
+                                <i data-lucide="shopping-bag" width="18" height="18" aria-hidden="true"></i>
+                                <span data-checkout-place-label class="text-white">Place Order — ₱{{ number_format(($payableTotalMinor ?? $summary->totalCentavos) / 100, 2) }}</span>
+                            </button>
+
+                            <p class="mt-3 text-center text-[11px] text-buyer-ink-soft">
+                                By placing your order, you agree to our Terms of Service and Privacy Policy.
+                            </p>
+                        </div>
                     </div>
                 </form>
             @endif

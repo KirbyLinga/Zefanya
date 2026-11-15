@@ -51,6 +51,8 @@ final class CartSummary
     /** @var array<int>|null null = all available items, [] = nothing selected */
     private readonly ?array $selectedIds;
 
+    private readonly string $reviewedPriceFingerprint;
+
     public function __construct(
         /** @param Collection<int, CartItem> $allItems All cart items, already loaded with product.images + product.seller + product.category */
         Collection $allItems,
@@ -86,10 +88,15 @@ final class CartSummary
 
         // Totals computed over selected items only. Bind first so a bundle or
         // Buy X Get Y sees the lines being purchased, not the rest of the cart.
-        app(OfferPricing::class)->bind($this->selectedItems());
+        $offers = app(OfferPricing::class);
+        $offers->bind($selectedAvailable);
 
-        $this->subtotalCentavos = (int) $this->selectedItems()
+        $this->subtotalCentavos = (int) $selectedAvailable
             ->sum(fn (CartItem $i): int => $i->lineTotalCentavos());
+        $lines = $selectedAvailable->sortBy('id')->map(fn (CartItem $item): array => [
+            $item->id, $item->product_id, $item->variant_id, $item->quantity, $offers->portions($item),
+        ])->values();
+        $this->reviewedPriceFingerprint = hash('sha256', $lines->toJson(JSON_THROW_ON_ERROR));
 
         $this->voucherApplication = match (true) {
             $voucher instanceof VoucherApplication => $voucher,
@@ -144,18 +151,11 @@ final class CartSummary
     }
 
     /**
-     * Identifies the unit prices of the selected lines. The checkout page sends
-     * it back, so a price that moved while the buyer was reviewing (a sale
-     * starting or ending) stops the order instead of charging a different total.
+     * Identifies the reviewed quantities and effective prices, including offer portions.
      */
     public function priceFingerprint(): string
     {
-        $lines = $this->selectedItems()
-            ->sortBy('id')
-            ->map(fn (CartItem $i): string => $i->id.':'.$i->unitPriceCentavos())
-            ->implode('|');
-
-        return hash('sha256', $lines);
+        return $this->reviewedPriceFingerprint;
     }
 
     // ── Formatted helpers (₱X,XXX.XX) ───────────────────────────────────────

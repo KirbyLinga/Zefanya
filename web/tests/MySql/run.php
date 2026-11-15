@@ -19,13 +19,15 @@ try {
     }
     $arguments = array_slice($argv, 1);
     foreach ($arguments as $argument) {
-        if (! str_starts_with($argument, '--filter=') && ! in_array($argument, ['--testdox', '--no-progress'], true)) {
+        if (! str_starts_with($argument, '--filter=') && ! in_array($argument, ['--testdox', '--no-progress', '--debug'], true)) {
             throw new RuntimeException('Unsupported runner argument.');
         }
     }
     $process = new Process([PHP_BINARY, dirname(__DIR__, 2).'/vendor/phpunit/phpunit/phpunit',
         '--configuration', dirname(__DIR__, 2).'/phpunit.mysql.xml', ...$arguments], dirname(__DIR__, 2));
-    $process->setTimeout(240);
+    // Each case cleans the isolated InnoDB schema and boots independent workers.
+    // The worker and SQL lock deadlines still bound each individual race.
+    $process->setTimeout(1800);
     exit($process->run(fn ($type, $buffer) => print ($buffer)));
 } catch (Throwable $exception) {
     fwrite(STDERR, 'T05 stopped: '.get_class($exception)." (credentials suppressed).\n");

@@ -58,10 +58,16 @@
                 <form method="POST" action="{{ route('admin.two-factor.disable') }}" class="mt-4 grid gap-4 sm:grid-cols-2">
                     @csrf
 
-                    <label class="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-600">
+                    <label class="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-600" for="twoFactorPassword">
                         Password
-                        <input name="password" type="password" required autocomplete="current-password"
-                               class="h-10 rounded-lg border border-neutral-300 px-3 text-sm font-normal normal-case tracking-normal text-neutral-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200" />
+                        <span class="relative block">
+                            <input id="twoFactorPassword" name="password" type="password" required autocomplete="current-password"
+                                   class="h-10 w-full rounded-lg border border-neutral-300 px-3 pr-10 text-sm font-normal normal-case tracking-normal text-neutral-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200" />
+                            <button type="button" data-toggle-visibility="twoFactorPassword" aria-label="Show password" aria-pressed="false" aria-controls="twoFactorPassword"
+                                    class="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-neutral-500 hover:text-neutral-800">
+                                <i data-lucide="eye" width="16" height="16"></i>
+                            </button>
+                        </span>
                     </label>
 
                     <label class="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-600">
@@ -113,3 +119,7 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+    @include('Components.password-toggle-script')
+@endpush

@@ -46,6 +46,8 @@ class WebRiderRegistrationTest extends TestCase
 
         foreach (['buyer', 'seller', 'logistics', 'rider'] as $role) {
             $this->assertSame(1, $xpath->query('//*[@data-'.$role.'-register-trigger]')->length);
+            $trigger = $xpath->query('//*[@data-'.$role.'-register-trigger]')->item(0);
+            $this->assertSame(route('register.'.$role), $trigger->getAttribute('href'), $role.' registration trigger must use its existing route.');
         }
         $this->assertSame(1, $xpath->query('//*[@id="riderModalOverlay"]//*[@role="dialog"]')->length);
         foreach (['first_name', 'last_name', 'middle_initial', 'sex', 'birthday', 'email', 'contact_no', 'password', 'password_confirmation', 'address_mode', 'province', 'municipality', 'barangay', 'street', 'house_number', 'address_detail', 'postal_code', 'license_no', 'license_expiry', 'vehicle_type', 'plate_number', 'logistics_provider_id', 'drivers_license', 'or_cr', 'terms'] as $field) {
@@ -77,6 +79,33 @@ class WebRiderRegistrationTest extends TestCase
     public function test_rider_direct_link_returns_to_the_existing_registration_page(): void
     {
         $this->get(route('register.rider'))->assertRedirect(route('register.type', ['open' => 'rider']));
+    }
+
+    public function test_role_registration_urls_redirect_to_the_existing_role_entry(): void
+    {
+        foreach (['buyer', 'seller', 'logistics', 'rider'] as $role) {
+            $this->get(route('register.'.$role))
+                ->assertRedirect(route('register.type', ['open' => $role]));
+        }
+    }
+
+    public function test_buyer_navbar_register_link_uses_the_existing_buyer_route(): void
+    {
+        $this->withoutVite();
+
+        $html = view('Components.navbar', [
+            'variant' => 'buyer',
+            'showRegisterModal' => true,
+            'categories' => collect(),
+        ])->render();
+
+        $document = new \DOMDocument;
+        @$document->loadHTML($html);
+        $xpath = new \DOMXPath($document);
+        $registerLink = $xpath->query('//a[@data-buyer-register-trigger]')->item(0);
+
+        $this->assertNotNull($registerLink);
+        $this->assertSame(route('register.buyer'), $registerLink->getAttribute('href'));
     }
 
     public function test_web_form_submits_and_verifies_to_pending_without_a_rider_session(): void

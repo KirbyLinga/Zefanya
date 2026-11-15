@@ -5,6 +5,7 @@ namespace Tests\Feature\Http\Controllers\Buyer;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Enums\PromotionKind;
 use App\Http\Controllers\Buyer\CheckoutController;
 use App\Models\Buyer\Buyer;
 use App\Models\Buyer\CartItem;
@@ -13,10 +14,12 @@ use App\Models\Catalog\InventoryTransaction;
 use App\Models\Catalog\Product;
 use App\Models\Catalog\ProductVariant;
 use App\Models\Seller\Seller;
+use App\Models\Seller\SellerPromotion;
 use App\Models\Shared\Order;
 use App\Models\Shared\OrderItem;
 use App\Models\Shared\Payment;
 use App\Models\Shared\Voucher;
+use App\Services\Buyer\CheckoutService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -74,6 +77,35 @@ class CheckoutFinancialIntegrityTest extends TestCase
         return [['1.04', 10, 10], ['1.05', 10, 11], ['1.06', 10, 11], ['9.99', 15, 150], ['0.01', 50, 1]];
     }
 
+    public static function priceBoundaries(): array
+    {
+        return [['0.01', 1], ['0.05', 5], ['99.99', 9999], ['999.99', 99999],
+            ['10000.00', 1000000], ['1000000.00', 100000000]];
+    }
+
+    #[DataProvider('priceBoundaries')]
+    public function test_order_and_cod_use_server_price_at_centavo_boundaries(string $price, int $minor): void
+    {
+        $buyer = Buyer::factory()->create();
+        $line = $this->line($buyer, $price);
+        $token = $this->prepareCheckout($buyer, [$line]);
+
+        $this->post(route('buyer.checkout.store'), $this->storePayload($token, [$line], [
+            'price' => '0.01', 'unit_price_minor' => 0, 'quantity' => -10,
+            'subtotal_minor' => -1, 'total_minor' => -100, 'seller_id' => 0,
+        ]))->assertRedirect();
+
+        $order = Order::query()->sole();
+        $shipment = $order->sellerOrders()->sole();
+        $item = $shipment->orderItems()->sole();
+        $this->assertSame($minor, $item->price_minor);
+        $this->assertSame(1, $item->quantity);
+        $this->assertSame($line->product->seller_id, $shipment->seller_id);
+        $this->assertSame($minor, $order->subtotal_minor);
+        $this->assertSame($minor + $shipment->shipping_fee_minor, $order->total_minor);
+        $this->assertSame($order->total_minor, $shipment->payment->amount_minor);
+    }
+
     #[DataProvider('percentageDiscountBoundaries')]
     public function test_cart_checkout_order_and_cod_share_the_same_half_up_discount(string $price, int $percent, int $discount): void
     {
@@ -95,7 +127,7 @@ class CheckoutFinancialIntegrityTest extends TestCase
         $payment = Payment::query()->sole();
         $this->assertSame($discount, $order->discount_minor);
         $this->assertSame($discount, $sellerOrder->voucher_discount_minor);
-        $this->assertSame($summary->totalCentavos + 4900, $order->total_minor);
+        $this->assertSame($summary->totalCentavos + 5000, $order->total_minor);
         $this->assertSame($order->total_minor, $payment->amount_minor);
         $this->assertSame(PaymentMethod::Cod, $payment->method);
         $this->assertSame(PaymentStatus::Pending, $payment->status);
@@ -116,8 +148,149 @@ class CheckoutFinancialIntegrityTest extends TestCase
         $this->assertSame(15, $order->subtotal_minor);
         $this->assertSame(2, $order->discount_minor);
         $this->assertSame(2, (int) $order->sellerOrders()->sum('voucher_discount_minor'));
-        $this->assertSame(9813, $order->total_minor);
-        $this->assertSame(9813, (int) Payment::query()->sum('amount_minor'));
+        $this->assertSame(10013, $order->total_minor);
+        $this->assertSame(10013, (int) Payment::query()->sum('amount_minor'));
+    }
+
+    public function test_failure_after_voucher_consumption_rolls_back_checkout_and_token(): void
+    {
+        $buyer = Buyer::factory()->create();
+        $line = $this->line($buyer);
+        $voucher = Voucher::factory()->fixed(1000)->create(['usage_limit' => 1]);
+        $token = $this->prepareCheckout($buyer, [$line], $voucher->code);
+        $this->mock(CheckoutService::class, function ($mock): void {
+            $mock->makePartial()->shouldReceive('planRoutesForOrder')->once()->andThrow(new \RuntimeException('Injected checkout failure'));
+        });
+
+        $this->post(route('buyer.checkout.store'), $this->storePayload($token, [$line]))->assertServerError();
+
+        $this->assertSame(0, $voucher->fresh()->times_used);
+        $this->assertFalse($token->fresh()->used);
+        $this->assertNotNull($line->fresh());
+        $this->assertSame(10, $line->variant->fresh()->stock_quantity);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('payments', 0);
+        $this->assertDatabaseCount('inventory_transactions', 0);
+    }
+
+    public function test_checkout_persists_restricted_marketplace_vouchers_only_on_eligible_shipments(): void
+    {
+        $buyer = Buyer::factory()->create();
+        $eligible = $this->line($buyer);
+        $other = $this->line($buyer, '200.00');
+        $platform = Voucher::factory()->platform()->fixed(20000)->create([
+            'applies_to_all_products' => false, 'funding_source' => Voucher::FUNDING_MARKETPLACE,
+        ]);
+        $shipping = Voucher::factory()->shipping()->fixed(1000)->create([
+            'applies_to_all_products' => false, 'funding_source' => Voucher::FUNDING_MARKETPLACE,
+        ]);
+        $platform->products()->attach($eligible->product_id);
+        $shipping->products()->attach($eligible->product_id);
+        $token = $this->prepareCheckout($buyer, [$eligible, $other]);
+        session(['cart_vouchers' => ['platform' => $platform->code, 'shipping' => $shipping->code]]);
+
+        $this->post(route('buyer.checkout.store'), $this->storePayload($token, [$eligible, $other]))
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $order = Order::query()->sole();
+        $shipments = $order->sellerOrders()->with('payment')->get()->keyBy('seller_id');
+        $discounted = $shipments[$eligible->product->seller_id];
+        $undiscounted = $shipments[$other->product->seller_id];
+        $this->assertSame(11000, $discounted->marketplace_funded_discount_minor);
+        $this->assertSame(4000, $discounted->payment->amount_minor);
+        $this->assertNull($undiscounted->platform_voucher_id);
+        $this->assertNull($undiscounted->shipping_voucher_id);
+        $this->assertSame(25000, $undiscounted->payment->amount_minor);
+        $this->assertSame(29000, $order->total_minor);
+        $this->assertSame(1, $platform->fresh()->times_used);
+        $this->assertSame(1, $shipping->fresh()->times_used);
+    }
+
+    public function test_a_quantity_change_before_submission_invalidates_the_reviewed_price(): void
+    {
+        $this->withoutVite();
+        $buyer = Buyer::factory()->create();
+        $line = $this->line($buyer);
+        $this->prepareCheckout($buyer, [$line]);
+        $page = $this->get(route('buyer.checkout.index'))->assertOk();
+        $token = CheckoutToken::query()->where('token', $page->viewData('checkoutToken'))->sole();
+        $line->update(['quantity' => 2]);
+
+        $this->post(route('buyer.checkout.store'), $this->storePayload($token, [$line]))
+            ->assertSessionHas('error');
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertFalse($token->fresh()->used);
+    }
+
+    public function test_checkout_rejects_totals_above_the_storage_range_without_partial_writes(): void
+    {
+        $buyer = Buyer::factory()->create();
+        $line = $this->line($buyer, '1000000.00');
+        $line->variant->update(['stock_quantity' => 50]);
+        $line->update(['quantity' => 50]);
+        $token = $this->prepareCheckout($buyer, [$line]);
+
+        $this->post(route('buyer.checkout.store'), $this->storePayload($token, [$line]))->assertSessionHas('error');
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('payments', 0);
+        $this->assertFalse($token->fresh()->used);
+        $this->assertSame(50, $line->variant->fresh()->stock_quantity);
+    }
+
+    public function test_failure_after_stock_deduction_rolls_back_the_order_and_ledger(): void
+    {
+        $buyer = Buyer::factory()->create();
+        $line = $this->line($buyer);
+        $token = $this->prepareCheckout($buyer, [$line]);
+        DB::connection()->beforeExecuting(function (string $query): void {
+            if (str_contains(strtolower($query), 'insert into "inventory_transactions"')) {
+                throw new \RuntimeException('Injected checkout ledger failure.');
+            }
+        });
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->post(route('buyer.checkout.store'), $this->storePayload($token, [$line]));
+            $this->fail('The injected failure must stop checkout.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Injected checkout ledger failure.', $exception->getMessage());
+        }
+
+        $this->assertSame(10, $line->variant->fresh()->stock_quantity);
+        $this->assertSame(10, $line->product->fresh()->stock_quantity);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('payments', 0);
+        $this->assertDatabaseCount('inventory_transactions', 0);
+        $this->assertDatabaseHas('cart_items', ['id' => $line->id]);
+        $this->assertFalse($token->fresh()->used);
+    }
+
+    public function test_an_ended_buy_x_get_y_promotion_invalidates_the_reviewed_price(): void
+    {
+        $this->withoutVite();
+        $buyer = Buyer::factory()->create();
+        $line = $this->line($buyer);
+        $line->update(['quantity' => 3]);
+        $promotion = SellerPromotion::query()->create([
+            'seller_id' => $line->product->seller_id,
+            'kind' => PromotionKind::BuyXGetY,
+            'name' => 'Buy 2 Get 1',
+            'buy_quantity' => 2,
+            'get_quantity' => 1,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHour(),
+        ]);
+        $promotion->products()->sync([$line->product_id]);
+        $this->prepareCheckout($buyer, [$line]);
+        $page = $this->get(route('buyer.checkout.index'))->assertOk();
+        $token = CheckoutToken::query()->where('token', $page->viewData('checkoutToken'))->sole();
+        $fingerprint = $page->viewData('summary')->priceFingerprint();
+        $promotion->update(['ends_at' => now()->subMinute()]);
+
+        $this->post(route('buyer.checkout.store'), $this->storePayload($token, [$line], ['price_fingerprint' => $fingerprint]))
+            ->assertSessionHas('error');
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertFalse($token->fresh()->used);
+        $this->assertSame(10, $line->variant->fresh()->stock_quantity);
     }
 
     public function test_checkout_only_displays_cash_on_delivery(): void
@@ -217,7 +390,7 @@ class CheckoutFinancialIntegrityTest extends TestCase
         $discount = $price === '125.99' ? 1000 : 0;
         $this->assertSame($minor, $order->subtotal_minor);
         $this->assertSame($discount, $order->discount_minor);
-        $this->assertSame($minor - $discount + 4900, $order->total_minor);
+        $this->assertSame($minor - $discount + 5000, $order->total_minor);
         $this->assertSame($minor, OrderItem::query()->sole()->price_minor);
         $this->assertSame($order->total_minor, Payment::query()->sole()->amount_minor);
     }
@@ -236,10 +409,10 @@ class CheckoutFinancialIntegrityTest extends TestCase
         $order = Order::query()->sole();
         $this->assertSame(5, $order->subtotal_minor);
         $this->assertSame(1, $order->discount_minor);
-        $this->assertSame(9804, $order->total_minor);
+        $this->assertSame(10004, $order->total_minor);
         $this->assertSame(5, (int) $order->sellerOrders()->sum('subtotal_minor'));
         $this->assertSame([3, 2], OrderItem::query()->orderBy('id')->pluck('price_minor')->all());
-        $this->assertSame([4902, 4902], Payment::query()->orderBy('id')->pluck('amount_minor')->all());
+        $this->assertSame([5002, 5002], Payment::query()->orderBy('id')->pluck('amount_minor')->all());
         $this->assertTrue(Payment::query()->get()->every(fn ($payment) => $payment->method === PaymentMethod::Cod));
         $this->assertSame(2, InventoryTransaction::query()->where('reason', 'checkout')->count());
     }

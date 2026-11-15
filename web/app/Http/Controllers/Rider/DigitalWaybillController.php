@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Rider;
 
-use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Shared\SellerOrder;
 use App\Services\Rider\RiderOperationsService;
+use App\Services\Rider\RiderWaybillService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\View\View;
@@ -20,6 +20,7 @@ class DigitalWaybillController extends Controller
         Request $request,
         SellerOrder $sellerOrder,
         RiderOperationsService $operations,
+        RiderWaybillService $waybills,
     ): View|Response {
         $rider = $request->user('rider');
         $courier = $operations->operationalCourier($rider, allowWindDown: true);
@@ -31,20 +32,9 @@ class DigitalWaybillController extends Controller
             'payment',
         ]);
 
-        $isPickup = (int) $sellerOrder->courier_id === (int) $courier->id
-            && in_array($sellerOrder->status, [
-                OrderStatus::ReadyForPickup,
-                OrderStatus::PickedUp,
-            ], true);
-
-        $isDelivery = (int) $sellerOrder->delivery_courier_id === (int) $courier->id
-            && in_array($sellerOrder->status, [
-                OrderStatus::AssignedToRider,
-                OrderStatus::OutForDelivery,
-                OrderStatus::DeliveryFailed,
-            ], true);
-
-        abort_unless($isPickup || $isDelivery, 403, 'This waybill is not available for your assignment.');
+        $context = $waybills->context($courier, $sellerOrder);
+        $isPickup = $context === 'pickup';
+        $isDelivery = ! $isPickup;
 
         $view = view('Rider.Waybills.show', [
             'sellerOrder' => $sellerOrder,

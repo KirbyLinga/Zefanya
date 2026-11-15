@@ -99,6 +99,92 @@ class BuyerChatTest extends TestCase
         $this->get(route('buyer.messages.show', $conversation))->assertOk()->assertSee('id="messageForm"', false);
     }
 
+    public function test_full_messages_pages_keep_the_inbox_and_exclude_the_floating_host(): void
+    {
+        $conversation = $this->conversation();
+        $this->actingAs($this->buyer, 'buyer');
+
+        foreach ([route('buyer.messages.index'), route('buyer.messages.show', $conversation)] as $url) {
+            $this->get($url)->assertOk()
+                ->assertSee('data-chat-widget="false"', false)
+                ->assertSee('class="inbox-panel"', false)
+                ->assertDontSee('id="buyer-chat-host"', false);
+        }
+    }
+
+    public function test_widget_reuses_authorized_chat_without_the_buyer_layout(): void
+    {
+        $conversation = $this->conversation();
+        $this->actingAs($this->buyer, 'buyer');
+        $widgetUrl = route('buyer.messages.show', ['conversation' => $conversation, 'widget' => 1]);
+
+        $this->get(route('buyer.messages.index', ['widget' => 1]))->assertOk()
+            ->assertSee('data-chat-widget="true"', false)
+            ->assertSee($widgetUrl, false)
+            ->assertDontSee('id="buyer-chat-host"', false)
+            ->assertDontSee('<main', false);
+
+        $this->get($widgetUrl)->assertOk()
+            ->assertSee('id="messageForm"', false)
+            ->assertSee(route('buyer.messages.index', ['widget' => 1]), false)
+            ->assertDontSee('<main', false);
+    }
+
+    public function test_only_authenticated_chat_widget_responses_allow_same_origin_framing(): void
+    {
+        $conversation = $this->conversation();
+        $widgetUrls = [
+            route('buyer.messages.index', ['widget' => 1]),
+            route('buyer.messages.show', ['conversation' => $conversation, 'widget' => 1]),
+        ];
+
+        $this->get($widgetUrls[0])->assertRedirect();
+        $this->actingAs($this->buyer, 'buyer');
+
+        foreach ($widgetUrls as $url) {
+            $response = $this->get($url)->assertOk()->assertHeader('X-Frame-Options', 'SAMEORIGIN');
+            $this->assertStringContainsString("frame-ancestors 'self'", $response->headers->get('Content-Security-Policy-Report-Only'));
+        }
+
+        foreach ([
+            route('buyer.messages.index'),
+            route('buyer.messages.show', $conversation),
+            route('buyer.messages.index', ['widget' => 0]),
+            route('buyer.pages.about', ['widget' => 1]),
+        ] as $url) {
+            $response = $this->get($url)->assertOk()->assertHeader('X-Frame-Options', 'DENY');
+            $this->assertStringContainsString("frame-ancestors 'none'", $response->headers->get('Content-Security-Policy-Report-Only'));
+        }
+    }
+
+    public function test_widget_rejects_another_buyers_conversation_with_recovery(): void
+    {
+        $conversation = Conversation::create([
+            'buyer_id' => Buyer::factory()->create()->id,
+            'seller_id' => $this->seller->id,
+        ]);
+        Message::create(['conversation_id' => $conversation->id, 'sender_role' => 'seller', 'sender_id' => $this->seller->id, 'body' => 'Private seller message']);
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.messages.show', ['conversation' => $conversation, 'widget' => 1]))
+            ->assertForbidden()->assertSee('data-chat-widget-error', false)
+            ->assertSee('Open conversations')->assertDontSee('Private seller message');
+
+        $this->assertNull(Message::sole()->read_at);
+    }
+
+    public function test_floating_host_is_only_rendered_for_signed_in_buyers_on_other_pages(): void
+    {
+        $url = route('buyer.pages.about');
+        $this->get($url)->assertOk()->assertDontSee('id="buyer-chat-host"', false);
+        $this->get(route('buyer.messages.index', ['widget' => 1]))->assertRedirect();
+
+        $this->actingAs($this->buyer, 'buyer')->get($url)->assertOk()
+            ->assertSee('id="buyer-chat-host"', false)
+            ->assertSee('data-chat-launcher', false)
+            ->assertDontSee('<iframe', false);
+    }
+
     public function test_buyer_sends_text_with_the_same_length_rules(): void
     {
         $conversation = $this->conversation();

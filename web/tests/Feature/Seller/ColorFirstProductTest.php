@@ -74,6 +74,7 @@ class ColorFirstProductTest extends TestCase
         $this->assertFalse($product->images()->where('sort_order', '<', 0)->exists());
         $this->assertCount(4, Storage::disk('public')->allFiles('products'));
         $this->assertDatabaseCount('inventory_transactions', 10);
+        $product->forceFill(['status' => 'active', 'approved_at' => now()])->save();
         $this->get(route('buyer.products.show', $product))->assertOk()->assertViewHas('variantData', function ($rows) {
             $this->assertCount(10, $rows);
             $black = collect($rows)->where('values.0', 'Black');
@@ -131,6 +132,7 @@ class ColorFirstProductTest extends TestCase
         $this->assertSame(11, $product->variants()->count());
         $this->assertSame(34, $product->fresh()->stock_quantity);
         $this->assertFalse($product->images()->where('sort_order', '<', 0)->exists());
+        $product->forceFill(['status' => 'active', 'approved_at' => now()])->save();
         $this->get(route('buyer.products.show', $product))->assertViewHas('variantData', function ($rows) use ($oldFiles) {
             $photos = collect($rows)->where('values.0', 'Black')->pluck('images.0');
             $this->assertCount(4, $photos);
@@ -182,6 +184,7 @@ class ColorFirstProductTest extends TestCase
             $this->assertTrue($product->images()->where('path', $path)->exists());
         }
         $this->assertDatabaseCount('inventory_transactions', 10);
+        $product->forceFill(['status' => 'active', 'approved_at' => now()])->save();
         $this->get(route('buyer.products.show', $product))->assertViewHas('variantData', fn ($rows) => collect($rows)->where('values.0', 'Black')->every(fn ($row) => count($row['images']) === 1 && ! str_contains($row['images'][0], $image->path)));
     }
 

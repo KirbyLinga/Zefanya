@@ -14,7 +14,7 @@
                 {{ $pickupStarts->format('M j, Y g:i A') }} &ndash; {{ $pickupEnds->format($pickupStarts->isSameDay($pickupEnds) ? 'g:i A' : 'M j, Y g:i A') }}
                 <span class="{{ $compactPickup ? 'block' : '' }} text-[11px] font-normal text-[var(--text-muted)]">Philippine time</span>
             @elseif ($beforeReady)
-                Window scheduled when marked ready
+                Window scheduled when pickup is requested
             @elseif ($awaitingPickup)
                 Pickup window not available yet
             @else
@@ -28,9 +28,9 @@
     @endif
     @unless ($compactPickup)
         @if ($awaitingPickup)
-            <p class="rounded-lg bg-[var(--bg-page)] p-3 text-xs leading-relaxed text-[var(--text-muted)]">This is a scheduled window, not confirmation of collection. Logistics arranges the pickup rider. If a window is missed, the parcel moves automatically to the next eligible window and keeps its existing rider. This is not a failed pickup. Sellers cannot manually reschedule.</p>
+            <p class="rounded-lg bg-[var(--bg-page)] p-3 text-xs leading-relaxed text-[var(--text-muted)]">This is a scheduled window, not confirmation of collection. Logistics assigns the pickup rider. If a window is missed, the parcel moves automatically to the next eligible window and keeps its existing rider. This is not a failed pickup. Sellers cannot manually reschedule.</p>
         @elseif ($beforeReady)
-            <p class="text-xs leading-relaxed text-[var(--text-muted)]">Marking ready schedules the current eligible or next pickup window. Logistics arranges the pickup rider.</p>
+            <p class="text-xs leading-relaxed text-[var(--text-muted)]">Requesting pickup schedules the current eligible or next pickup window. Logistics assigns the rider.</p>
         @endif
     @endunless
 </div>

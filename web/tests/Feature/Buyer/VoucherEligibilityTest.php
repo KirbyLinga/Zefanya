@@ -12,6 +12,7 @@ use App\Models\Shared\Voucher;
 use App\Services\Buyer\CartSummary;
 use App\Services\Buyer\VoucherApplication;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -33,6 +34,7 @@ class VoucherEligibilityTest extends TestCase
     {
         return [
             'expired' => [['expires_at' => '2020-01-01'], 'This voucher has expired.'],
+            'disabled' => [['is_active' => false], 'This voucher is no longer active.'],
             'not started' => [['starts_at' => '2099-01-01'], 'This voucher is not active yet.'],
             'limit reached' => [['usage_limit' => 1, 'times_used' => 1], 'This voucher has reached its usage limit.'],
             'one cent short' => [['min_spend' => 10001], 'Spend ₱0.01 more to use this voucher.'],
@@ -65,9 +67,9 @@ class VoucherEligibilityTest extends TestCase
 
     public function test_voucher_expires_at_its_exact_expiry_time(): void
     {
-        $this->freezeTime();
+        $this->travelTo(Carbon::parse('2026-11-13 00:00:00', 'Asia/Manila'));
         $this->cart();
-        $voucher = Voucher::factory()->fixed(1000)->create(['expires_at' => now()]);
+        $voucher = Voucher::factory()->fixed(1000)->create(['expires_at' => now()->utc()]);
         $this->postJson(route('buyer.cart.voucher.apply'), ['code' => $voucher->code])
             ->assertStatus(422)->assertJsonPath('error', 'This voucher has expired.');
         $this->assertSame('Expired', $voucher->statusLabel());
@@ -99,6 +101,31 @@ class VoucherEligibilityTest extends TestCase
         $this->assertSame(300, $application->shippingDiscountCentavos);
         $summary = new CartSummary($buyer->cartItems()->with('product.seller', 'variant')->get(), $application);
         $this->assertSame(7000, $summary->totalCentavos);
+    }
+
+    public function test_marketplace_selected_products_control_minimum_spend_and_discount_allocation(): void
+    {
+        [$buyer, $eligible] = $this->cart();
+        $ineligible = Product::factory()->create(['price' => 200, 'stock_quantity' => 10]);
+        CartItem::factory()->create(['buyer_id' => $buyer->id, 'product_id' => $ineligible->id, 'quantity' => 1]);
+        $platform = Voucher::factory()->platform()->fixed(20000)->create([
+            'applies_to_all_products' => false, 'min_spend' => 10001,
+        ]);
+        $platform->products()->attach($eligible);
+        $this->postJson(route('buyer.cart.voucher.apply'), ['code' => $platform->code])
+            ->assertUnprocessable()->assertJsonPath('error', 'Spend ₱0.01 more to use this voucher.');
+
+        $platform->update(['min_spend' => 10000]);
+        $shipping = Voucher::factory()->shipping()->fixed(10000)->create(['applies_to_all_products' => false]);
+        $shipping->products()->attach($eligible);
+        $base = new CartSummary($buyer->cartItems()->with('product.seller', 'variant')->get());
+        $application = new VoucherApplication(collect([$platform->fresh(), $shipping]), $base->sellerGroups, [
+            $eligible->seller_id => 5000, $ineligible->seller_id => 5000,
+        ]);
+        $this->assertSame(10000, $application->platformDiscountFor($eligible->seller_id));
+        $this->assertSame(0, $application->platformDiscountFor($ineligible->seller_id));
+        $this->assertSame(5000, $application->shippingDiscountFor($eligible->seller_id));
+        $this->assertSame(0, $application->shippingDiscountFor($ineligible->seller_id));
     }
 
     public function test_oversized_vouchers_cannot_make_shipping_or_merchandise_negative(): void

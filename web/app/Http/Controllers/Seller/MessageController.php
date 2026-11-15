@@ -74,7 +74,7 @@ class MessageController extends Controller
                     'body' => htmlspecialchars($m->body, ENT_QUOTES, 'UTF-8'),
                     'image_url' => $m->imageUrl('seller'),
                     'html' => view('Messages._bubble', ['message' => $m, 'role' => 'seller'])->render(),
-                    'created_at' => $m->created_at->format('M d, Y H:i'),
+                    'created_at' => manila($m->created_at, 'M d, Y H:i'),
                     'read_at' => $m->read_at,
                 ]),
             ]);
@@ -110,7 +110,7 @@ class MessageController extends Controller
             'sender_name' => $seller->business_name,
             'body' => htmlspecialchars($message->body, ENT_QUOTES, 'UTF-8'),
             'image_url' => $message->imageUrl('seller'),
-            'created_at' => $message->created_at->format('M d, Y H:i'),
+            'created_at' => manila($message->created_at, 'M d, Y H:i'),
         ]);
     }
 

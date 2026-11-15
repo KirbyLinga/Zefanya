@@ -35,12 +35,7 @@
                     </p>
                 </div>
 
-                @if (session('success'))
-                    <div class="mb-6 flex items-center gap-2.5 rounded-lg border border-[var(--pill-success-border)] bg-[var(--pill-success-bg)] px-3.5 py-2.5 font-sans text-[12.5px] font-medium text-[var(--status-success)]" role="status">
-                        <i data-lucide="check-circle-2" width="15" height="15" class="shrink-0"></i>
-                        <span class="text-[var(--status-success)]">{{ session('success') }}</span>
-                    </div>
-                @endif
+                <x-flash type="success" :message="session('success')" spacing="mb-6" />
 
                 <section class="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm sm:p-7">
                     <h2 class="font-serif text-[18px] font-normal text-[var(--text-ink)]">Saved addresses</h2>
@@ -93,9 +88,9 @@
                         <input type="hidden" name="barangay_name" id="barangayNameField" value="{{ $val('barangay_name') }}">
 
                         @if ($errors->any())
-                            <div class="mb-4 flex items-center gap-2.5 rounded-lg border border-[var(--border-error-soft)] bg-[var(--bg-error-soft)] px-3.5 py-2.5 font-sans text-[12.5px] font-medium text-[var(--status-danger)]" role="alert">
-                                <i data-lucide="alert-circle" width="15" height="15" class="shrink-0"></i>
-                                <span class="text-[var(--status-danger)]">{{ $errors->first() }}</span>
+                            <div id="address-error-summary" tabindex="-1" class="mb-4 rounded-lg border border-[var(--border-error-soft)] bg-[var(--bg-error-soft)] px-3.5 py-2.5 font-sans text-[12.5px] text-[var(--status-danger)]" role="alert">
+                                <p class="font-semibold">Please correct the following:</p>
+                                <ul class="mt-1 list-inside list-disc">@foreach ($errors->all() as $message)<li>{{ $message }}</li>@endforeach</ul>
                             </div>
                         @endif
 
@@ -109,37 +104,37 @@
                             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2" id="apiAddressFields">
                                 <div>
                                     <label class="{{ $labelCls }}" for="region">Region *</label>
-                                    <select name="region" id="region" required data-saved-code="{{ old('region') }}" class="{{ $inputCls }}">
+                                    <select name="region" id="region" @if($errors->has('region')) aria-invalid="true" aria-describedby="address-error-region" @endif required data-saved-code="{{ old('region') }}" class="{{ $inputCls }}">
                                         <option value="">Loading regions...</option>
                                     </select>
-                                    @error('region')<span class="{{ $errorCls }}">{{ $message }}</span>@enderror
+                                    @error('region')<span id="address-error-region" class="{{ $errorCls }}">{{ $message }}</span>@enderror
                                 </div>
                                 <div>
                                     <label class="{{ $labelCls }}" for="province">Province *</label>
-                                    <select name="province" id="province" required
+                                    <select name="province" id="province" @if($errors->has('province')) aria-invalid="true" aria-describedby="address-error-province" @endif required
                                             data-saved-code="{{ old('province', $record?->province_code) }}"
                                             class="{{ $inputCls }}">
                                         <option value="" disabled selected>Select region first</option>
                                     </select>
-                                    @error('province')<span class="{{ $errorCls }}">{{ $message }}</span>@enderror
+                                    @error('province')<span id="address-error-province" class="{{ $errorCls }}">{{ $message }}</span>@enderror
                                 </div>
                                 <div>
                                     <label class="{{ $labelCls }}" for="municipality">Municipality / city *</label>
-                                    <select name="municipality" id="municipality" disabled required
+                                    <select name="municipality" id="municipality" @if($errors->has('municipality')) aria-invalid="true" aria-describedby="address-error-municipality" @endif disabled required
                                             data-saved-code="{{ old('municipality', $record?->municipality_code) }}"
                                             class="{{ $inputCls }} disabled:bg-neutral-100 disabled:text-neutral-400">
                                         <option value="" disabled selected>Select province first</option>
                                     </select>
-                                    @error('municipality')<span class="{{ $errorCls }}">{{ $message }}</span>@enderror
+                                    @error('municipality')<span id="address-error-municipality" class="{{ $errorCls }}">{{ $message }}</span>@enderror
                                 </div>
                                 <div class="sm:col-span-2">
                                     <label class="{{ $labelCls }}" for="barangay">Barangay *</label>
-                                    <select name="barangay" id="barangay" disabled required
+                                    <select name="barangay" id="barangay" @if($errors->has('barangay')) aria-invalid="true" aria-describedby="address-error-barangay" @endif disabled required
                                             data-saved-code="{{ old('barangay', $record?->barangay_code) }}"
                                             class="{{ $inputCls }} disabled:bg-neutral-100 disabled:text-neutral-400">
                                         <option value="" disabled selected>Select municipality first</option>
                                     </select>
-                                    @error('barangay')<span class="{{ $errorCls }}">{{ $message }}</span>@enderror
+                                    @error('barangay')<span id="address-error-barangay" class="{{ $errorCls }}">{{ $message }}</span>@enderror
                                 </div>
                             </div>
 
@@ -147,27 +142,28 @@
                             <div class="mt-4 grid grid-cols-1 gap-4">
                                 <div>
                                     <label class="{{ $labelCls }}" for="street">Street / house number *</label>
-                                    <input type="text" name="street" id="street" required
+                                    <input type="text" name="street" id="street" @if($errors->has('street')) aria-invalid="true" aria-describedby="address-error-street" @endif required
                                            placeholder="e.g. 123 Rizal St., Purok 2"
                                            value="{{ $val('street') }}"
                                            class="{{ $inputCls }}">
-                                    @error('street')<span class="{{ $errorCls }}">{{ $message }}</span>@enderror
+                                    @error('street')<span id="address-error-street" class="{{ $errorCls }}">{{ $message }}</span>@enderror
                                 </div>
                                 <div>
                                     <label class="{{ $labelCls }}" for="addressDetail">Additional details</label>
-                                    <input type="text" name="address_detail" id="addressDetail"
+                                    <input type="text" name="address_detail" id="addressDetail" @if($errors->has('address_detail')) aria-invalid="true" aria-describedby="address-error-address_detail" @endif
                                            placeholder="Building, unit, landmark, etc."
                                            value="{{ $val('address_detail') }}"
                                            class="{{ $inputCls }}">
+                                    @error('address_detail')<span id="address-error-address_detail" class="{{ $errorCls }}">{{ $message }}</span>@enderror
                                 </div>
                                 <div>
                                     <label class="{{ $labelCls }}" for="postalCode">Postal code</label>
-                                    <input type="text" name="postal_code" id="postalCode"
+                                    <input type="text" name="postal_code" id="postalCode" @if($errors->has('postal_code')) aria-invalid="true" aria-describedby="address-error-postal_code" @endif
                                            inputmode="numeric" maxlength="10"
                                            placeholder="e.g. 4030"
                                            value="{{ $val('postal_code') }}"
                                            class="{{ $inputCls }}">
-                                    @error('postal_code')<span class="{{ $errorCls }}">{{ $message }}</span>@enderror
+                                    @error('postal_code')<span id="address-error-postal_code" class="{{ $errorCls }}">{{ $message }}</span>@enderror
                                 </div>
                             </div>
                         </div>
@@ -197,4 +193,7 @@
 
 {{-- Shared PSGC lookup: same module the registration modal uses (no duplicated API code). --}}
 @vite('resources/js/buyer/address-lookup.js')
+@if ($errors->any())
+<script>document.addEventListener('DOMContentLoaded', () => { const form = document.querySelector('[data-account-address]'); const target = form?.querySelector('[aria-invalid="true"]:not(:disabled)') || document.getElementById('address-error-summary'); target?.focus(); });</script>
+@endif
 @endsection

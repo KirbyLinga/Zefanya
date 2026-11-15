@@ -9,6 +9,7 @@ use App\Models\Seller\Seller;
 use App\Models\Shared\OrderItem;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -38,6 +39,10 @@ class ProductPublishingService
         $removedPaths = [];
         try {
             $saved = DB::transaction(function () use ($product, $seller, $data, &$stored, &$removedPaths): Product {
+                if ($product->exists) {
+                    $product = Product::query()->whereKey($product->id)->lockForUpdate()->firstOrFail();
+                    abort_unless($product->seller_id === $seller->id, 403);
+                }
                 $currentSeller = Seller::query()->whereKey($seller->id)->lockForUpdate()->firstOrFail();
                 $this->assertSellerCanSaveStatus($currentSeller, $data['status']);
                 if (! $product->exists) {
@@ -53,14 +58,22 @@ class ProductPublishingService
                 $data['stock_quantity'] ??= 0;
                 $withVariants = filter_var($data['variants_exist'] ?? false, FILTER_VALIDATE_BOOLEAN);
                 if ($product->exists) {
-                    $product = Product::query()->whereKey($product->id)->lockForUpdate()->firstOrFail();
-                    abort_if($product->seller_id !== $seller->id, 403);
                     $product->setRelation('variants', $product->variants()->orderBy('id')->lockForUpdate()->get());
                     if (! hash_equals($this->inventoryRevision($product), (string) ($data['inventory_revision'] ?? ''))) {
                         throw ValidationException::withMessages(['inventory_revision' => 'Inventory changed after this form was opened. Reload the product before saving so recent sales are preserved.']);
                     }
                 }
                 abort_if($product->exists && $product->seller_id !== $seller->id, 403);
+                $approval = app(ProductApprovalService::class);
+                if ($product->exists && empty($data['approval_apply']) && $approval->isMaterial($product, $data)) {
+                    $newImages = count(array_filter($data['images'] ?? [], fn ($file): bool => $file instanceof UploadedFile));
+                    if ($product->images()->whereNull('variant_id')->count() + $newImages > 9) {
+                        throw ValidationException::withMessages(['images' => 'A product can have at most 9 JPG/PNG images, 5 MB each.']);
+                    }
+
+                    return $approval->queueRevision($product, $seller, $data);
+                }
+                $data['status'] = $approval->submissionStatus($product, (string) ($data['status'] ?? 'draft'));
                 $product->fill([
                     'seller_id' => $seller->id,
                     'category_id' => $data['category_id'] ?? $product->category_id,
@@ -92,7 +105,10 @@ class ProductPublishingService
                 }
                 $this->variants->sync($product, $withVariants ? $data['options'] : [], $withVariants ? $data['variants'] : [], $withVariants);
                 $this->generalImages($product, $data, $stored);
-                $this->removeColorImages($product, $data['color_images'] ?? [], $removedPaths);
+                $this->removeColorImages($product, array_merge($data['color_images'] ?? [], array_map(
+                    fn (array $color): array => ['value' => $color['value'] ?? '', 'remove_ids' => $color['remove_ids'] ?? []],
+                    $data['stored_color_images'] ?? [],
+                )), $removedPaths);
                 $this->colorImages($product, $data['color_images'] ?? [], $stored, (bool) ($data['color_first'] ?? false));
                 foreach ($data['variant_images'] ?? [] as $id => $files) {
                     if (! $product->variants()->whereKey($id)->exists()) {
@@ -105,8 +121,12 @@ class ProductPublishingService
                 if ($product->images()->whereNull('variant_id')->count() > 9) {
                     throw ValidationException::withMessages(['images' => 'A product can have at most 9 JPG/PNG images, 5 MB each.']);
                 }
-                if ($product->status === 'active') {
+                if (in_array($product->status, ['active', 'pending'], true)) {
                     $this->assertPublishable($product);
+                }
+                if ($product->status === 'pending' && Schema::hasColumn('products', 'rejection_reason')) {
+                    $product->forceFill(['rejection_reason' => null])->save();
+                    DB::afterCommit(fn () => app(ProductApprovalService::class)->notifyAdmins($product));
                 }
 
                 return $product->refresh();
@@ -167,14 +187,23 @@ class ProductPublishingService
     public function setStatus(Product $product, Seller $seller, string $status): Product
     {
         return DB::transaction(function () use ($product, $seller, $status): Product {
-            $currentSeller = Seller::query()->whereKey($seller->id)->lockForUpdate()->firstOrFail();
             $locked = Product::query()->whereKey($product->id)->lockForUpdate()->firstOrFail();
             abort_unless($locked->seller_id === $seller->id, 403);
+            $currentSeller = Seller::query()->whereKey($seller->id)->lockForUpdate()->firstOrFail();
+            $status = app(ProductApprovalService::class)->submissionStatus($locked, $status);
             $this->assertSellerCanSaveStatus($currentSeller, $status);
-            if ($status === 'active') {
+            if (in_array($status, ['active', 'pending'], true)) {
                 $this->assertPublishable($locked);
             }
-            $locked->forceFill(['status' => $status])->save();
+            $locked->forceFill([
+                'status' => $status,
+                ...(Schema::hasColumn('products', 'rejection_reason')
+                    ? ['rejection_reason' => $status === 'pending' ? null : $locked->rejection_reason]
+                    : []),
+            ])->save();
+            if ($status === 'pending') {
+                DB::afterCommit(fn () => app(ProductApprovalService::class)->notifyAdmins($locked));
+            }
 
             return $locked;
         }, 3);
@@ -207,12 +236,19 @@ class ProductPublishingService
     public function duplicate(Product $product, Seller $seller): Product
     {
         return DB::transaction(function () use ($product, $seller): Product {
-            Seller::query()->whereKey($seller->id)->lockForUpdate()->firstOrFail();
             $source = Product::query()->whereKey($product->id)->lockForUpdate()->firstOrFail();
             abort_unless($source->seller_id === $seller->id, 403);
+            Seller::query()->whereKey($seller->id)->lockForUpdate()->firstOrFail();
             $source->load(['options.values', 'variants.optionValues.option', 'images', 'storeCategories']);
             $copy = $source->replicate(['slug', 'creation_key']);
-            $copy->forceFill(['status' => 'draft', 'stock_quantity' => 0, 'slug' => Product::generateUniqueSlug($source->name), 'creation_key' => (string) Str::uuid()])->save();
+            $copy->forceFill([
+                'status' => 'draft',
+                'approved_at' => null,
+                'rejection_reason' => null,
+                'stock_quantity' => 0,
+                'slug' => Product::generateUniqueSlug($source->name),
+                'creation_key' => (string) Str::uuid(),
+            ])->save();
             $options = $source->options->map(fn ($option) => ['name' => $option->name, 'values' => $option->values->pluck('value')->all()])->all();
             $variants = $source->variants->filter->hasOptions()->map(fn ($variant) => [
                 'values' => $variant->optionValues->pluck('value')->all(), 'sku' => null,
@@ -250,6 +286,11 @@ class ProductPublishingService
     public function removeImage(Product $product, ProductImage $image): void
     {
         abort_unless($image->product_id === $product->id, 403);
+        if ($product->approved_at !== null) {
+            throw ValidationException::withMessages([
+                'images' => 'Image changes on an approved product stay hidden until an admin approves the edit. Save the product to submit them.',
+            ]);
+        }
         DB::transaction(function () use ($product, $image): void {
             $locked = Product::query()->whereKey($product->id)->lockForUpdate()->firstOrFail();
             if ($locked->status === 'active' && $image->variant_id === null
@@ -283,6 +324,11 @@ class ProductPublishingService
         }
         foreach ($files as $index => $file) {
             $this->attachImage($product, $this->store($product, $file, $stored), null, $setPrimary && $index === $cover);
+        }
+        foreach ($data['stored_image_paths'] ?? [] as $index => $path) {
+            if (is_string($path) && $path !== '') {
+                $this->attachImage($product, $path, null, $setPrimary && (int) $index === $cover);
+            }
         }
     }
 
@@ -342,6 +388,27 @@ class ProductPublishingService
                 $path = $this->store($product, $file, $stored);
                 foreach ($matches as $variant) {
                     $this->attachImage($product, $path, $variant->id, false, $colorFirst ? $offset : null);
+                }
+            }
+        }
+        foreach ($data['stored_color_images'] ?? [] as $color) {
+            $matches = $variants->filter(fn ($variant) => $variant->optionValues->contains(fn ($value) => in_array(mb_strtolower($value->option->name), ['color', 'colour'], true) && $value->value === ($color['value'] ?? '')));
+            foreach ($color['paths'] ?? [] as $offset => $path) {
+                if (! is_string($path) || $path === '') {
+                    continue;
+                }
+                foreach ($matches as $variant) {
+                    $this->attachImage($product, $path, $variant->id, false, $colorFirst ? (int) $offset : null);
+                }
+            }
+        }
+        foreach ($data['stored_variant_images'] ?? [] as $variantId => $paths) {
+            if (! $product->variants()->whereKey($variantId)->exists()) {
+                continue;
+            }
+            foreach ($paths as $path) {
+                if (is_string($path) && $path !== '') {
+                    $this->attachImage($product, $path, (int) $variantId);
                 }
             }
         }

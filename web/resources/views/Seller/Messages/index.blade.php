@@ -36,7 +36,7 @@
                         {{ $lastMessage?->preview() ?? 'No messages' }}
                     </p>
                     <p class="text-xs text-gray-400 mt-1">
-                        {{ $conversation->last_message_at?->format('M j, g:i a') }}
+                        {{ manila($conversation->last_message_at, 'M j, g:i a') }}
                     </p>
                 </a>
             </div>

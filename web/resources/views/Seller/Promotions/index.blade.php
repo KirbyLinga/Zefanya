@@ -18,9 +18,7 @@
         <p class="mt-2 text-sm text-[var(--text-muted)]">A bundle takes a percentage off every product in the deal when they are bought together. Buy X Get Y makes the free units of one product cost nothing. Times are Philippine time. A running store sale keeps its own price.</p>
     </div>
 
-    @if(session('success'))
-        <div role="status" class="rounded-md border border-tertiary-300 bg-tertiary-50 p-4 text-sm text-tertiary-800">{{ session('success') }}</div>
-    @endif
+    <x-flash type="success" :message="session('success')" spacing="" />
     @if($errors->any())
         <div role="alert" class="rounded-md border border-error p-4 text-sm text-error">{{ $errors->first() }}</div>
     @endif

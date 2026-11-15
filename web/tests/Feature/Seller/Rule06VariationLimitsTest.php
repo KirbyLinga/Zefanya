@@ -55,6 +55,8 @@ class Rule06VariationLimitsTest extends TestCase
         $this->assertSame([5, 5, 5, 5, 5, 5], $rows->pluck('stock_quantity')->all());
         $this->assertSame(['BCP-0', 'BCP-1', 'BCP-2', 'BCP-3', 'BCP-4', 'BCP-5'], $rows->pluck('sku')->all());
         $this->assertSame(['Red-S', 'Red-M', 'Red-L', 'Blue-S', 'Blue-M', 'Blue-L'], $rows->map(fn ($row) => $row->optionValues->pluck('value')->implode('-'))->all());
+        $this->assertSame('pending', $product->status);
+        $product->forceFill(['status' => 'active', 'approved_at' => now()])->save();
         $this->get(route('buyer.products.show', $product))->assertOk()->assertSee('Color')->assertSee('Size')
             ->assertViewHas('variantData', fn ($data) => count($data) === 6);
     }

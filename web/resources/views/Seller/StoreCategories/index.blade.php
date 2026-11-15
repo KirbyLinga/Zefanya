@@ -6,7 +6,7 @@
         <div><h1 class="font-serif text-3xl text-[var(--text-ink)]">Sub-categories</h1><p class="mt-2 text-sm text-[var(--text-muted)]">Sort your products under your main category{{ $seller->lineOfBusiness ? ', '.$seller->lineOfBusiness->label : '' }}. A product can have up to three.</p></div>
         <a href="{{ route('buyer.stores.show', $seller) }}" class="rounded-md border border-[var(--border-input)] px-4 py-2 text-sm text-[var(--text-ink)]">View store</a>
     </div>
-    @if(session('success'))<div role="status" class="rounded-md border border-tertiary-300 bg-tertiary-50 p-4 text-sm text-tertiary-800">{{ session('success') }}</div>@endif
+    <x-flash type="success" :message="session('success')" spacing="" />
     @if($errors->any())
         <div role="alert" class="rounded-md border border-error bg-[var(--bg-surface)] p-4 text-sm text-error"><p class="font-semibold">Please review the following:</p><ul class="mt-2 list-disc pl-5">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
     @endif

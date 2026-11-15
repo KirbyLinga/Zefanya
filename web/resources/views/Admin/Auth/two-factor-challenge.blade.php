@@ -5,9 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Two-Factor Verification — Zefanya</title>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:wght@400&display=swap" rel="stylesheet">
+    <x-fonts />
     @vite(['resources/css/app.css'])
 </head>
 <body class="min-h-screen bg-[var(--bg-page)] font-sans text-[var(--text-body)]">

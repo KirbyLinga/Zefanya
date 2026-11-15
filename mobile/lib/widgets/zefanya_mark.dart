@@ -50,21 +50,30 @@ class ZefanyaMark extends StatelessWidget {
   const ZefanyaMark({
     super.key,
     this.size = 28,
-    this.color = AppColors.primaryDark,
+    this.color,
     this.strokeWidth = 5,
   });
 
   final double size;
-  final Color color;
+
+  /// Nullable rather than defaulted: the palette resolves at runtime now,
+  /// so a default argument can't reference it. Falls back to
+  /// [AppColors.primaryDark] in the painter below.
+  final Color? color;
   final double strokeWidth;
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return SizedBox(
       width: size,
       height: size,
       child: CustomPaint(
-        painter: _MarkPainter(progress: 1, color: color, strokeWidth: strokeWidth),
+        painter: _MarkPainter(
+          progress: 1,
+          color: color ?? AppColors.primaryDark,
+          strokeWidth: strokeWidth,
+        ),
       ),
     );
   }
@@ -75,12 +84,14 @@ class ZefanyaLoader extends StatefulWidget {
   const ZefanyaLoader({
     super.key,
     this.size = 34,
-    this.color = AppColors.primaryDark,
+    this.color,
     this.strokeWidth = 5,
   });
 
   final double size;
-  final Color color;
+
+  /// Nullable rather than defaulted — see [ZefanyaMark.color].
+  final Color? color;
   final double strokeWidth;
 
   @override
@@ -88,13 +99,23 @@ class ZefanyaLoader extends StatefulWidget {
 }
 
 class _ZefanyaLoaderState extends State<ZefanyaLoader> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1900),
-  );
+  late final AnimationController _controller;
 
   bool _started = false;
   bool _reduced = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Built here, not lazily in the field initializer: reduced-motion users
+    // never touch it while the widget is alive, and a `late final` would then
+    // create it inside dispose(), where `vsync: this` cannot look up
+    // TickerMode on a deactivated element.
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1900),
+    );
+  }
 
   @override
   void didChangeDependencies() {
@@ -125,10 +146,11 @@ class _ZefanyaLoaderState extends State<ZefanyaLoader> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     if (_reduced) {
       return ZefanyaMark(
         size: widget.size,
-        color: widget.color,
+        color: widget.color ?? AppColors.primaryDark,
         strokeWidth: widget.strokeWidth,
       );
     }
@@ -142,7 +164,7 @@ class _ZefanyaLoaderState extends State<ZefanyaLoader> with SingleTickerProvider
           return CustomPaint(
             painter: _MarkPainter(
               progress: _progressFor(_controller.value),
-              color: widget.color,
+              color: widget.color ?? AppColors.primaryDark,
               strokeWidth: widget.strokeWidth,
               // Retraction eats the path from the start, so the stroke
               // travels rather than just shrinking in place.
@@ -167,24 +189,27 @@ class ZefanyaMarkTrace extends StatelessWidget {
     super.key,
     required this.progress,
     this.size = 34,
-    this.color = AppColors.primaryDark,
+    this.color,
     this.strokeWidth = 5,
   });
 
   final double progress;
   final double size;
-  final Color color;
+
+  /// Nullable rather than defaulted — see [ZefanyaMark.color].
+  final Color? color;
   final double strokeWidth;
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return SizedBox(
       width: size,
       height: size,
       child: CustomPaint(
         painter: _MarkPainter(
           progress: progress.clamp(0.0, 1.0),
-          color: color,
+          color: color ?? AppColors.primaryDark,
           strokeWidth: strokeWidth,
         ),
       ),

@@ -12,6 +12,7 @@ use App\Models\Logistics\LogisticsProvider;
 use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
 use App\Models\Shared\OrderItem;
+use App\Services\Seller\ProductApprovalService;
 use App\Services\Seller\ProductPublishingService;
 use App\Services\Seller\StoreCategoryService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -41,12 +42,24 @@ class SellerProductManagementTest extends TestCase
         ], $changes);
     }
 
-    private function publish(Seller $seller, array $changes = []): Product
+    private function submit(Seller $seller, array $changes = []): Product
     {
         $data = $this->payload($changes);
         $this->actingAs($seller, 'seller')->post(route('seller.products.store'), $data)->assertSessionHasNoErrors();
 
-        return Product::query()->where('creation_key', $data['creation_key'])->firstOrFail();
+        $product = Product::query()->where('creation_key', $data['creation_key'])->firstOrFail();
+        $this->assertSame('pending', $product->status);
+
+        return $product;
+    }
+
+    /** A seller submission plus the admin approval that makes it public. */
+    private function publish(Seller $seller, array $changes = []): Product
+    {
+        $product = $this->submit($seller, $changes);
+        $product->forceFill(['status' => 'active', 'approved_at' => now(), 'rejection_reason' => null])->save();
+
+        return $product->fresh();
     }
 
     public function test_sel_prod_001_saves_all_fields_and_store_category_in_uploaded_order(): void
@@ -55,9 +68,13 @@ class SellerProductManagementTest extends TestCase
         $category = app(StoreCategoryService::class)->save($seller, ['name' => 'Kitchen & Dining']);
         $first = $this->publicationDefaults()['images'][0];
         $second = $this->publicationDefaults()['images'][0];
-        $product = $this->publish($seller, ['images' => [$first, $second], 'store_category_ids' => [$category->id]]);
+        $product = $this->submit($seller, ['images' => [$first, $second], 'store_category_ids' => [$category->id]]);
 
-        $this->assertSame('active', $product->status);
+        $this->assertSame('pending', $product->status);
+        $this->get(route('buyer.products.index', ['q' => $product->name]))
+            ->assertViewHas('products', fn ($rows): bool => $rows->where('id', $product->id)->isEmpty());
+        $this->get(route('buyer.products.show', $product))->assertNotFound();
+        $product->forceFill(['status' => 'active', 'approved_at' => now()])->save();
         $this->assertSame('299.00', $product->price);
         $this->assertSame(30, $product->stock_quantity);
         $this->assertSame(600, $product->weight_grams);
@@ -128,9 +145,10 @@ class SellerProductManagementTest extends TestCase
         }
         $response->assertSessionHasNoErrors();
         $product = Product::query()->sole();
-        $this->assertSame('active', $product->status);
+        $this->assertSame('pending', $product->status);
         $this->assertSame((string) $value, (string) $product->{$field});
         if ($field === 'stock_quantity' && $value === 0) {
+            $product->forceFill(['status' => 'active', 'approved_at' => now()])->save();
             $this->get(route('buyer.products.show', $product))->assertSee('Out of Stock');
         }
     }
@@ -165,12 +183,12 @@ class SellerProductManagementTest extends TestCase
         $data = $this->payload(['images' => array_map(fn () => $this->publicationDefaults()['images'][0], range(1, 8))]);
         $data['inventory_revision'] = app(ProductPublishingService::class)->inventoryRevision($product->fresh()->load('variants'));
         $this->put(route('seller.products.update', $product), $data)->assertSessionHasNoErrors();
-        $this->assertSame(9, $product->images()->count());
-        $data = $this->payload();
+        $this->assertSame(1, $product->images()->count());
+        $this->assertCount(8, $product->fresh()->latestRevision->payload['stored_image_paths']);
+        $data = $this->payload(['images' => array_map(fn () => $this->publicationDefaults()['images'][0], range(1, 9))]);
         $data['inventory_revision'] = app(ProductPublishingService::class)->inventoryRevision($product->fresh()->load('variants'));
         $this->put(route('seller.products.update', $product), $data)->assertSessionHasErrors('images');
-        $this->assertSame(9, $product->images()->count());
-        $this->assertCount(9, Storage::disk('public')->allFiles('products'));
+        $this->assertSame(1, $product->images()->count());
     }
 
     public static function invalidImages(): array
@@ -239,7 +257,7 @@ class SellerProductManagementTest extends TestCase
         $data = $this->payload(['name' => $product->name]);
         $data['inventory_revision'] = app(ProductPublishingService::class)->inventoryRevision($product->fresh()->load('variants'));
         $this->put(route('seller.products.update', $product), $data)->assertSessionHasNoErrors();
-        $this->assertSame('active', $product->fresh()->status);
+        $this->assertSame('pending', $product->fresh()->status);
     }
 
     public function test_sel_prod_011_deactivation_and_reactivation_preserve_inventory_and_images(): void
@@ -287,6 +305,10 @@ class SellerProductManagementTest extends TestCase
         $data = $this->payload(['price' => '420.00']);
         $data['inventory_revision'] = app(ProductPublishingService::class)->inventoryRevision($product->fresh()->load('variants'));
         $this->put(route('seller.products.update', $product), $data)->assertSessionHasNoErrors();
+        $this->assertSame('450.00', $product->fresh()->price);
+        $this->assertSame('450.00', $cart->fresh()->variant->price);
+        $admin = Admin::factory()->create();
+        app(ProductApprovalService::class)->approve($product->fresh(), $admin);
         $this->assertSame($variant->id, $product->variants()->sole()->id);
         $this->assertSame('420.00', $cart->fresh()->variant->price);
         $this->assertSame('420.00', $product->fresh()->price);

@@ -11,6 +11,7 @@ use App\Models\Shared\Category;
 use App\Services\Seller\ProductPublishingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
@@ -28,7 +29,7 @@ class ProductController extends Controller
         $search = trim((string) $request->input('q', ''));
 
         $status = $request->input('status');
-        if (! in_array($status, ['active', 'draft', 'inactive'], true)) {
+        if (! in_array($status, ['active', 'draft', 'inactive', 'pending', 'rejected'], true)) {
             $status = null;
         }
 
@@ -60,8 +61,13 @@ class ProductController extends Controller
             $sort = 'newest';
         }
 
+        $with = ['images', 'category', 'variants'];
+        if (Schema::hasTable('product_revisions')) {
+            $with[] = 'latestRevision';
+        }
+
         $query = Product::forSeller($sellerId)
-            ->with(['images', 'category', 'variants'])
+            ->with($with)
             ->withSum('variants as variants_sum_stock_quantity', 'stock_quantity')
             ->when($categoryId, fn ($q) => $q->where('category_id', $categoryId))
             ->when($status, fn ($q) => $q->where('status', $status))
@@ -132,7 +138,9 @@ class ProductController extends Controller
 
         return redirect()
             ->route('seller.products.index')
-            ->with('success', "\"{$product->name}\" was created.");
+            ->with('success', $product->status === 'pending'
+                ? "\"{$product->name}\" was submitted for admin approval."
+                : "\"{$product->name}\" was created.");
     }
 
     public function edit(Request $request, Product $product)
@@ -159,9 +167,14 @@ class ProductController extends Controller
     {
         $this->authorizeOwnership($product);
         $this->authorizeNotRestricted($product);
-        $publishing->save($product, Auth::guard('seller')->user(), $request->validated());
+        $product = $publishing->save($product, Auth::guard('seller')->user(), $request->validated());
+        $message = $product->approval_queued
+            ? "\"{$product->name}\" was submitted for approval. Buyers still see the current listing."
+            : ($product->status === 'pending'
+                ? "\"{$product->name}\" was submitted for admin approval."
+                : "\"{$product->name}\" was updated.");
 
-        return back()->with('success', "\"{$product->name}\" was updated.");
+        return back()->with('success', $message);
     }
 
     public function destroy(Request $request, Product $product, ProductPublishingService $publishing)
@@ -200,7 +213,7 @@ class ProductController extends Controller
             return response()->json([
                 'id' => $product->id,
                 'status' => $product->status,
-                'label' => ucfirst($product->status),
+                'label' => $product->sellerApprovalLabel(),
                 'message' => $message,
             ]);
         }

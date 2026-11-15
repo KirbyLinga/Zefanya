@@ -38,11 +38,19 @@ class PlatformFinanceService
                 $start = $from?->copy() ?? Carbon::now(StoreSale::TIMEZONE)->startOfMonth()->utc();
 
                 return $query->where('commission_finalized_at', '>=', $start)
-                    ->when($from !== null, fn ($inner) => $inner->where('commission_finalized_at', '<', $start->copy()->addMonth()));
+                    // Add the month in Manila time: in UTC a month starts on the previous
+                    // day, and adding a month to Sep 30 lands on Oct 30, dropping Oct 31.
+                    ->where('commission_finalized_at', '<', $start->copy()->timezone(StoreSale::TIMEZONE)->addMonthNoOverflow()->utc());
             })
             ->whereNotNull('commission_finalized_at');
         $commission = (int) $finalized()->sum('commission_minor');
-        $platform = (int) $finalized()->where('platform_voucher_funding_source', Voucher::FUNDING_MARKETPLACE)->sum('platform_voucher_discount_minor');
+        $platform = (int) $finalized()->selectRaw(
+            'COALESCE(SUM(CASE WHEN platform_voucher_funding_source = ? THEN COALESCE(platform_voucher_discount_minor, 0) ELSE 0 END'
+            .' + CASE WHEN shop_voucher_funding_source = ? THEN COALESCE(shop_voucher_discount_minor, 0) ELSE 0 END'
+            .' + CASE WHEN platform_voucher_discount_minor IS NULL AND shop_voucher_discount_minor IS NULL'
+            .' AND voucher_funding_source = ? THEN COALESCE(voucher_discount_minor, 0) ELSE 0 END), 0) as voucher_cost',
+            array_fill(0, 3, Voucher::FUNDING_MARKETPLACE),
+        )->value('voucher_cost');
         $shipping = (int) $finalized()->where('shipping_voucher_funding_source', Voucher::FUNDING_MARKETPLACE)->sum('shipping_voucher_discount_minor');
 
         return [
@@ -80,23 +88,25 @@ class PlatformFinanceService
         $sellerPayable = (int) SellerSettlement::query()
             ->where('status', SellerSettlement::PENDING_PAYOUT)->whereNull('paid_at')
             ->whereNull('pending_reason')->whereNotNull('financials_finalized_at')
-            ->whereColumn('paid_amount_minor', '<', 'seller_payout_minor')
+            ->whereRaw('COALESCE(paid_amount_minor, 0) < seller_payout_minor')
             ->whereHas('sellerOrder', fn ($query) => $query->where('status', OrderStatus::Completed->value))
-            ->sum(DB::raw('seller_payout_minor - paid_amount_minor'));
+            ->sum(DB::raw('seller_payout_minor - COALESCE(paid_amount_minor, 0)'));
 
         $origin = (int) $this->remittances->originOwedByProvider()->sum('amountMinor');
         $destination = (int) $this->remittances->destinationOwed()->sum(fn (CodRemittance $parcel): int => (int) $parcel->destination_share_minor);
 
-        $toRecord = ParcelReturn::query()->where('financial_review_required', true)->whereNull('refunded_at');
+        // A withdrawn return and uncollected COD do not create money owed to a Buyer.
+        $toRecord = ParcelReturn::query()->awaitingRefundRecording();
+        // Match Payment::refundableCollectedMinor(), including its legacy paid-record fallback.
         $refundsToRecordMinor = (int) (clone $toRecord)
-            ->join('seller_orders', 'seller_orders.id', '=', 'parcel_returns.seller_order_id')
-            ->join('payments', 'payments.seller_order_id', '=', 'seller_orders.id')
-            ->sum('payments.amount_minor');
+            ->join('payments', 'payments.seller_order_id', '=', 'parcel_returns.seller_order_id')
+            ->sum(DB::raw('CASE WHEN payments.collected_amount_minor < payments.amount_minor THEN payments.collected_amount_minor ELSE payments.amount_minor END'));
 
         $debts = (int) SellerDebt::query()->whereColumn('settled_minor', '<', 'amount_minor')
             ->sum(DB::raw('amount_minor - settled_minor'));
 
-        $withRiders = (int) CodRemittance::query()->where('status', CodRemittance::PENDING_REMITTANCE)->sum('amount_minor');
+        $withRiders = (int) CodRemittance::query()->where('status', CodRemittance::PENDING_REMITTANCE)->sum('amount_minor')
+            + (int) CodRemittance::query()->where('status', CodRemittance::PARTIALLY_REMITTED)->sum(DB::raw('shortage_minor - shortage_recovered_minor'));
         $atCompanies = (int) $this->remittances->unsentByProvider()->sum('dueMinor');
         $sent = (int) LogisticsRemittance::query()->where('status', LogisticsRemittance::SUBMITTED)->sum('amount_minor');
 
@@ -109,6 +119,7 @@ class PlatformFinanceService
             'refundsToRecordMinor' => $refundsToRecordMinor,
             'refundsRecordedMonthMinor' => (int) ParcelReturn::query()
                 ->where('refunded_at', '>=', Carbon::now(StoreSale::TIMEZONE)->startOfMonth()->utc())
+                ->where('refunded_at', '<', Carbon::now(StoreSale::TIMEZONE)->startOfMonth()->addMonthNoOverflow()->utc())
                 ->sum('refund_amount_minor'),
             'commissionOnRefundedMinor' => (int) SellerOrder::query()->whereNotNull('commission_finalized_at')
                 ->whereHas('parcelReturn', fn ($query) => $query->whereNotNull('refunded_at'))

@@ -2,7 +2,7 @@
 
 use App\Enums\AuthRole;
 use App\Http\Middleware\Admin\EnsureAdminRole;
-use App\Http\Middleware\Admin\EnsureAdminTwoFactor;
+use App\Http\Middleware\ApiCourier;
 use App\Http\Middleware\ApiRole;
 use App\Http\Middleware\AuthenticateRoleSession;
 use App\Http\Middleware\Buyer\EnsureBuyerActive;
@@ -18,6 +18,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -47,15 +48,24 @@ return Application::configure(basePath: dirname(__DIR__))
         // Cloudflare Tunnel connector (or load balancer) that forwards requests
         // to this app. That value cannot be guessed from this repository.
 
+        // Only answer for our own host names (config/app.php trusted_hosts plus
+        // APP_URL's host, each with subdomains). A forged Host header is rejected
+        // instead of leaking into generated URLs. The framework skips this in the
+        // local environment and in unit tests.
+        $middleware->trustHosts(at: fn (): array => array_map(
+            fn (string $host): string => '^(.+\.)?'.preg_quote($host).'$',
+            array_values(array_filter(array_map('trim', explode(',', (string) config('app.trusted_hosts'))))),
+        ));
+
         $middleware->alias([
             'admin.role' => EnsureAdminRole::class,
-            'admin.2fa' => EnsureAdminTwoFactor::class,
             'guest.role' => RedirectIfAuthenticatedRole::class,
             'logistics.approved' => EnsureLogisticsApproved::class,
             'rider.active' => EnsureRiderActive::class,
             'seller.approved' => EnsureSellerApproved::class,
             'buyer.active' => EnsureBuyerActive::class,
             'api.role' => ApiRole::class,
+            'api.courier' => ApiCourier::class,
         ]);
 
         // Single-account-per-browser net + password-change session guard, on
@@ -73,6 +83,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Revoke stale credentials before route authentication can authorize a request.
         $middleware->prependToPriorityList(AuthenticatesRequests::class, AuthenticateRoleSession::class);
         $middleware->prependToPriorityList(AuthenticateRoleSession::class, EnforceSingleBrowserAccount::class);
+
+        // Reject disabled Courier routes before rate limiting or resolving a bearer token.
+        $middleware->prependToPriorityList(ThrottleRequests::class, ApiCourier::class);
 
         $middleware->redirectGuestsTo(function (Request $request) {
             if ($request->is('admin', 'admin/*')) {

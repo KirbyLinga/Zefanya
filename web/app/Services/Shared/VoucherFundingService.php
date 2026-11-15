@@ -5,6 +5,7 @@ namespace App\Services\Shared;
 use App\Models\Seller\SellerSettlement;
 use App\Models\Shared\SellerOrder;
 use App\Models\Shared\Voucher;
+use Illuminate\Support\Facades\DB;
 
 class VoucherFundingService
 {
@@ -93,7 +94,12 @@ class VoucherFundingService
             return $this->unresolved($recorded, SellerSettlement::FINANCIAL_RECONCILIATION_REQUIRED);
         }
 
-        if ($merchandise !== $parentDiscount
+        // Each shop owns only its allocated share of the parent's discount.
+        // Check conservation across the immutable checkout snapshots, including
+        // cancelled siblings: cancellation does not rewrite the original sale.
+        $checkoutDiscount = (int) SellerOrder::query()->where('order_id', $sellerOrder->order_id)
+            ->sum(DB::raw('COALESCE(voucher_discount_minor, COALESCE(shop_voucher_discount_minor, 0) + COALESCE(platform_voucher_discount_minor, 0))'));
+        if ($checkoutDiscount !== $parentDiscount || $merchandise > $parentDiscount
             || $merchandise < 0 || $merchandise > $sellerOrder->subtotal_minor
             || $shipping < 0 || $shipping > (int) $sellerOrder->shipping_fee_minor) {
             return $this->unresolved($recorded, SellerSettlement::FINANCIAL_RECONCILIATION_REQUIRED);

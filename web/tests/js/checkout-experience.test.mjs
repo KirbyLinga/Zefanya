@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 const source = readFileSync(new URL('../../resources/js/buyer/checkout-carriers.js', import.meta.url), 'utf8');
-function mount({ fee = 5000, available = true, voucherType = 'fixed', voucherValue = 1000 } = {}) {
+function mount({ fee = 5000, available = true, eligible = true, voucherType = 'fixed', voucherValue = 1000, voucherCap } = {}) {
     const fields = new Map(); const events = {}; const windowEvents = {};
     const field = name => { const node = { textContent: '', hidden: false }; fields.set(name, node); return node; };
     for (const key of ['shipping-total', 'shipping-discount-row', 'shipping-discount', 'payable-total', 'savings-row', 'savings', 'shipping-block']) field(key);
     const label = {}; const button = { disabled: false, querySelector: () => label };
-    const attributes = { 'data-merchandise-minor': '10000', 'data-merchandise-savings-minor': '2000', 'data-shipping-voucher-type': voucherType, 'data-shipping-voucher-value': String(voucherValue) };
-    const group = { getAttribute: () => available ? '1' : '0', querySelector: () => ({ getAttribute: () => String(fee) }) };
-    const root = { getAttribute: key => attributes[key], setAttribute: (key, value) => attributes[key] = value, querySelectorAll: () => [group], addEventListener: (key, fn) => events[key] = fn };
+    const attributes = { 'data-merchandise-minor': '10000', 'data-merchandise-savings-minor': '2000', 'data-shipping-voucher-type': voucherType, 'data-shipping-voucher-value': String(voucherValue), 'data-shipping-voucher-cap': voucherCap };
+    const group = { getAttribute: key => (key === 'data-available' ? available : eligible) ? '1' : '0', querySelector: () => ({ getAttribute: () => String(fee) }) };
+    const root = { getAttribute: key => attributes[key], setAttribute: (key, value) => attributes[key] = value, querySelector: () => null, querySelectorAll: () => [group], addEventListener: (key, fn) => events[key] = fn };
     const document = { readyState: 'complete', querySelector: selector => selector === '[data-checkout-carriers]' ? root : fields.get(selector.slice(15, -1)), querySelectorAll: () => [button] };
     runInNewContext(source, { document, window: { addEventListener: (key, fn) => windowEvents[key] = fn } });
     return { fields, button, label, attributes, pageshow: () => windowEvents.pageshow(), submit: () => { const event = { prevented: false, preventDefault() { this.prevented = true; } }; events.submit(event); return event; } };
@@ -29,6 +29,13 @@ test('free delivery does not apply a shipping voucher twice', () => {
     assert.equal(ui.fields.get('shipping-discount-row').hidden, true);
     assert.equal(ui.fields.get('payable-total').textContent, '\u20b1100.00');
     assert.equal(ui.fields.get('savings').textContent, '\u20b120.00');
+});
+test('shipping preview honours selected products and the percentage cap', () => {
+    const capped = mount({ voucherType: 'percent', voucherValue: 50, voucherCap: 1000 });
+    assert.equal(capped.fields.get('shipping-discount').textContent, '-\u20b110.00');
+    const ineligible = mount({ eligible: false });
+    assert.equal(ineligible.fields.get('shipping-discount-row').hidden, true);
+    assert.equal(ineligible.fields.get('payable-total').textContent, '\u20b1150.00');
 });
 test('unavailable carrier blocks submission and explains recovery', () => {
     const ui = mount({ available: false });

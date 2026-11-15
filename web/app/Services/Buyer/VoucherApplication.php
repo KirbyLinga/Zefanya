@@ -52,6 +52,12 @@ final class VoucherApplication
     /** @var array<int, int> Seller id => quoted shipping fee in centavos */
     public readonly array $shippingFees;
 
+    /** @var array<int, bool> */
+    public readonly array $shippingEligibility;
+
+    /** @var array<int, int> */
+    public readonly array $platformEligibleSubtotals;
+
     /**
      * @param  Collection<int, Voucher>  $vouchers
      * @param  Collection<int, array{seller: Seller, items: Collection}>  $sellerGroups
@@ -90,28 +96,44 @@ final class VoucherApplication
 
         $shopDiscounts = [];
         $remaining = [];
+        $platformWeights = [];
+        $shippingEligible = [];
         foreach ($subtotals as $sellerId => $subtotal) {
             $shopVoucher = $this->shopVouchers[$sellerId] ?? null;
             $shopDiscounts[$sellerId] = $shopVoucher === null
                 ? 0
                 : $shopVoucher->discountCentavos($shopVoucher->eligibleSubtotal($itemsBySeller[$sellerId]));
             $remaining[$sellerId] = max(0, $subtotal - $shopDiscounts[$sellerId]);
+            $platformWeights[$sellerId] = $this->platformVoucher?->eligibleSubtotal($itemsBySeller[$sellerId]) ?? $subtotal;
+            $shippingEligible[$sellerId] = $this->shippingVoucher === null
+                || $this->shippingVoucher->applies_to_all_products !== false
+                || $itemsBySeller[$sellerId]->contains(fn ($item): bool => $this->shippingVoucher->appliesToProduct((int) $item->product_id));
+
+            if ($this->platformVoucher?->applies_to_all_products === false) {
+                $sharedItems = $itemsBySeller[$sellerId]->filter(
+                    fn ($item): bool => $this->platformVoucher->appliesToProduct((int) $item->product_id),
+                );
+                $overlap = $shopVoucher?->eligibleSubtotal($sharedItems) ?? 0;
+                $remaining[$sellerId] = $platformWeights[$sellerId] - min($shopDiscounts[$sellerId], $overlap);
+            }
         }
 
         $this->shopDiscounts = $shopDiscounts;
         $this->shopDiscountCentavos = array_sum($shopDiscounts);
+        $this->shippingEligibility = $shippingEligible;
+        $this->platformEligibleSubtotals = $platformWeights;
 
-        $platformBase = max(0, array_sum($subtotals) - $this->shopDiscountCentavos);
+        $platformBase = array_sum($remaining);
         $platformDiscount = $this->platformVoucher === null
             ? 0
             : min($this->platformVoucher->discountCentavos($platformBase), $platformBase);
 
-        $this->platformDiscounts = $this->allocate($platformDiscount, $subtotals, $remaining);
+        $this->platformDiscounts = $this->allocate($platformDiscount, $platformWeights, $remaining);
         $this->platformDiscountCentavos = array_sum($this->platformDiscounts);
 
         $fees = [];
         foreach ($subtotals as $sellerId => $subtotal) {
-            $fees[$sellerId] = max(0, (int) ($this->shippingFees[$sellerId] ?? 0));
+            $fees[$sellerId] = $shippingEligible[$sellerId] ? max(0, (int) ($this->shippingFees[$sellerId] ?? 0)) : 0;
         }
         $grossShipping = array_sum($fees);
         $shippingDiscount = $this->shippingVoucher === null || $grossShipping <= 0
@@ -149,6 +171,17 @@ final class VoucherApplication
     public function platformDiscountFor(int $sellerId): int
     {
         return (int) ($this->platformDiscounts[$sellerId] ?? 0);
+    }
+
+    public function platformVoucherFor(int $sellerId): ?Voucher
+    {
+        return $this->platformVoucher?->applies_to_all_products === false
+            && ($this->platformEligibleSubtotals[$sellerId] ?? 0) === 0 ? null : $this->platformVoucher;
+    }
+
+    public function shippingVoucherFor(int $sellerId): ?Voucher
+    {
+        return ($this->shippingEligibility[$sellerId] ?? false) ? $this->shippingVoucher : null;
     }
 
     public function shippingDiscountFor(int $sellerId): int
@@ -232,12 +265,20 @@ final class VoucherApplication
     }
 
     /**
-     * Identifies the vouchers and merchandise discount the buyer reviewed.
-     * Shipping discounts are left out: they move with the carrier the buyer picks.
+     * Identifies the vouchers, merchandise allocation and shipping terms the buyer reviewed.
+     * The shipping discount amount can move with the selected carrier.
      */
     public function reviewFingerprint(): string
     {
-        return hash('sha256', implode(',', $this->voucherIds()).'|'.$this->discountCentavos);
+        $allocations = [$this->shopDiscounts, $this->platformDiscounts, $this->shippingEligibility];
+        foreach ($allocations as &$allocation) {
+            ksort($allocation);
+        }
+
+        return hash('sha256', json_encode([
+            $this->voucherIds(), $allocations, $this->shippingVoucher?->type->value,
+            $this->shippingVoucher?->value, $this->shippingVoucher?->max_discount,
+        ], JSON_THROW_ON_ERROR));
     }
 
     /**

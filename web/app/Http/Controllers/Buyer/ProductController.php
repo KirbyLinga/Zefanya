@@ -9,11 +9,11 @@ use App\Models\Shared\Voucher;
 use App\Services\Buyer\BuyerAddressBook;
 use App\Services\Buyer\CatalogSearch;
 use App\Services\Buyer\CheckoutCarrierService;
+use App\Services\Buyer\ProductCatalogQuery;
 use App\Services\Buyer\ProductReviewService;
 use App\Services\Shared\PriceResolver;
 use App\Services\Shared\ResolvedPrice;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\View\View;
 
 class ProductController extends Controller
@@ -23,58 +23,15 @@ class ProductController extends Controller
 
     public function index(): View
     {
-        // Base visibility + authorization filters: no expensive card aggregates yet.
-        $base = Product::query()
-            ->discoverable();
-
-        if (request()->filled('seller')) {
-            $base->where('seller_id', request()->integer('seller'));
-        }
-
-        // Filter by category if provided
-        $categoryId = request('category');
-        if ($categoryId) {
-            $base->where('category_id', (int) $categoryId);
-        }
-
-        // The navbar's Sale link: only products a buyer can really buy for less.
-        $onSaleOnly = request()->boolean('on_sale');
-        if ($onSaleOnly) {
-            $base->withRealSaleDiscount();
-        }
-
-        // Search by product name or description (the navbar searches here).
-        $searchTerm = CatalogSearch::term(request()->query('q'));
-        if ($searchTerm !== '') {
-            CatalogSearch::apply($base, $searchTerm);
-        }
-
-        ['filters' => $priceFilters, 'error' => $priceError] = CatalogSearch::priceFilters(request()->only(['min_price', 'max_price']));
-
-        $perPage = self::PER_PAGE;
-        $page = max(1, (int) request()->integer('page', 1));
-
-        // Phase 1: select the page of product IDs *before* the expensive
-        // rating/sales/stock aggregates. The sort (including price sort) is
-        // applied here so the final ordering stays correct.
-        $idQuery = clone $base;
-        $idQuery->withBuyerPriceFilters($priceFilters + request()->only(['sort']));
-        $total = (int) $idQuery->count();
-        $ids = $idQuery->forPage($page, $perPage)->pluck('id')->all();
-
-        // Phase 2: load card aggregates + eager loads only for this page.
-        // Ordered in PHP to stay portable (SQLite has no FIELD() function).
-        $products = Product::query()->withBuyerCardData()
-            ->with(['images', 'seller', 'category'])
-            ->whereIn('id', $ids)
-            ->get()
-            ->sortBy(fn (Product $product) => array_search($product->id, $ids, true))
-            ->values();
-
-        $products = new LengthAwarePaginator(
-            $products, $total, $perPage, $page,
-            ['path' => request()->url()]
+        // Listing query shared with loadMore() and the mobile API.
+        $result = app(ProductCatalogQuery::class)->run(
+            array_merge(request()->all(), ['q' => request()->query('q')]),
+            (int) request()->integer('page', 1),
+            self::PER_PAGE,
         );
+        ['search_term' => $searchTerm, 'price_filters' => $priceFilters, 'price_error' => $priceError, 'on_sale' => $onSaleOnly] = $result;
+
+        $products = app(ProductCatalogQuery::class)->paginator($result, request()->url());
         $products->appends(request()->except(array_merge(['page'], $priceError !== null ? ['min_price', 'max_price'] : [])));
 
         // Load all categories for filters
@@ -247,47 +204,12 @@ class ProductController extends Controller
      */
     public function loadMore(): JsonResponse
     {
-        $base = Product::query()
-            ->discoverable();
-
-        if (request()->filled('seller')) {
-            $base->where('seller_id', request()->integer('seller'));
-        }
-
-        $categoryId = request('category');
-        if ($categoryId) {
-            $base->where('category_id', (int) $categoryId);
-        }
-
-        $onSaleOnly = request()->boolean('on_sale');
-        if ($onSaleOnly) {
-            $base->withRealSaleDiscount();
-        }
-
-        $searchTerm = CatalogSearch::term(request()->query('q'));
-        if ($searchTerm !== '') {
-            CatalogSearch::apply($base, $searchTerm);
-        }
-
-        ['filters' => $priceFilters, 'error' => $priceError] = CatalogSearch::priceFilters(
-            request()->only(['min_price', 'max_price'])
+        $result = app(ProductCatalogQuery::class)->run(
+            array_merge(request()->all(), ['q' => request()->query('q')]),
+            (int) request()->integer('page', 2),
+            self::PER_PAGE,
         );
-
-        $perPage = self::PER_PAGE;
-        $page = max(1, (int) request()->integer('page', 2));
-
-        // Same two-phase loading as index()
-        $idQuery = clone $base;
-        $idQuery->withBuyerPriceFilters($priceFilters + request()->only(['sort']));
-        $total = (int) $idQuery->count();
-        $ids = $idQuery->forPage($page, $perPage)->pluck('id')->all();
-
-        $products = Product::query()->withBuyerCardData()
-            ->with(['images', 'seller', 'category'])
-            ->whereIn('id', $ids)
-            ->get()
-            ->sortBy(fn (Product $product) => array_search($product->id, $ids, true))
-            ->values();
+        ['products' => $products, 'total' => $total, 'page' => $page, 'per_page' => $perPage] = $result;
 
         $hasMore = ($page * $perPage) < $total;
         $showing = min($page * $perPage, $total);

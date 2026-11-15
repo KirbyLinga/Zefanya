@@ -201,6 +201,18 @@ class ShopVoucherOffersTest extends TestCase
         $this->assertDatabaseHas('voucher_claims', ['voucher_id' => $platform->id, 'buyer_id' => $this->buyer->id]);
     }
 
+    public function test_cancelling_the_last_legacy_shipment_returns_the_platform_voucher_once(): void
+    {
+        $voucher = Voucher::factory()->platform()->create(['times_used' => 1]);
+        $first = $this->shipment(['voucher_id' => $voucher->id]);
+        $second = $this->shipment(['voucher_id' => $voucher->id, 'seller_id' => Seller::factory()->create()->id], $first->order);
+
+        $this->buyerCancels($first);
+        $this->assertSame(1, $voucher->fresh()->times_used);
+        $this->buyerCancels($second);
+        $this->assertSame(0, $voucher->fresh()->times_used);
+    }
+
     public function test_seller_then_buyer_cancels_return_a_shared_voucher_exactly_once(): void
     {
         $platform = Voucher::factory()->create(['code' => 'PLAT1', 'times_used' => 5]);

@@ -14,7 +14,7 @@
 @endphp
 
 <div
-  class="js-cartpage-item-row flex items-start gap-4 border-b border-buyer-line/60 px-5 py-4 transition-opacity duration-200 last:border-b-0 {{ $unavailable ? 'opacity-50' : '' }}"
+  class="js-cartpage-item-row grid grid-cols-[auto_4.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-3 sm:flex sm:gap-4 border-b border-buyer-line/60 px-5 py-4 transition-opacity duration-200 last:border-b-0 {{ $unavailable ? 'opacity-50' : '' }}"
   data-item-id="{{ $item->id }}"
   data-seller-id="{{ $product?->seller_id }}"
   data-stock="{{ $stock }}"
@@ -36,7 +36,7 @@
   </div>
 
   {{-- Thumbnail with the category chip pinned to its bottom-right corner --}}
-  <div class="relative h-[100px] w-[100px] shrink-0 overflow-hidden rounded-xl bg-secondary-100">
+  <div class="relative h-[72px] w-[72px] shrink-0 overflow-hidden sm:h-[100px] sm:w-[100px] rounded-xl bg-secondary-100">
     @if ($imageUrl)
       <img src="{{ $imageUrl }}" alt="{{ $product->name }}" class="h-full w-full object-cover">
     @else
@@ -55,11 +55,11 @@
   <div class="min-w-0 flex-1">
     @if ($pdpUrl)
       <a href="{{ $pdpUrl }}"
-         class="line-clamp-2 text-[13.5px] font-semibold leading-snug text-buyer-ink hover:underline hover:underline-offset-2">
+         class="line-clamp-2 [overflow-wrap:anywhere] text-[13.5px] font-semibold leading-snug text-buyer-ink hover:underline hover:underline-offset-2">
         {{ $product->name }}
       </a>
     @else
-      <span class="line-clamp-2 text-[13.5px] font-semibold leading-snug text-buyer-ink">
+      <span class="line-clamp-2 [overflow-wrap:anywhere] text-[13.5px] font-semibold leading-snug text-buyer-ink">
         {{ $product?->name ?? 'Product no longer available' }}
       </span>
     @endif
@@ -107,10 +107,10 @@
   </div>
 
   {{-- Right column: line total, quantity stepper, remove --}}
-  <div class="flex shrink-0 flex-col items-end gap-2">
-    <span class="js-cartpage-line-total font-serif text-[15px] font-semibold text-buyer-ink">
+  <div class="col-span-2 col-start-2 flex min-w-0 flex-wrap items-center justify-between gap-2 sm:shrink-0 sm:flex-col sm:items-end">
+    <span class="text-[12px] text-buyer-ink-soft">Subtotal <span class="js-cartpage-line-total font-serif text-[15px] font-semibold text-buyer-ink">
       {{ $unavailable ? '—' : $item->formattedLineTotal() }}
-    </span>
+    </span></span>
 
     @unless ($unavailable)
       <div class="inline-flex items-center rounded-full border border-buyer-line bg-buyer-cream">

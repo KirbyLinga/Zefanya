@@ -18,9 +18,7 @@
         </div>
     </div>
 
-    @if(session('success'))
-        <div role="status" class="rounded-md border border-tertiary-300 bg-tertiary-50 p-4 text-sm text-tertiary-800">{{ session('success') }}</div>
-    @endif
+    <x-flash type="success" :message="session('success')" spacing="" />
     @if($errors->any())
         <div role="alert" class="rounded-md border border-error p-4 text-sm text-error">{{ $errors->first() }}</div>
     @endif

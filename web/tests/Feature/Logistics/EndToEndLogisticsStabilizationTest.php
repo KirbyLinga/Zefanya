@@ -29,11 +29,13 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\AssignsTransferCouriers;
 use Tests\Support\BootstrapsCrossProviderHandoffs;
 use Tests\TestCase;
 
 class EndToEndLogisticsStabilizationTest extends TestCase
 {
+    use AssignsTransferCouriers;
     use BootstrapsCrossProviderHandoffs;
     use LazilyRefreshDatabase;
 
@@ -115,6 +117,7 @@ class EndToEndLogisticsStabilizationTest extends TestCase
                 $this->post(route('logistics.manifests.items.store', $manifest), ['seller_order_id' => $parcel->id])
                     ->assertRedirect()->assertSessionHasNoErrors();
                 $item = $manifest->items()->sole();
+                $this->assignTransferCourier($manifest, $owner);
                 $scan = $service->verifyScan($manifest, $owner, $parcel->tracking_number, 'dispatch');
                 $this->post(route('logistics.manifests.dispatch', $manifest), ['tokens' => [$item->id => $scan['verification_token']]])
                     ->assertRedirect()->assertSessionHasNoErrors();
@@ -136,6 +139,7 @@ class EndToEndLogisticsStabilizationTest extends TestCase
                     ->assertOk()->assertSee('Accept');
                 $this->post(route('logistics.handoffs.accept', $handoff))->assertRedirect()->assertSessionHasNoErrors();
                 $handoff->refresh();
+                $this->assignTransferCourier($handoff, $owner);
                 $this->assertSame($index, $route->fresh()->current_leg_index);
                 $this->assertSame($owner->id, $parcel->fresh()->custody_provider_id);
                 $scan = $service->verifyScan($handoff, $owner, $parcel->tracking_number, 'dispatch');
@@ -175,9 +179,13 @@ class EndToEndLogisticsStabilizationTest extends TestCase
             $this->assertSame(['ROAD', 'SEA', 'AIR'], array_column($route->fresh()->legs, 'transport_mode'));
         }
 
-        $token = $this->logisticsScan($f['b'], $parcel);
-        $this->post(route('logistics.parcel-sorting.sort', $parcel), ['verification_token' => $token])
-            ->assertRedirect()->assertSessionHasNoErrors();
+        if ($scenario !== 'local') {
+            // A parcel that travelled is sorted by its destination hub's own scan;
+            // a local one was already sorted by its origin receipt scan.
+            $token = $this->logisticsScan($f['b'], $parcel);
+            $this->post(route('logistics.parcel-sorting.sort', $parcel), ['verification_token' => $token])
+                ->assertRedirect()->assertSessionHasNoErrors();
+        }
         $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
         $this->post(route('logistics.parcel-sorting.assignDelivery', $parcel), ['courier_id' => $delivery->id, 'reason' => 'Destination delivery'])
             ->assertRedirect()->assertSessionHasNoErrors();
@@ -230,7 +238,7 @@ class EndToEndLogisticsStabilizationTest extends TestCase
         $cart = $this->cart($f);
         $this->actingAs($f['buyer'], 'buyer')->get(route('buyer.checkout.index'))
             ->assertOk()->assertSee('not available');
-        $this->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($f['buyer']->id)->token,
+        $this->post(route('buyer.checkout.store'), ['checkout_token' => session(CheckoutController::TOKEN_KEY) ?? CheckoutToken::issue($f['buyer']->id)->token,
             'carriers' => [$f['seller']->id => $f['a']['provider']->id]])->assertSessionHasErrors();
         foreach (['orders', 'seller_orders', 'payments', 'parcel_routes', 'inventory_transactions'] as $table) {
             $this->assertDatabaseCount($table, 0);
@@ -244,7 +252,7 @@ class EndToEndLogisticsStabilizationTest extends TestCase
         Notification::fake();
         $f = $this->network('cross');
         $cart = $this->cart($f);
-        $token = CheckoutToken::issue($f['buyer']->id);
+        $token = CheckoutToken::query()->where('token', session(CheckoutController::TOKEN_KEY))->first() ?? CheckoutToken::issue($f['buyer']->id);
         $event = 'eloquent.creating: '.ParcelRoute::class;
         Event::listen($event, function (): void {
             throw ValidationException::withMessages(['route' => 'Route persistence unavailable.']);
@@ -339,7 +347,7 @@ class EndToEndLogisticsStabilizationTest extends TestCase
     {
         $this->cart($f);
         $this->actingAs($f['buyer'], 'buyer')->post(route('buyer.checkout.store'), [
-            'checkout_token' => CheckoutToken::issue($f['buyer']->id)->token,
+            'checkout_token' => session(CheckoutController::TOKEN_KEY) ?? CheckoutToken::issue($f['buyer']->id)->token,
             'carriers' => [$f['seller']->id => $f['a']['provider']->id],
         ])->assertRedirect()->assertSessionHasNoErrors();
 

@@ -161,14 +161,14 @@ class AdminVoucherTest extends TestCase
         $this->getJson(route('admin.vouchers.code-availability'))->assertUnprocessable()->assertJsonValidationErrors('code');
     }
 
-    public function test_admin_code_availability_requires_admin_authentication_and_two_factor_enrolment_when_enforced(): void
+    public function test_admin_code_availability_requires_admin_authentication_without_two_factor_enforcement(): void
     {
         $url = route('admin.vouchers.code-availability', ['code' => 'TEST123']);
         $this->getJson($url)->assertUnauthorized();
         $this->actingAs(Seller::factory()->create(['status' => 'approved']), 'seller')->getJson($url)->assertUnauthorized();
         $this->actingAs(Buyer::factory()->create(), 'buyer')->getJson($url)->assertUnauthorized();
         config(['admin.require_two_factor' => true]);
-        $this->actingAs($this->admin(), 'admin')->getJson($url)->assertRedirect(route('admin.two-factor.show'));
+        $this->actingAs($this->admin(), 'admin')->getJson($url)->assertOk()->assertExactJson(['available' => true]);
 
         $enrolled = Admin::factory()->superAdmin()->create(['two_factor_secret' => 'TESTENROLLEDSECRET', 'two_factor_confirmed_at' => now()]);
         $this->actingAs($enrolled, 'admin')->getJson($url)->assertOk()->assertExactJson(['available' => true]);

@@ -18,9 +18,7 @@
       Enter it below to continue — your registration then goes to an administrator for approval.
     </p>
 
-    @if (session('success'))
-      <p style="color: green;">{{ session('success') }}</p>
-    @endif
+    <x-flash type="success" :message="session('success')" />
 
     <form method="POST" action="{{ $verifyUrl }}" style="margin-top: 16px;">
       @csrf

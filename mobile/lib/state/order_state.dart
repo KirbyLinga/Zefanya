@@ -1,48 +1,122 @@
 // lib/state/order_state.dart
 //
-// The buyer's order history, exposed via Provider (see main.dart) —
-// same pattern as CartState.
+// The buyer's order history, exposed via Provider (see main.dart) — same
+// pattern as CartState.
 //
-// Until this existed, Checkout cleared the cart and showed a confirmation,
-// but the order went nowhere: Orders and Profile read the constant
-// `mockOrders` list, so nothing you "bought" ever appeared. This is the
-// missing link. Checkout calls [placeOrders]; Orders and Profile read
-// [orders].
+// ## Where orders come from now
 //
-// The seeded `mockOrders` stay underneath as sample history so the
-// tabs aren't empty on a fresh install. Delete that fallback once a real
-// orders API exists.
+// From an [OrderRepository]. Everything the state class used to do *itself* —
+// minting `ORD-10246`, grouping a cart by seller, encoding the orders to
+// `shared_preferences` — now lives in the mock repository, because all of it is
+// data work and every part of it is the server's in live mode (a real
+// `POST /orders` mints the id, prices the lines and decides the status).
 //
-// A cart can hold pieces from several sellers, and a marketplace order
-// belongs to ONE seller (that's who ships it, and who the buyer contacts),
-// so a checkout is split into one order per seller.
+// What is left here is presentation: [orders] and [purchasedProductIds] are
+// synchronous getters read inside `build()`, so they resolve against a cache
+// that [load] fills. The app loads before its first frame (see `main.dart`), so
+// there is no empty-then-jump.
 //
-// Persisted via shared_preferences, like the other state classes.
+// ## The one place this state class still composes two sources
+//
+// [resolvedOrders] merges the buyer's orders with live courier progress — when
+// a courier marks a parcel picked up, the order moves to "In Transit". That is a
+// *view over two states*, not a data source, which is why it stayed here: moving
+// it into a repository would mean a repository taking another state object as an
+// argument, inverting the dependency this pass is trying to straighten.
+//
+// ## The seller split
+//
+// A cart can hold pieces from several sellers, and a marketplace order belongs
+// to ONE seller (that is who ships it, and who the buyer contacts), so a
+// checkout becomes one order per seller. That rule is the *server's* in live
+// mode and the mock mirrors it exactly, so switching modes cannot change how
+// many orders a cart produces.
 
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../data/mock_data.dart';
+import '../data/api/api_exception.dart';
+import '../data/mock_data.dart' show Order, OrderStatus;
+import '../data/repositories/order_repository.dart';
 import 'cart_state.dart';
 import 'courier_state.dart';
+import 'return_state.dart';
 
 class OrderState extends ChangeNotifier {
-  /// Orders placed in this app, newest first.
-  final List<Order> _placed = [];
+  /// [repository] defaults to the mock implementation so existing call sites
+  /// (and tests) are unaffected; `main.dart` passes the resolved bundle's.
+  ///
+  /// [returns] is the sibling state that owns return/refund requests. It is
+  /// wired here rather than through a second provider because the order
+  /// screens already read [OrderState], and the two facts that must agree
+  /// (what the order row says and whether completion is blocked) belong in one
+  /// object graph.
+  OrderState({OrderRepository? repository, ReturnState? returns})
+    : _repository = repository ?? MockOrderRepository(),
+      returns = returns ?? ReturnState() {
+    this.returns.addListener(_onReturnsChanged);
+  }
 
-  static const _storageKey = 'placed_orders';
+  final OrderRepository _repository;
 
-  /// The seeded sample orders use ORD-10xxx numbers up to 10245; new ones
-  /// continue from there so an id never collides with sample history.
-  static const int _firstPlacedNumber = 10246;
+  /// The buyer's return/refund requests. Exposed so order screens can overlay
+  /// the request status without adding another provider to every test.
+  final ReturnState returns;
 
-  /// Placed orders first (newest on top), then the seeded sample history.
-  /// Statuses here are as-placed; use [resolvedOrders] for what to show.
-  List<Order> get orders => List.unmodifiable([..._placed, ...mockOrders]);
+  void _onReturnsChanged() => notifyListeners();
 
-  /// [orders], with each placed order's status and ETA following its
-  /// delivery job in [courier]. This is what the Orders screen shows: when
-  /// a courier marks an order picked up, it moves to In Transit here.
+  @override
+  void dispose() {
+    returns.removeListener(_onReturnsChanged);
+    super.dispose();
+  }
+
+  /// Orders placed or restored, newest first — as-placed statuses. Read
+  /// [resolvedOrders] for what a screen should show.
+  ///
+  /// A cache over the repository's answer, refreshed by [load] and [place].
+  /// Synchronous on purpose: this getter is called from `build()`.
+  List<Order> _orders = const [];
+
+  /// Whether a load or refresh is in flight. Used by the Orders screen to
+  /// show skeletons instead of an empty list while data arrives.
+  bool _loading = false;
+
+  /// Whether orders are currently being loaded or refreshed.
+  bool get isLoading => _loading;
+
+  List<Order> get orders => List.unmodifiable(_orders);
+
+  /// Every catalogue item this buyer has ordered, across all orders.
+  ///
+  /// The join key the personalization surfaces share. Deliberately derived from
+  /// data that already exists rather than tracked separately: there is no new
+  /// event stream here, no "engagement" counter, nothing that could drift from
+  /// the order history or outlive it. The only question it answers is the one
+  /// the rails actually need — has this person already bought this?
+  Set<String> get purchasedProductIds => {
+    for (final o in _orders) ...o.productIds,
+  };
+
+  /// Units of [productId] this buyer has ordered, excluding cancelled orders.
+  ///
+  /// Purchase limits are per buyer, so "how many are already in the cart" is
+  /// not enough. Orders saved before quantities existed only carry the flat
+  /// [Order.productIds] list; one id there means one unit.
+  int purchasedQuantity(String productId) {
+    var total = 0;
+    for (final order in _orders) {
+      if (order.cancelled) continue;
+      final recorded = order.productQuantities[productId];
+      if (recorded != null) {
+        total += recorded;
+      } else if (order.productIds.contains(productId)) {
+        total += 1;
+      }
+    }
+    return total;
+  }
+
+  /// [orders], with each order's status and ETA following its delivery job in
+  /// [courier]. This is what the Orders screen shows.
   ///
   ///   courier: assigned / at the seller  ->  To Ship
   ///   courier: picked up                 ->  In Transit
@@ -50,119 +124,292 @@ class OrderState extends ChangeNotifier {
   ///   courier: delivered                 ->  Delivered
   ///
   /// Seeded sample orders have no job, so they keep their fixed status.
-  List<Order> resolvedOrders(CourierState courier) => List.unmodifiable([
-        for (final o in _placed) _resolve(o, courier),
-        ...mockOrders,
-      ]);
+  List<Order> resolvedOrders(CourierState courier) =>
+      List.unmodifiable([for (final o in _orders) _resolve(o, courier)]);
 
   Order _resolve(Order order, CourierState courier) {
     final job = courier.jobForOrder(order.id);
     if (job == null) return order;
 
     if (courier.isCompleted(job.id)) {
-      return order.copyWith(status: OrderStatus.toRate, eta: 'Delivered');
+      return order.copyWith(
+        status: OrderStatus.toRate,
+        eta: 'Delivered',
+        deliveredAt: courier.completedAtFor(job.id) ?? order.deliveredAt,
+      );
     }
     return switch (courier.milestoneFor(job.id)) {
-      DeliveryMilestone.accepted =>
-        order.copyWith(status: OrderStatus.toShip, eta: 'A courier has been assigned'),
-      DeliveryMilestone.arrivedAtSeller =>
-        order.copyWith(status: OrderStatus.toShip, eta: 'Courier is at the seller collecting it'),
-      DeliveryMilestone.pickedUp =>
-        order.copyWith(status: OrderStatus.inTransit, eta: 'Picked up, heading to sorting center'),
-      DeliveryMilestone.atSortingCenter =>
-        order.copyWith(status: OrderStatus.inTransit, eta: 'Package at sorting center'),
-      DeliveryMilestone.sorted =>
-        order.copyWith(status: OrderStatus.inTransit, eta: 'Sorted and ready for dispatch'),
-      DeliveryMilestone.assignedToRider =>
-        order.copyWith(status: OrderStatus.outForDelivery, eta: 'Assigned to a delivery rider'),
-      DeliveryMilestone.inTransit =>
-        order.copyWith(status: OrderStatus.outForDelivery, eta: 'Courier is heading to you'),
-      DeliveryMilestone.delivered =>
-        order.copyWith(status: OrderStatus.toRate, eta: 'Delivered'),
-      DeliveryMilestone.failedDelivery =>
-        order.copyWith(status: OrderStatus.outForDelivery, eta: 'Delivery attempted — will retry'),
-      DeliveryMilestone.returnToSender =>
-        order.copyWith(status: OrderStatus.inTransit, eta: 'Being returned to seller'),
+      DeliveryMilestone.accepted => order.copyWith(
+        status: OrderStatus.toShip,
+        eta: 'A courier has been assigned',
+      ),
+      DeliveryMilestone.arrivedAtSeller => order.copyWith(
+        status: OrderStatus.toShip,
+        eta: 'Courier is at the seller collecting it',
+      ),
+      DeliveryMilestone.pickedUp => order.copyWith(
+        status: OrderStatus.inTransit,
+        eta: 'Picked up, heading to sorting center',
+      ),
+      DeliveryMilestone.atSortingCenter => order.copyWith(
+        status: OrderStatus.inTransit,
+        eta: 'Package at sorting center',
+      ),
+      DeliveryMilestone.sorted => order.copyWith(
+        status: OrderStatus.inTransit,
+        eta: 'Sorted and ready for dispatch',
+      ),
+      DeliveryMilestone.assignedToRider => order.copyWith(
+        status: OrderStatus.outForDelivery,
+        eta: 'Assigned to a delivery rider',
+      ),
+      DeliveryMilestone.inTransit => order.copyWith(
+        status: OrderStatus.outForDelivery,
+        eta: 'Courier is heading to you',
+      ),
+      DeliveryMilestone.delivered => order.copyWith(
+        status: OrderStatus.toRate,
+        eta: 'Delivered',
+      ),
+      DeliveryMilestone.failedDelivery => order.copyWith(
+        status: OrderStatus.outForDelivery,
+        eta: 'Delivery attempted — will retry',
+      ),
+      DeliveryMilestone.returnToSender => order.copyWith(
+        status: OrderStatus.inTransit,
+        eta: 'Being returned to seller',
+      ),
     };
   }
 
   /// Call once before runApp (see main.dart) to restore placed orders.
+  ///
+  /// **A failure here is recorded, never thrown.** `main()` awaits this before
+  /// `runApp`, so a live build — which has no `GET /orders` yet — would otherwise
+  /// abort the entire app over one unimplemented endpoint instead of opening with
+  /// an empty history. The exception is kept in [loadFailure] so the screen that
+  /// asks for orders can explain it, which is what `LiveOrderRepository.load()`'s
+  /// own comment has always said: an empty Orders tab that reports the error when
+  /// it is actually opened.
   Future<void> load() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_storageKey);
-      if (raw == null) return;
+    _loading = true;
+    notifyListeners();
+    await Future.wait([_repository.load(), returns.load()]);
 
-      final decoded = jsonDecode(raw) as List<dynamic>;
-      _placed.clear();
-      for (final entry in decoded) {
-        final map = entry as Map<String, dynamic>;
-        _placed.add(Order(
-          id: map['id'] as String,
-          shopName: map['shopName'] as String,
-          status: OrderStatus.values.byName(map['status'] as String),
-          eta: map['eta'] as String,
-          itemSummary: map['itemSummary'] as String,
-        ));
-      }
-    } catch (_) {
-      // Corrupt/old data shape — start clean rather than crash.
-      _placed.clear();
+    try {
+      _orders = await _repository.orders();
+      _loadFailure = null;
+    } on ApiNotConfiguredException {
+      // A live build with no base URL is a *build* mistake rather than a runtime
+      // condition: no screen can do anything sensible with it, and the person who
+      // has to fix it is the developer, not the person holding the phone. It keeps
+      // throwing, and `repository_wiring_test.dart` pins that.
+      rethrow;
+    } on ApiException catch (error) {
+      _orders = const [];
+      _loadFailure = error;
+    } finally {
+      _loading = false;
+      notifyListeners();
     }
   }
 
-  Future<void> _save() async {
-    final prefs = await SharedPreferences.getInstance();
-    final encoded = jsonEncode([
-      for (final o in _placed)
-        {
-          'id': o.id,
-          'shopName': o.shopName,
-          'status': o.status.name,
-          'eta': o.eta,
-          'itemSummary': o.itemSummary,
-        },
-    ]);
-    await prefs.setString(_storageKey, encoded);
+  /// Re-reads orders from the repository, recording how the attempt went.
+  ///
+  /// This is the Retry behind the Orders screen's failure copy, and safe to call
+  /// repeatedly. A failure still propagates — the repositories throw rather than
+  /// answer empty, and callers may want that — *and* it is kept in [loadFailure],
+  /// so a reader that cannot handle a throw (a `notifyListeners`-driven rebuild)
+  /// still has something true to render.
+  Future<void> refresh() async {
+    _loading = true;
+    notifyListeners();
+    try {
+      _orders = await _repository.orders();
+      _loadFailure = null;
+    } on ApiException catch (error) {
+      _loadFailure = error;
+      rethrow;
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Why [orders] is empty, when the reason is a failed request rather than an
+  /// empty history.
+  ///
+  /// Set by [load] and [refresh], cleared by a [refresh] that succeeds. It exists
+  /// so the Orders screen can say *what* happened: without it, a live build with
+  /// no `GET /orders` yet would render its honest "no orders yet" empty state over
+  /// a request that never succeeded — an absence presented as a fact.
+  ApiException? _loadFailure;
+
+  /// The failure behind an empty [orders], or null when nothing failed.
+  ApiException? get loadFailure => _loadFailure;
+
+  /// The reasons the cancellation sheet offers. Kept here rather than in the
+  /// screen because the mock repository and the eventual server need to agree
+  /// on the vocabulary, and a free-text field would make "reason required"
+  /// impossible to check.
+  static const cancellationReasons = [
+    'Changed my mind',
+    'Ordered the wrong item',
+    'Need to update the address',
+    'Found a better price',
+    'Other',
+  ];
+
+  /// Orders with a cancellation request in flight. A double tap on a small
+  /// button can fire two taps in the same frame; this makes the second a
+  /// no-op before either request has returned.
+  final Set<String> _cancelling = {};
+
+  /// Cancels a not-yet-shipped order. Returns null on success, or the sentence
+  /// to show when the action is refused.
+  ///
+  /// [order] is the *resolved* order the screen is showing, because a courier
+  /// pickup moves the display to In Transit while the base order row still says
+  /// To Ship. Checking the display status is what makes "no cancel after
+  /// shipping" true rather than a race between two independent states.
+  Future<String?> cancelOrder(Order order, String reason) async {
+    if (reason.trim().isEmpty) {
+      return 'Choose a reason before cancelling.';
+    }
+    if (order.cancelled) return 'This order is already cancelled.';
+    if (!order.canCancel) {
+      return 'This order can no longer be cancelled because it has shipped.';
+    }
+    if (!cancellationReasons.contains(reason.trim())) {
+      return 'Choose a reason from the list.';
+    }
+    if (_cancelling.contains(order.id)) {
+      return 'Cancellation is already being processed.';
+    }
+
+    _cancelling.add(order.id);
+    try {
+      final base = _orders.firstWhere(
+        (o) => o.id == order.id,
+        orElse: () => order,
+      );
+      if (base.cancelled) return 'This order is already cancelled.';
+      if (!base.canCancel) {
+        return 'This order can no longer be cancelled because it has shipped.';
+      }
+
+      await _repository.saveBuyerState(
+        base.copyWith(cancelled: true, cancellationReason: reason.trim()),
+      );
+      _orders = await _repository.orders();
+      notifyListeners();
+      return null;
+    } on ApiException {
+      rethrow;
+    } finally {
+      _cancelling.remove(order.id);
+    }
+  }
+
+  /// Confirms that a delivered order arrived. Returns null on success, or the
+  /// sentence to show when the action is refused.
+  ///
+  /// This is the buyer's own acknowledgement, not the courier's handover: the
+  /// courier already marked it delivered, and the Rate action existed before
+  /// this flag. What changes is the label the buyer sees — Delivered becomes
+  /// Completed — which is the state the workbook's "Order Received" step
+  /// describes.
+  Future<String?> confirmOrderReceived(Order order) async {
+    if (order.cancelled) return 'This order was cancelled.';
+    if (order.buyerConfirmed) return 'You already confirmed this order.';
+    if (returns.openRequestFor(order.id) != null) {
+      return 'This order has an open return request and cannot be completed.';
+    }
+    if (!order.canConfirmReceived) {
+      return 'You can confirm receipt only after the order is delivered.';
+    }
+
+    final base = _orders.firstWhere(
+      (o) => o.id == order.id,
+      orElse: () => order,
+    );
+    if (returns.openRequestFor(base.id) != null) {
+      return 'This order has an open return request and cannot be completed.';
+    }
+    if (!base.canConfirmReceived) {
+      return 'You can confirm receipt only after the order is delivered.';
+    }
+
+    await _repository.saveBuyerState(
+      base.copyWith(buyerConfirmed: true, completedAt: DateTime.now()),
+    );
+    _orders = await _repository.orders();
+    notifyListeners();
+    return null;
   }
 
   /// Turns the checked-out cart lines into orders, one per seller, all
-  /// starting at "To Ship". Returns the orders it created (empty if
-  /// [items] is empty) so the caller can dispatch a courier for each.
+  /// starting at "To Ship". Returns the orders it created (empty if [items] is
+  /// empty) so the caller can dispatch a courier for each.
   ///
-  /// Call this BEFORE `CartState.clearSelected()` — it reads the items you
-  /// pass in, it does not touch the cart itself.
-  List<Order> placeOrders(List<CartItem> items) {
+  /// Call this BEFORE `CartState.clearSelected()` — it reads the items you pass
+  /// in; it does not touch the cart itself.
+  ///
+  /// Async because placing an order is a *write*: the mock writes to disk and a
+  /// live implementation posts to `POST /orders` and waits for the server to
+  /// mint the ids. A synchronous signature here would be a lie that has to be
+  /// broken later, and every caller would need changing at that point instead of
+  /// now.
+  ///
+  /// See [quoteTotal] for the live-mode review step that comes first.
+  ///
+  /// [voucherCodes] and [expectedTotal] matter only in live mode: the server
+  /// re-validates the codes and prices the order itself, and refuses (409)
+  /// when its payable total differs from the [expectedTotal] the buyer saw.
+  /// The server's payable total for [items] (live mode), or null when orders
+  /// are priced on the device (mock mode). The checkout screen shows this
+  /// figure before placing, then passes it as `expectedTotal`.
+  Future<double?> quoteTotal(
+    List<CartItem> items, {
+    List<String> voucherCodes = const [],
+  }) async {
+    // QuotesCheckout is not a subtype of OrderRepository, so an is check
+    // cannot promote _repository; take the capability through a cast.
+    final repository = _repository;
+    if (repository is! QuotesCheckout || items.isEmpty) return null;
+    return (repository as QuotesCheckout).quoteTotal([
+      for (final item in items) _lineFor(item),
+    ], voucherCodes: voucherCodes);
+  }
+
+  OrderLineRequest _lineFor(CartItem item) => OrderLineRequest(
+    productId: item.product.id,
+    productName: item.product.name,
+    sellerName: item.product.sellerName,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+    variantId: item.product.variantForLabel(item.variant)?.id,
+  );
+
+  Future<List<Order>> placeOrders(
+    List<CartItem> items, {
+    List<String> voucherCodes = const [],
+    double? expectedTotal,
+  }) async {
     if (items.isEmpty) return const [];
 
-    // Group by seller, keeping the order sellers first appear in the cart.
-    final bySeller = <String, List<CartItem>>{};
-    for (final item in items) {
-      bySeller.putIfAbsent(item.product.sellerName, () => []).add(item);
-    }
+    final created = await _repository.place(
+      [for (final item in items) _lineFor(item)],
+      voucherCodes: voucherCodes,
+      expectedTotal: expectedTotal,
+    );
 
-    final created = <Order>[];
-    for (final entry in bySeller.entries) {
-      final summary = entry.value
-          .map((i) => i.quantity > 1 ? '${i.product.name} \u00d7${i.quantity}' : i.product.name)
-          .join(', ');
-
-      // Newest first. Each new order goes to the front, so a checkout
-      // with two sellers ends up with the later seller's order on top;
-      // fine, they were placed in the same instant.
-      final order = Order(
-        id: 'ORD-${_firstPlacedNumber + _placed.length}',
-        shopName: entry.key,
-        status: OrderStatus.toShip,
-        eta: 'Seller ships within 1-2 days',
-        itemSummary: summary,
-      );
-      _placed.insert(0, order);
-      created.add(order);
-    }
-
+    // Re-read rather than merging `created` by hand: in live mode the server's
+    // list is authoritative (it may include orders placed on another device),
+    // and in mock mode this is the same list plus the new ones. One code path,
+    // so the two modes cannot disagree about ordering.
+    _orders = await _repository.orders();
     notifyListeners();
-    _save();
     return created;
   }
 }

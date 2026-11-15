@@ -28,7 +28,7 @@
             <h1 class="font-serif text-[28px] leading-tight text-[var(--text-ink)] sm:text-[32px]">Batch #{{ $manifest->id }}</h1>
             <span class="inline-flex rounded-full border px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.5px] {{ $statusStyles[$manifest->status->value] ?? $statusStyles['DRAFT'] }}">{{ $manifest->status->label() }}</span>
         </div>
-        <p class="mt-2 font-sans text-xs text-[var(--text-muted)]">{{ $manifest->created_at?->format('M j, Y g:i A') }} · {{ $actorName }}</p>
+        <p class="mt-2 font-sans text-xs text-[var(--text-muted)]">{{ manila($manifest->created_at, 'M j, Y g:i A') }} · {{ $actorName }}</p>
     </div>
 
     <div class="flex flex-wrap gap-2">
@@ -36,8 +36,31 @@
             <a href="{{ route('logistics.manifests.receive.index', $manifest) }}" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-sm bg-primary-700 px-4 font-sans text-[11px] font-semibold uppercase tracking-[0.5px] text-white hover:bg-primary-800">
                 <i data-lucide="scan-line" class="size-3.5"></i>Receive parcels
             </a>
+            @if (($counts['received'] ?? 0) === 0)
+                <details class="relative" data-manifest-cancel>
+                    <summary class="inline-flex min-h-10 cursor-pointer list-none items-center justify-center gap-2 rounded-sm border border-rose-200 px-4 font-sans text-[11px] font-semibold uppercase tracking-[0.5px] text-rose-700 hover:bg-rose-50">
+                        <i data-lucide="octagon-x" class="size-3.5"></i>Cancel batch
+                    </summary>
+                    <form method="POST" action="{{ route('logistics.manifests.cancel', $manifest) }}" class="absolute right-0 z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] space-y-3 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 shadow-lg"
+                          onsubmit="return confirm('Cancel batch #{{ $manifest->id }}? Its {{ $counts['total'] }} {{ \Illuminate\Support\Str::plural('parcel', $counts['total']) }} already left {{ $manifest->originHub?->name }}, so each stays held as an exception until it is scanned at a hub.');">
+                        @csrf
+                        <label for="cancellation_reason" class="block font-sans text-[11px] font-semibold text-[var(--text-ink)]">Why is this batch cancelled?</label>
+                        <textarea id="cancellation_reason" name="cancellation_reason" required maxlength="1000" rows="3" class="w-full rounded-md border border-[var(--border-strong)] bg-[var(--bg-page)] p-2 font-sans text-[12px] text-[var(--text-ink)]" placeholder="Vehicle broke down on the way">{{ old('cancellation_reason') }}</textarea>
+                        <p class="font-sans text-[10px] leading-relaxed text-[var(--text-muted)]">Cancelling does not bring the parcels back. Each one must be scanned at the hub where it physically is before its route can resume.</p>
+                        <button type="submit" class="inline-flex min-h-9 w-full items-center justify-center rounded-sm bg-rose-700 px-4 font-sans text-[11px] font-semibold uppercase tracking-[0.5px] text-white hover:bg-rose-800">Cancel batch</button>
+                    </form>
+                </details>
+            @endif
         @elseif ($isDraft)
             <span class="inline-flex min-h-10 items-center rounded-sm border border-[var(--border-strong)] px-3 font-sans text-[11px] text-[var(--text-muted)]">Draft — add parcels below</span>
+            <form method="POST" action="{{ route('logistics.manifests.destroy', $manifest) }}"
+                  onsubmit="return confirm('Delete draft batch #{{ $manifest->id }}? It never left the hub, so its parcels go back to the sending hub\'s queue.');">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-sm border border-rose-200 px-4 font-sans text-[11px] font-semibold uppercase tracking-[0.5px] text-rose-700 hover:bg-rose-50">
+                    <i data-lucide="trash-2" class="size-3.5"></i>Delete draft
+                </button>
+            </form>
         @endif
     </div>
 </div>
@@ -79,22 +102,92 @@
     <div class="grid grid-cols-1 gap-3 border-t border-[var(--border-strong)] bg-[var(--bg-page)]/40 px-4 py-3 font-sans text-[11px] text-[var(--text-muted)] sm:grid-cols-2">
         <p><span class="font-semibold text-[var(--text-ink)]">Dispatch:</span>
             @if ($manifest->dispatched_at)
-                {{ $manifest->dispatched_at->format('M j, Y g:i A') }} by {{ $actorName }}
+                {{ manila($manifest->dispatched_at, 'M j, Y g:i A') }} by {{ $actorName }}
             @else
                 Not dispatched
             @endif
         </p>
         <p><span class="font-semibold text-[var(--text-ink)]">Receiving:</span>
             @if ($manifest->received_at)
-                {{ $manifest->received_at->format('M j, Y g:i A') }} by {{ $actorName }}
+                {{ manila($manifest->received_at, 'M j, Y g:i A') }} by {{ $actorName }}
             @elseif ($isDispatched)
                 In transit — origin hub remains accountable
             @else
                 Waiting for dispatch
             @endif
         </p>
+        @if ($transportAvailable && ($transportCourier || $manifest->transport_required))
+            <p class="sm:col-span-2"><span class="font-semibold text-[var(--text-ink)]">Carried by:</span>
+                @if ($transportCourier)
+                    {{ $transportCourier->name }} · {{ $manifest->transport_vehicle_type }}{{ $manifest->transport_plate_number ? ' · '.$manifest->transport_plate_number : '' }}
+                @else
+                    Not assigned yet — required before dispatch
+                @endif
+            </p>
+        @endif
     </div>
 </section>
+
+@if ($recoveryHubs->isNotEmpty())
+    <section class="mb-6 rounded-lg border border-amber-200 bg-amber-50/60 p-4 shadow-sm" aria-labelledby="recovery-title">
+        <h2 id="recovery-title" class="font-serif text-xl text-[var(--text-ink)]">Recover parcels</h2>
+        <p class="mt-1 max-w-3xl font-sans text-[11px] leading-relaxed text-[var(--text-muted)]">
+            This batch was cancelled after it left {{ $manifest->originHub?->name }}{{ $manifest->cancellation_reason ? ' ('.$manifest->cancellation_reason.')' : '' }}.
+            Where its parcels are has not been verified. Scan each one at the hub where it physically is. The scan records its location;
+            it stays held until its exception is resolved.
+        </p>
+        <p class="mt-2 font-sans text-[12px] font-semibold text-amber-900">{{ $awaitingRecovery }} of {{ $counts['total'] }} {{ \Illuminate\Support\Str::plural('parcel', $counts['total']) }} still {{ $awaitingRecovery === 1 ? 'needs' : 'need' }} a recovery scan.</p>
+        @if ($awaitingRecovery > 0)
+            <div class="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="Hub where the parcel is now">
+                <span class="font-sans text-[11px] font-semibold text-[var(--text-ink)]">Scanning at:</span>
+                @foreach ($recoveryHubs as $hub)
+                    <a href="{{ route('logistics.manifests.show', [$manifest, 'hub' => $hub->id]) }}" @if ($recoveryHub?->id === $hub->id) aria-current="true" @endif
+                       class="inline-flex min-h-8 items-center rounded-full border px-3 font-sans text-[11px] font-semibold {{ $recoveryHub?->id === $hub->id ? 'border-primary-700 bg-primary-700 text-white' : 'border-[var(--border-strong)] bg-[var(--bg-surface)] text-[var(--text-ink)] hover:bg-[var(--bg-page)]' }}">
+                        {{ $hub->name }}{{ (int) $hub->id === (int) $manifest->origin_hub_id ? ' (origin)' : ' (destination)' }}
+                    </a>
+                @endforeach
+            </div>
+            <div class="mt-4">
+                <x-parcel-scanner
+                    :verify-url="route('logistics.manifests.scan.verify', [$manifest, 'hub' => $recoveryHub?->id])"
+                    heading="Scan a parcel at {{ $recoveryHub?->name }}"
+                    subheading="Scan the waybill QR or enter the tracking number. The recovery action appears only after a valid single-use scan at this hub."
+                />
+            </div>
+        @endif
+    </section>
+@endif
+
+@if ($isDispatched && $items->contains(fn ($item) => ! $item->received_at && ! $item->released_at))
+    <section class="mb-6 rounded-lg border border-red-200 bg-red-50/40 p-4 shadow-sm" aria-labelledby="report-missing-title" data-report-missing>
+        <h2 id="report-missing-title" class="font-serif text-xl text-[var(--text-ink)]">Report missing parcels</h2>
+        <p class="mt-1 max-w-3xl font-sans text-[11px] leading-relaxed text-[var(--text-muted)]">Select the parcels that did not arrive. Each one becomes its own exception for Admin to review, all together or not at all. Parcels already received are not listed, and custody does not change: they stay with {{ $manifest->originHub?->name ?? 'your hub' }} until Admin decides or a verified scan finds them.</p>
+        <form method="POST" action="{{ route('logistics.manifests.report-missing', $manifest) }}" class="mt-3" onsubmit="return confirm('Report the selected parcels missing?');">
+            @csrf
+            <ul class="max-h-56 divide-y divide-red-100 overflow-y-auto rounded-md border border-red-100 bg-white">
+                @foreach ($items->filter(fn ($item) => ! $item->received_at && ! $item->released_at) as $item)
+                    <li class="px-3 py-2"><label class="flex items-center gap-3 font-sans text-[12.5px] text-[var(--text-ink)]"><input type="checkbox" name="seller_order_ids[]" value="{{ $item->seller_order_id }}" class="size-4"><span class="font-mono">{{ $item->sellerOrder?->tracking_number ?? '#'.$item->seller_order_id }}</span></label></li>
+                @endforeach
+            </ul>
+            <label for="missing-reason" class="mb-1 mt-3 block font-sans text-[11px] font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)]">What happened</label>
+            <input id="missing-reason" name="reason" required maxlength="255" placeholder="e.g. The truck never reached the hub" class="w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 py-2 font-sans text-[13px] text-[var(--text-ink)]">
+            <button type="submit" class="mt-3 inline-flex min-h-9 items-center rounded-sm bg-red-700 px-4 font-sans text-[11px] font-semibold uppercase tracking-[0.5px] text-white hover:bg-red-800">Report selected as missing</button>
+        </form>
+    </section>
+@endif
+
+@if ($transportAvailable && ($isDraft || $transportCourier))
+    @include('Logistics._transfer-courier', [
+        'action' => $isDraft ? route('logistics.manifests.transport', $manifest) : null,
+        'noun' => 'batch',
+        'courier' => $transportCourier,
+        'vehicle' => $manifest->transport_vehicle_type,
+        'plate' => $manifest->transport_plate_number,
+        'candidates' => $transportCandidates,
+        'history' => $transportHistory,
+        'required' => (bool) $manifest->transport_required,
+    ])
+@endif
 
 @if ($isDraft)
     <section class="mb-6 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-sm" aria-labelledby="dispatch-title" data-manifest-dispatch data-verify-url="{{ route('logistics.manifests.scan.verify', $manifest) }}" data-item-count="{{ $items->count() }}">
@@ -256,11 +349,15 @@
                                 <span class="inline-flex rounded-full border px-2.5 py-1 font-sans text-[10px] font-semibold {{ $item->received_at ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : ($isDispatched ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-[var(--border-strong)] bg-[var(--bg-page)] text-[var(--text-muted)]') }}">{{ $item->custodyLabel() }}</span>
                                 @if ($isDispatched && ! $item->received_at)
                                     <p class="mt-2 max-w-[220px] font-sans text-[10px] leading-relaxed text-[var(--text-muted)]">Custody stays with {{ $manifest->originHub?->name }} until the destination verifies this parcel.</p>
+                                @elseif ($item->awaitsRecovery())
+                                    <p class="mt-2 max-w-[220px] font-sans text-[10px] leading-relaxed text-amber-800">Location not verified since the batch was cancelled. Held as an exception.</p>
+                                @elseif ($item->recovered_at)
+                                    <p class="mt-2 max-w-[220px] font-sans text-[10px] leading-relaxed text-[var(--text-muted)]">Scanned {{ manila($item->recovered_at, 'M j, Y g:i A') }}. Resolve its exception to continue.</p>
                                 @endif
                             </td>
                             <td class="px-4 py-4">
                                 @if ($manifest->dispatched_at)
-                                    <p class="font-sans text-[11px] text-[var(--text-ink)]">{{ $manifest->dispatched_at->format('M j, Y g:i A') }}</p>
+                                    <p class="font-sans text-[11px] text-[var(--text-ink)]">{{ manila($manifest->dispatched_at, 'M j, Y g:i A') }}</p>
                                     <p class="mt-1 font-sans text-[10px] text-[var(--text-muted)]">By {{ $actorName }} at {{ $manifest->originHub?->name }}</p>
                                 @else
                                     <p class="font-sans text-[11px] text-[var(--text-muted)]">Not dispatched</p>
@@ -268,7 +365,7 @@
                             </td>
                             <td class="px-4 py-4">
                                 @if ($item->received_at)
-                                    <p class="font-sans text-[11px] text-[var(--text-ink)]">{{ $item->received_at->format('M j, Y g:i A') }}</p>
+                                    <p class="font-sans text-[11px] text-[var(--text-ink)]">{{ manila($item->received_at, 'M j, Y g:i A') }}</p>
                                     <p class="mt-1 font-sans text-[10px] text-[var(--text-muted)]">By {{ $actorName }} at {{ $manifest->destinationHub?->name }}</p>
                                 @else
                                     <p class="font-sans text-[11px] text-[var(--text-muted)]">Waiting for a valid receiving scan</p>
@@ -286,5 +383,11 @@
 @if ($isDraft && $items->isNotEmpty())
     @push('scripts')
         @vite('resources/js/logistics/manifests.js')
+    @endpush
+@endif
+
+@if ($awaitingRecovery > 0)
+    @push('scripts')
+        @vite('resources/js/parcel-scanner.js')
     @endpush
 @endif

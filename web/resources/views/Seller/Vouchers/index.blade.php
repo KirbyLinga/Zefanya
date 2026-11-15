@@ -17,9 +17,7 @@
 
     <noscript><p class="rounded-lg border border-[var(--border-input)] bg-[var(--bg-surface)] p-3 text-sm text-[var(--text-ink)]">Enable JavaScript to create a voucher in the modal, check its code, and review the discount before submitting.</p></noscript>
 
-    @if(session('success'))
-        <div role="status" class="rounded-md border border-tertiary-300 bg-tertiary-50 p-4 text-sm text-tertiary-800">{{ session('success') }}</div>
-    @endif
+    <x-flash type="success" :message="session('success')" spacing="" />
     @if($errors->any() && old('_modal') !== 'voucher-create')
         <div role="alert" class="rounded-md border border-error p-4 text-sm text-error">{{ $errors->first() }}</div>
     @endif

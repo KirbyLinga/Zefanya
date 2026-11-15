@@ -27,9 +27,7 @@
         <h1 class="font-serif text-3xl text-[var(--text-ink)]">Notifications</h1>
         <p class="mt-2 font-sans text-sm text-[var(--text-muted)]">Orders, returns, deliveries and low-stock alerts. {{ $unreadCount }} unread.</p>
     </header>
-    @if (session('success'))
-        <p role="status" class="mb-5 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 font-sans text-sm text-[var(--text-ink)]">{{ session('success') }}</p>
-    @endif
+    <x-flash type="success" :message="session('success')" spacing="mb-5" />
 
     <section aria-label="Your notifications" class="overflow-hidden rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)]">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-strong)] px-5 py-3">

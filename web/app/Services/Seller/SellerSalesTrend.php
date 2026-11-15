@@ -98,7 +98,7 @@ class SellerSalesTrend
         return SellerOrder::query()
             ->leftJoinSub($firstDelivered, 'first_delivered', 'first_delivered.seller_order_id', '=', 'seller_orders.id')
             ->where('seller_orders.seller_id', $sellerId)
-            ->whereIn('seller_orders.status', [OrderStatus::Delivered->value, OrderStatus::Completed->value])
+            ->salesWithoutReturns()
             ->whereRaw("{$soldAt} >= ?", [$start->copy()->utc()->toDateTimeString()])
             ->selectRaw("seller_orders.subtotal_minor as subtotal_minor, {$soldAt} as sold_at")
             ->toBase()

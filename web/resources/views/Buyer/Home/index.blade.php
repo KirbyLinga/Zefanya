@@ -167,12 +167,12 @@
       </div>
 
       {{-- Best Selling Stores sidebar --}}
-      <aside class="flex flex-col gap-3">
+      <aside class="flex flex-col gap-3 self-start">
         <div class="flex items-center justify-between">
           <h3 class="font-serif text-[18px] text-buyer-ink">Best Selling Store</h3>
         </div>
         @forelse ($stores as $store)
-          @include('Components.buyer.store-card', ['store' => $store, 'following' => in_array($store->id, $followedStoreIds, true)])
+          @include('Components.buyer.store-card', ['store' => $store, 'compact' => true, 'following' => in_array($store->id, $followedStoreIds, true)])
         @empty
           <div class="rounded-2xl border border-dashed border-buyer-line bg-white p-5 text-[13px] text-neutral-500">
             Stores will appear here once they have delivered orders.

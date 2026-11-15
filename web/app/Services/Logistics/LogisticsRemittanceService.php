@@ -56,11 +56,13 @@ class LogisticsRemittanceService
 
         $rows = $this->withShipping(CodRemittance::query()->where('cod_remittances.logistics_provider_id', $provider->getKey()))
             ->selectRaw(
-                'CASE WHEN cod_remittances.status = ? THEN ? WHEN cod_remittances.zefanya_received_at IS NOT NULL THEN ? '
+                'CASE WHEN cod_remittances.status = ? THEN ? WHEN cod_remittances.status = ? THEN ? '
+                .'WHEN cod_remittances.zefanya_received_at IS NOT NULL THEN ? '
                 .'WHEN cod_remittances.logistics_remittance_id IS NOT NULL THEN ? ELSE ? END as stage',
-                [CodRemittance::PENDING_REMITTANCE, self::STAGE_RIDER, self::STAGE_SETTLED, self::STAGE_SENT, self::STAGE_READY],
+                [CodRemittance::PENDING_REMITTANCE, self::STAGE_RIDER, CodRemittance::PARTIALLY_REMITTED, self::STAGE_RIDER,
+                    self::STAGE_SETTLED, self::STAGE_SENT, self::STAGE_READY],
             )
-            ->selectRaw('COUNT(*) as parcels, SUM(cod_remittances.amount_minor) as cod_minor, SUM('.CodRemittance::KEPT_SHIPPING_SQL.') as shipping_minor')
+            ->selectRaw('COUNT(*) as parcels, SUM(CASE WHEN cod_remittances.status = ? THEN cod_remittances.shortage_minor - cod_remittances.shortage_recovered_minor ELSE cod_remittances.amount_minor END) as cod_minor, SUM('.CodRemittance::KEPT_SHIPPING_SQL.') as shipping_minor, SUM(cod_remittances.amount_minor - ('.CodRemittance::KEPT_SHIPPING_SQL.')) as due_minor', [CodRemittance::PARTIALLY_REMITTED])
             ->groupBy('stage')
             ->get();
 
@@ -69,7 +71,8 @@ class LogisticsRemittanceService
                 'parcels' => (int) $row->parcels,
                 'codMinor' => (int) $row->cod_minor,
                 'shippingMinor' => (int) $row->shipping_minor,
-                'dueMinor' => (int) $row->cod_minor - (int) $row->shipping_minor,
+                // Due follows whole-parcel eligibility; codMinor shows actual Rider custody.
+                'dueMinor' => (int) $row->due_minor,
             ];
         }
 
@@ -88,8 +91,13 @@ class LogisticsRemittanceService
      */
     public function unsentByProvider(): Collection
     {
-        return $this->withShipping($this->readyQuery(CodRemittance::query()))
-            ->selectRaw('cod_remittances.logistics_provider_id, COUNT(*) as parcels, SUM(cod_remittances.amount_minor) as cod_minor, SUM('.CodRemittance::KEPT_SHIPPING_SQL.') as shipping_minor')
+        // Partial handovers are cash at the company even though they cannot yet
+        // enter a platform batch. Keep their gross actual cash visible, just as
+        // pending Rider cash is gross; shipping is retained on full handover.
+        return $this->withShipping(CodRemittance::query()
+            ->whereIn('cod_remittances.status', [CodRemittance::REMITTED_TO_LOGISTICS, CodRemittance::PARTIALLY_REMITTED])
+            ->whereNull('cod_remittances.logistics_remittance_id')->whereNull('cod_remittances.zefanya_received_at'))
+            ->selectRaw('cod_remittances.logistics_provider_id, COUNT(*) as parcels, SUM(CASE WHEN cod_remittances.status = ? THEN cod_remittances.received_amount_minor ELSE cod_remittances.amount_minor END) as cod_minor, SUM(CASE WHEN cod_remittances.status = ? THEN 0 ELSE '.CodRemittance::KEPT_SHIPPING_SQL.' END) as shipping_minor', [CodRemittance::PARTIALLY_REMITTED, CodRemittance::PARTIALLY_REMITTED])
             ->selectRaw('MIN(cod_remittances.confirmed_at) as oldest_at')
             ->selectRaw('SUM(CASE WHEN cod_remittances.confirmed_at < ? THEN 1 ELSE 0 END) as overdue_parcels', [$this->overdueCutoff()->toDateTimeString()])
             ->groupBy('cod_remittances.logistics_provider_id')
@@ -576,6 +584,42 @@ class LogisticsRemittanceService
             ->where('cod_remittances.origin_share_minor', 0)
             ->where('cod_remittances.kept_shipping_minor', 0)
             ->where('seller_orders.shipping_fee_minor', '>', 0);
+    }
+
+    /**
+     * Running parcel-cash balance for the Shipping fees table, oldest parcel
+     * first: + the cash once the rider hands it over, − Zefanya's part once it
+     * is sent (a rejected payment puts it back). Read only.
+     *
+     * @return array<int, array{cashIn: bool, sentOut: bool, balanceMinor: int}> keyed by cod_remittances.id
+     */
+    public function parcelBalances(LogisticsProvider $provider): array
+    {
+        $rows = $this->withShipping(CodRemittance::query()->where('cod_remittances.logistics_provider_id', $provider->getKey()))
+            ->leftJoin('logistics_remittances', 'logistics_remittances.id', '=', 'cod_remittances.logistics_remittance_id')
+            ->orderBy('cod_remittances.id')
+            ->get([
+                'cod_remittances.id', 'cod_remittances.status', 'cod_remittances.amount_minor', 'cod_remittances.received_amount_minor',
+                'logistics_remittances.status as sent_status',
+            ]);
+        $kept = $this->withShipping(CodRemittance::query()->where('cod_remittances.logistics_provider_id', $provider->getKey()))
+            ->pluck(DB::raw(CodRemittance::KEPT_SHIPPING_SQL.' as kept'), 'cod_remittances.id');
+
+        $balance = 0;
+        $out = [];
+        foreach ($rows as $row) {
+            $cashIn = $row->status !== CodRemittance::PENDING_REMITTANCE;
+            $sentOut = $cashIn && $row->sent_status !== null && $row->sent_status !== LogisticsRemittance::REJECTED;
+            if ($cashIn) {
+                $balance += (int) ($row->received_amount_minor ?? $row->amount_minor);
+            }
+            if ($sentOut) {
+                $balance -= (int) $row->amount_minor - (int) ($kept[$row->id] ?? 0);
+            }
+            $out[(int) $row->id] = ['cashIn' => $cashIn, 'sentOut' => $sentOut, 'balanceMinor' => $balance];
+        }
+
+        return $out;
     }
 
     private function withShipping(Builder $query): Builder

@@ -15,16 +15,19 @@ class SellerPromotionService
     {
         return DB::transaction(function () use ($seller, $attributes): SellerPromotion {
             $productIds = collect($attributes['product_ids'])->unique()->values();
+            // Checkout locks products before the Seller. Pivot inserts also need those product rows.
             $owned = Product::query()
                 ->where('seller_id', $seller->id)
                 ->whereIn('id', $productIds)
-                ->count();
+                ->orderBy('id')->lockForUpdate()->get(['id'])->count();
 
             if ($owned !== $productIds->count()) {
                 throw ValidationException::withMessages([
                     'product_ids' => 'Choose products from your store.',
                 ]);
             }
+
+            Seller::query()->whereKey($seller->id)->lockForUpdate()->firstOrFail();
 
             $overlap = SellerPromotion::query()
                 ->where('seller_id', $seller->id)
@@ -53,6 +56,16 @@ class SellerPromotionService
             $promotion->products()->sync($productIds->all());
 
             return $promotion;
+        });
+    }
+
+    public function delete(Seller $seller, SellerPromotion $promotion): void
+    {
+        abort_unless($promotion->seller_id === $seller->id, 403);
+
+        DB::transaction(function () use ($seller, $promotion): void {
+            Seller::query()->whereKey($seller->id)->lockForUpdate()->firstOrFail();
+            $promotion->delete();
         });
     }
 }

@@ -166,9 +166,10 @@ class HomeController extends Controller
             ];
         }
 
-        // Platform vouchers only: a Seller's code-only code must never be advertised.
+        // Code-only vouchers are distributed by their issuer.
         $voucher = Voucher::query()->where('is_active', true)->where('value', '>', 0)
             ->where('scope', VoucherScope::Platform->value)
+            ->where('is_claimable', true)->whereNull('ended_at')
             ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
             ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
             ->where(fn ($query) => $query->whereNull('usage_limit')->orWhereColumn('times_used', '<', 'usage_limit'))

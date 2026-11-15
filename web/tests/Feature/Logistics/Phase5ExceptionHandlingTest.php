@@ -34,6 +34,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Tests\Support\AssignsTransferCouriers;
 use Tests\Support\BootstrapsCheckoutCarriers;
 use Tests\TestCase;
 
@@ -46,6 +47,7 @@ use Tests\TestCase;
  */
 class Phase5ExceptionHandlingTest extends TestCase
 {
+    use AssignsTransferCouriers;
     use BootstrapsCheckoutCarriers;
     use LazilyRefreshDatabase;
 
@@ -700,6 +702,7 @@ class Phase5ExceptionHandlingTest extends TestCase
         $service = app(ManifestService::class);
         $manifest = $service->create($this->checkoutCarrier, $middle->id, $alternate->id);
         $item = $service->addParcel($manifest, $parcel->fresh());
+        $this->assignTransferCourier($manifest, $this->checkoutCarrier);
         $scan = $service->verifyScan($manifest, $this->checkoutCarrier, $parcel->tracking_number, 'dispatch');
         $manifest = $service->dispatch($manifest, $this->checkoutCarrier, [$item->id => $scan['verification_token']]);
         $scan = $service->verifyScan($manifest, $this->checkoutCarrier, $parcel->tracking_number, 'receive');
@@ -759,6 +762,7 @@ class Phase5ExceptionHandlingTest extends TestCase
             'legs' => [['hub_id' => $destination->id, 'transport_mode' => 'ROAD']]]);
         $service = app(ManifestService::class);
         $manifest = $service->create($this->checkoutCarrier, $origin->id, $wrong->id);
+        $this->assignTransferCourier($manifest, $this->checkoutCarrier);
         $item = $service->addParcel($manifest, $parcel);
         $scan = $service->verifyScan($manifest, $this->checkoutCarrier, $parcel->tracking_number, 'dispatch');
         $manifest = $service->dispatch($manifest, $this->checkoutCarrier, [$item->id => $scan['verification_token']]);
@@ -782,6 +786,7 @@ class Phase5ExceptionHandlingTest extends TestCase
         $this->assertSame($origin->id, $route->fresh()->origin_hub_id);
         $this->assertSame($wrong->id, $route->fresh()->legs[0]['origin_hub_id']);
         $next = $service->create($this->checkoutCarrier, $wrong->id, $destination->id);
+        $this->assignTransferCourier($next, $this->checkoutCarrier);
         $nextItem = $service->addParcel($next, $parcel->fresh());
         $scan = $service->verifyScan($next, $this->checkoutCarrier, $parcel->tracking_number, 'dispatch');
         $next = $service->dispatch($next, $this->checkoutCarrier, [$nextItem->id => $scan['verification_token']]);

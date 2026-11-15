@@ -138,6 +138,9 @@ Route::middleware('guest.role')->group(function (): void {
     //     buyer  → buyer.home
     // The shared public login modal submits here so the
     // public roles share a single auth backend.
+    // A bookmarked or typed /login opens the home page login modal instead of a raw 405.
+    Route::get('/login', fn () => redirect('/?login=1'))->name('unified.login.form');
+
     Route::post('/login', [UnifiedLoginController::class, 'login'])
         ->name('unified.login')
         ->middleware('throttle:login');

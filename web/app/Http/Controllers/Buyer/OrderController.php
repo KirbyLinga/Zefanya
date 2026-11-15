@@ -2,21 +2,19 @@
 
 namespace App\Http\Controllers\Buyer;
 
-use App\Enums\OrderActor;
 use App\Enums\OrderStatus;
 use App\Exceptions\StaleStateException;
 use App\Http\Controllers\Controller;
 use App\Models\Shared\Order;
 use App\Models\Shared\SellerOrder;
+use App\Services\Buyer\BuyerOrderCancellation;
 use App\Services\Buyer\BuyerShipmentConfirmation;
 use App\Services\Logistics\DeliveryOtpService;
 use App\Services\Logistics\ParcelReturnService;
 use App\Services\Logistics\RouteExecutionService;
-use App\Services\Seller\SellerOrderStatusService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -275,38 +273,8 @@ class OrderController extends Controller
             'reason.required' => 'Please provide a cancellation reason.',
         ]);
 
-        $service = new SellerOrderStatusService;
-
         try {
-            DB::transaction(function () use ($sellerOrder, $service, $validated, $buyer, $order): void {
-                // Serialize sibling cancellations before taking the shipment lock.
-                Order::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
-                $current = SellerOrder::query()
-                    ->whereKey($sellerOrder->id)
-                    ->lockForUpdate()
-                    ->first();
-
-                if ($current === null) {
-                    abort(404);
-                }
-
-                if ($current->status !== OrderStatus::Placed) {
-                    throw new StaleStateException($current->status === OrderStatus::Cancelled
-                        ? 'This shipment is already cancelled.'
-                        : 'This order can no longer be cancelled because the seller has already accepted it.');
-                }
-
-                $service->transition(
-                    $current,
-                    OrderStatus::Cancelled,
-                    note: 'Buyer cancelled: '.$validated['reason'],
-                    changedBy: 'buyer',
-                    actor: OrderActor::Buyer,
-                    actorId: (int) $buyer->id,
-                    source: 'web',
-                    expectedFrom: $current->status,
-                );
-            }, 3);
+            app(BuyerOrderCancellation::class)->cancel($order, $sellerOrder, $buyer, $validated['reason']);
         } catch (\InvalidArgumentException $e) {
             if ($request->expectsJson()) {
                 if (! $e instanceof StaleStateException) {

@@ -19,6 +19,8 @@ class BuyerShipmentConfirmation
     {
         abort_unless($order->buyer_id === $buyer->id, 404);
         DB::transaction(function () use ($order, $buyer, $shipmentId): void {
+            // Cancellation takes the parent lock before any of its shipments.
+            $order = Order::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
             $shipments = $order->sellerOrders()
                 ->when($shipmentId !== null, fn ($query) => $query->whereKey($shipmentId))
                 ->orderBy('id')->lockForUpdate()->get();

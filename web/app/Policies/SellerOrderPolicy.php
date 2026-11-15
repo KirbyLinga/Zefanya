@@ -14,6 +14,11 @@ use App\Models\Shared\SellerOrder;
  */
 class SellerOrderPolicy
 {
+    public function writeMobileReview(\App\Models\Buyer\Buyer $buyer, SellerOrder $sellerOrder): bool
+    {
+        return (int) $sellerOrder->order->buyer_id === (int) $buyer->getKey();
+    }
+
     /**
      * The owning seller may view and manage (mark ready) their slice.
      */

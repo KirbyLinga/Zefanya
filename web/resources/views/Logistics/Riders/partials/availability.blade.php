@@ -10,6 +10,6 @@
         {{ $rider->isOnline() ? 'Online' : 'Offline' }}
     </span>
     @if ($rider->online_changed_at)
-        <p class="mt-0.5 font-sans text-[11px] text-[var(--text-muted)]">since {{ $rider->online_changed_at->format('M j, g:i A') }}</p>
+        <p class="mt-0.5 font-sans text-[11px] text-[var(--text-muted)]">since {{ manila($rider->online_changed_at, 'M j, g:i A') }}</p>
     @endif
 @endif

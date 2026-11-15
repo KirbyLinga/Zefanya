@@ -14,6 +14,7 @@ use App\Notifications\Rider\RiderPayoutRecorded;
 use App\Services\Logistics\PickupPolicy;
 use App\Services\Logistics\PickupSessionService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -21,8 +22,8 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Rider pay. Pickup is paid per seller visit (a pickup session): the first parcel
- * collected earns the first rate (₱30 by default) and each further parcel in the
- * same session the additional rate (₱5). Delivery earns ₱50 per parcel. Rates come
+ * collected earns the first rate (₱10 by default) and each further parcel in the
+ * same session the additional rate (₱10). Delivery earns ₱30 per parcel. Rates come
  * from Platform Settings and are saved on each earning, so a later change never
  * alters a past one. A failed pickup or delivery attempt earns nothing. The
  * Logistics company pays its own riders and records each payment here.
@@ -110,7 +111,7 @@ class RiderEarningService
      * Unpaid earnings per Courier, highest first. `throughId` is the newest
      * earning shown, so a job finished after the page loaded is not paid unseen.
      *
-     * @return Collection<int, array{courierId: int, courier: string, pickups: int, deliveries: int, amountMinor: int, throughId: int}>
+     * @return Collection<int, array{courierId: int, courier: string, pickups: int, deliveries: int, amountMinor: int, throughId: int, payoutRevision: int}>
      */
     public function unpaidByCourier(LogisticsProvider $provider): Collection
     {
@@ -118,6 +119,8 @@ class RiderEarningService
             ->whereNull('rider_payout_id')
             ->selectRaw('courier_id, SUM(CASE WHEN job = ? THEN 1 ELSE 0 END) as pickups', [RiderEarning::PICKUP])
             ->selectRaw('SUM(CASE WHEN job = ? THEN 1 ELSE 0 END) as deliveries, SUM(amount_minor) as amount_minor, MAX(id) as through_id', [RiderEarning::DELIVERY])
+            ->addSelect(['payout_revision' => $this->payoutActivity($provider)
+                ->whereColumn('rider_payouts.courier_id', 'rider_earnings.courier_id')->limit(1)])
             ->groupBy('courier_id')
             ->with('courier:id,name')
             ->get()
@@ -128,9 +131,21 @@ class RiderEarningService
                 'deliveries' => (int) $row->deliveries,
                 'amountMinor' => (int) $row->amount_minor,
                 'throughId' => (int) $row->through_id,
+                'payoutRevision' => (int) $row->payout_revision,
             ])
             ->sortByDesc('amountMinor')
             ->values();
+    }
+
+    /** Payment and reversal both change which earnings a confirmation can cover. */
+    private function payoutActivity(LogisticsProvider $provider): Builder
+    {
+        return RiderPayout::query()
+            ->join('operations_audit_logs', 'operations_audit_logs.entity_id', '=', 'rider_payouts.id')
+            ->where('rider_payouts.logistics_provider_id', $provider->getKey())
+            ->where('operations_audit_logs.entity_type', 'rider_payout')
+            ->whereIn('operations_audit_logs.action', ['rider_payout_paid', 'rider_payout_reversed'])
+            ->select('operations_audit_logs.id')->orderByDesc('operations_audit_logs.id');
     }
 
     public function paidThisMonthMinor(LogisticsProvider $provider): int
@@ -145,12 +160,12 @@ class RiderEarningService
      * Record that the company paid a rider every unpaid earning up to `throughId`
      * in one batch. An earning can be in one payout only.
      */
-    public function payCourier(LogisticsProvider $provider, Courier $courier, int $throughId, int $expectedMinor, string $reference, string $paidOn): RiderPayout
+    public function payCourier(LogisticsProvider $provider, Courier $courier, int $throughId, int $expectedMinor, string $reference, string $paidOn, int $payoutRevision): RiderPayout
     {
         abort_unless((int) $courier->logistics_provider_id === (int) $provider->getKey(), 404);
         $reference = trim($reference);
 
-        return DB::transaction(function () use ($provider, $courier, $throughId, $expectedMinor, $reference, $paidOn): RiderPayout {
+        return DB::transaction(function () use ($provider, $courier, $throughId, $expectedMinor, $reference, $paidOn, $payoutRevision): RiderPayout {
             // Serializes payouts for one rider so a double submit cannot pay twice.
             $courier = Courier::query()->whereKey($courier->getKey())->lockForUpdate()->firstOrFail();
 
@@ -166,6 +181,13 @@ class RiderEarningService
             $amount = (int) $earnings->sum('amount_minor');
             if ($amount !== $expectedMinor) {
                 throw ValidationException::withMessages(['rider' => 'The amount owed changed. Check the new amount before recording the payment.']);
+            }
+
+            // A reversal can restore the same earnings or substitute other jobs with the same total.
+            $currentRevision = (int) $this->payoutActivity($provider)
+                ->where('rider_payouts.courier_id', $courier->getKey())->lockForUpdate()->first()?->id;
+            if ($payoutRevision !== $currentRevision) {
+                throw ValidationException::withMessages(['rider' => 'Rider payment history changed. Review the unpaid jobs and transfer before recording a payment.']);
             }
 
             $payout = new RiderPayout;

@@ -50,6 +50,7 @@ class EarningsController extends Controller
                 ->latest('id')->paginate(25, ['*'], 'parcels_page')->withQueryString(),
             'payments' => LogisticsRemittance::query()->where('logistics_provider_id', $provider->getKey())
                 ->latest('id')->paginate(25, ['*'], 'payments_page')->withQueryString(),
+            'parcelBalances' => $remittances->parcelBalances($provider),
         ]);
     }
 
@@ -58,10 +59,12 @@ class EarningsController extends Controller
         $data = $request->validate([
             'through_id' => ['required', 'integer', 'min:1'],
             'expected_amount_minor' => ['required', 'integer', 'min:1'],
+            'payout_revision' => ['required', 'integer', 'min:0'],
             'reference' => ['required', 'string', 'max:100'],
             // "Today" is the Philippine date the form defaults to, not the server clock's date.
             'paid_on' => ['required', 'date', 'before_or_equal:'.Carbon::now(StoreSale::TIMEZONE)->toDateString()],
         ], [
+            'payout_revision.required' => 'Reload the earnings page and review the unpaid jobs before recording this payment.',
             'reference.required' => 'Enter the bank, GCash or cash voucher reference for this payment.',
             'paid_on.before_or_equal' => 'The payment date cannot be in the future.',
         ]);
@@ -73,6 +76,7 @@ class EarningsController extends Controller
             (int) $data['expected_amount_minor'],
             $data['reference'],
             $data['paid_on'],
+            (int) $data['payout_revision'],
         );
 
         return redirect()->route('logistics.earnings.index')

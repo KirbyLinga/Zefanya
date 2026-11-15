@@ -1,20 +1,29 @@
 @extends('Admin.Layouts.app')
 
 @section('title', 'Dashboard')
+@section('content-width', 'max-w-none')
 
 @section('content')
     @php
         $peso = fn (int $minor): string => ($minor < 0 ? '−' : '').'₱'.number_format(abs($minor) / 100, 2);
-        $card = 'relative flex flex-col rounded-2xl border border-neutral-200 bg-white p-5 no-underline';
+        $card = 'relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-l-4 border-neutral-200 bg-white p-5 no-underline shadow-sm';
         $linkedCard = $card.' transition-colors hover:border-primary-800';
-        $iconChip = 'absolute right-4 top-4 flex size-9 items-center justify-center rounded-lg bg-primary-100 text-primary-800';
+        $iconChip = 'absolute right-4 top-4 flex size-9 items-center justify-center rounded-lg';
         $cardLabel = 'pr-11 font-sans text-[13px] font-medium text-neutral-600';
-        $value = 'mt-4 font-serif text-[28px] font-bold leading-tight text-neutral-950';
+        $value = 'mt-4 break-words font-serif text-[28px] font-bold leading-tight text-neutral-950';
         $cardHint = 'mt-1 font-sans text-xs text-neutral-600';
-        $panel = 'rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6';
+        $panel = 'min-w-0 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6';
         $panelTitle = 'font-sans text-[15px] font-semibold text-neutral-950';
         $th = 'whitespace-nowrap border-b border-neutral-200 py-2.5 font-sans text-[11px] font-semibold uppercase tracking-[0.6px] text-neutral-600';
         $td = 'whitespace-nowrap border-b border-neutral-200 py-3.5 font-sans text-[13px] text-neutral-950';
+        $accents = [
+            ['border-l-primary-700', 'bg-primary-100 text-primary-800'],
+            ['border-l-amber-500', 'bg-amber-50 text-amber-800'],
+            ['border-l-red-400', 'bg-red-50 text-red-800'],
+            ['border-l-blue-500', 'bg-blue-50 text-blue-800'],
+            ['border-l-violet-400', 'bg-violet-50 text-violet-800'],
+            ['border-l-emerald-500', 'bg-emerald-50 text-emerald-800'],
+        ];
         $cards = [
             ['label' => 'Active Users', 'value' => number_format($activeUsers), 'hint' => $activeBreakdown ?: 'No approved accounts yet', 'icon' => 'users', 'url' => $canModerate ? route('admin.users.index') : null],
             ['label' => 'Pending Registrations', 'value' => number_format($pendingRegistrations), 'hint' => $pendingRegistrations > 0 ? 'Waiting for approval' : 'None waiting', 'icon' => 'user-check', 'url' => $canModerate ? route('admin.registrations.index') : null],
@@ -62,7 +71,7 @@
             @endif
             <ul class="mt-3 grid grid-cols-1 gap-x-8 divide-y divide-neutral-200 xl:grid-cols-2 xl:divide-y-0">
                 @foreach ($waiting as $item)
-                    @include('Admin.partials.attention-row', ['item' => $item, 'dim' => false])
+                    @include('Admin.partials.attention-row', ['item' => $item, 'dim' => false, 'wide' => $loop->last && $waiting->count() % 2 !== 0])
                 @endforeach
             </ul>
             @if ($quiet->isNotEmpty())
@@ -70,7 +79,7 @@
                     <summary class="cursor-pointer font-sans text-xs font-semibold text-neutral-600">{{ $quiet->count() }} queue{{ $quiet->count() === 1 ? '' : 's' }} with nothing waiting</summary>
                     <ul class="mt-2 divide-y divide-neutral-200">
                         @foreach ($quiet as $item)
-                            @include('Admin.partials.attention-row', ['item' => $item, 'dim' => true])
+                            @include('Admin.partials.attention-row', ['item' => $item, 'dim' => true, 'wide' => false])
                         @endforeach
                     </ul>
                 </details>
@@ -78,18 +87,19 @@
         </section>
     @endif
 
-    <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 {{ $money !== null ? 'xl:grid-cols-3' : 'xl:grid-cols-3' }}">
+    <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         @foreach ($cards as $item)
+            @php([$rail, $chip] = $accents[$loop->index % count($accents)])
             @if ($item['url'])
-                <a href="{{ $item['url'] }}" class="{{ $linkedCard }}">
-                    <span class="{{ $iconChip }}"><i data-lucide="{{ $item['icon'] }}" class="size-[18px]" aria-hidden="true"></i></span>
+                <a href="{{ $item['url'] }}" class="{{ $linkedCard }} {{ $rail }}">
+                    <span class="{{ $iconChip }} {{ $chip }}"><i data-lucide="{{ $item['icon'] }}" class="size-[18px]" aria-hidden="true"></i></span>
                     <span class="{{ $cardLabel }}">{{ $item['label'] }}</span>
                     <span class="{{ $value }}">{{ $item['value'] }}</span>
                     <span class="{{ $cardHint }}">{{ $item['hint'] }}</span>
                 </a>
             @else
-                <div class="{{ $card }}">
-                    <span class="{{ $iconChip }}"><i data-lucide="{{ $item['icon'] }}" class="size-[18px]" aria-hidden="true"></i></span>
+                <div class="{{ $card }} {{ $rail }}">
+                    <span class="{{ $iconChip }} {{ $chip }}"><i data-lucide="{{ $item['icon'] }}" class="size-[18px]" aria-hidden="true"></i></span>
                     <span class="{{ $cardLabel }}">{{ $item['label'] }}</span>
                     <span class="{{ $value }}">{{ $item['value'] }}</span>
                     <span class="{{ $cardHint }}">{{ $item['hint'] }}</span>
@@ -98,37 +108,48 @@
         @endforeach
     </div>
 
-    <div class="mt-6 grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
+    <div class="mt-6">
 
         @if ($money !== null)
             <section data-platform-money class="{{ $panel }}">
-                <h2 class="{{ $panelTitle }}">Platform money {{ $isCurrent ? 'this month' : 'in '.$periodLabel }}</h2>
-                <p class="mt-1 font-sans text-xs text-neutral-600">What Zefanya earns and what it funds</p>
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <h2 class="{{ $panelTitle }}">Platform money {{ $isCurrent ? 'this month' : 'in '.$periodLabel }}</h2>
+                    <div class="w-full min-w-0 rounded-xl bg-primary-50 px-5 py-4 sm:w-auto sm:min-w-[220px]">
+                        <p class="font-sans text-[13px] font-semibold text-neutral-700">Platform net earnings</p>
+                        <p class="mt-1 break-words font-serif text-[32px] font-bold leading-tight text-primary-800 tabular-nums">{{ $peso($money['net']) }}</p>
+                    </div>
+                </div>
                 @if ($money['commission'] === 0 && $money['platformVouchers'] === 0 && $money['shippingVouchers'] === 0)
-                    <p class="mt-3 rounded-xl bg-primary-50 px-4 py-4 text-center font-sans text-[13px] text-neutral-600">No orders were finalized {{ $isCurrent ? 'this month yet' : 'in '.$periodLabel }}. Commission is counted when an order is completed.</p>
+                    <p class="mt-4 font-sans text-[13px] text-neutral-600">No orders finalized {{ $isCurrent ? 'this month yet' : 'in '.$periodLabel }}.</p>
                 @endif
-                <dl class="mt-3 divide-y divide-neutral-200">
-                    <div class="flex items-center justify-between gap-4 py-3">
-                        <dt class="font-sans text-[13px] font-semibold text-neutral-950">Commission revenue<span class="block text-xs font-normal text-neutral-600">{{ \App\Services\Shared\CommissionFinalizationService::COMMISSION_BPS / 100 }}% on finalized orders</span></dt>
-                        <dd class="font-sans text-sm font-semibold text-neutral-950">+ {{ $peso($money['commission']) }}</dd>
+                <dl class="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <div class="min-w-0 rounded-xl border border-neutral-200 px-4 py-4">
+                        <dt class="font-sans text-sm font-semibold text-neutral-950">Commission revenue</dt>
+                        <dd class="mt-2 break-words font-sans text-[25px] font-semibold leading-tight text-neutral-950 tabular-nums">{{ $money['commission'] < 0 ? '' : '+ ' }}{{ $peso($money['commission']) }}</dd>
+                        <dd class="mt-2 font-sans text-[13px] text-neutral-600">Finalized orders</dd>
                     </div>
-                    <div class="flex items-center justify-between gap-4 py-3">
-                        <dt class="font-sans text-[13px] font-semibold text-neutral-950">Platform vouchers<span class="block text-xs font-normal text-neutral-600">Discounts Zefanya paid for</span></dt>
-                        <dd class="font-sans text-sm font-semibold text-neutral-950">− {{ $peso($money['platformVouchers']) }}</dd>
+                    <div class="min-w-0 rounded-xl border border-neutral-200 px-4 py-4">
+                        <dt class="font-sans text-sm font-semibold text-neutral-950">Platform vouchers</dt>
+                        <dd class="mt-2 break-words font-sans text-[25px] font-semibold leading-tight text-neutral-950 tabular-nums">{{ $money['platformVouchers'] < 0 ? '+ ' : '− ' }}{{ $peso(abs($money['platformVouchers'])) }}</dd>
+                        <dd class="mt-2 font-sans text-[13px] text-neutral-600">Marketplace discounts</dd>
                     </div>
-                    <div class="flex items-center justify-between gap-4 py-3">
-                        <dt class="font-sans text-[13px] font-semibold text-neutral-950">Shipping vouchers<span class="block text-xs font-normal text-neutral-600">Shipping fees Zefanya paid for</span></dt>
-                        <dd class="font-sans text-sm font-semibold text-neutral-950">− {{ $peso($money['shippingVouchers']) }}</dd>
+                    <div class="min-w-0 rounded-xl border border-neutral-200 px-4 py-4">
+                        <dt class="font-sans text-sm font-semibold text-neutral-950">Shipping vouchers</dt>
+                        <dd class="mt-2 break-words font-sans text-[25px] font-semibold leading-tight text-neutral-950 tabular-nums">{{ $money['shippingVouchers'] < 0 ? '+ ' : '− ' }}{{ $peso(abs($money['shippingVouchers'])) }}</dd>
+                        <dd class="mt-2 font-sans text-[13px] text-neutral-600">Shipping discounts</dd>
                     </div>
                 </dl>
-                <div class="mt-2 flex items-center justify-between gap-4 rounded-xl bg-primary-50 px-4 py-4">
-                    <span class="font-sans text-[13px] font-semibold text-neutral-950">Platform net earnings<span class="block text-xs font-normal text-neutral-600">Commission revenue minus vouchers Zefanya funded</span></span>
-                    <span class="font-serif text-xl font-bold text-neutral-950">{{ $peso($money['net']) }}</span>
-                </div>
-                <p class="mt-3 font-sans text-xs text-neutral-600">Store vouchers are seller-funded and never appear here.</p>
+                <details class="mt-4 border-t border-neutral-200 pt-4 font-sans text-[13px] leading-relaxed text-neutral-600">
+                    <summary class="w-fit cursor-pointer rounded font-semibold text-primary-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary-700">How earnings are calculated</summary>
+                    <div class="mt-3 space-y-2">
+                        <p>Commission revenue is {{ \App\Services\Shared\CommissionFinalizationService::COMMISSION_BPS / 100 }}% of item subtotal after seller discounts, counted when an order is completed.</p>
+                        <p>Platform net earnings = commission revenue minus marketplace-funded platform and shipping vouchers.</p>
+                        <p>Store vouchers are seller-funded and excluded from these totals.</p>
+                    </div>
+                </details>
             </section>
         @else
-            <section data-marketplace class="{{ $panel }} {{ $canModerate ? '' : 'xl:col-span-2' }}">
+            <section data-marketplace class="{{ $panel }}">
                 <h2 class="{{ $panelTitle }}">Marketplace activity</h2>
                 <dl class="mt-3 divide-y divide-neutral-200">
                     <div class="flex items-center justify-between gap-4 py-3">
@@ -146,26 +167,47 @@
 
     @if ($money !== null && $position !== null)
         <section data-platform-position-section class="mt-6 {{ $panel }}">
-            <h2 class="{{ $panelTitle }}">Liabilities and money in transit <span class="font-normal text-neutral-600">(live, not filtered by month)</span></h2>
-            <p class="mt-1 font-sans text-xs text-neutral-600">Not revenue and not part of the net above. COD cash, seller payouts and origin shipping shares only pass through Zefanya.</p>
-            <dl data-platform-position class="mt-4 grid grid-cols-1 gap-4 font-sans text-[13px] text-neutral-950 md:grid-cols-3">
-                <div class="rounded-xl bg-primary-50 p-4">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.6px] text-neutral-600">Zefanya owes</p>
-                    <div class="mt-2 flex justify-between gap-4 py-1.5"><dt>Seller payouts owed</dt><dd class="font-semibold tabular-nums">{{ $peso($position['sellerPayableMinor']) }}</dd></div>
-                    <div class="flex justify-between gap-4 py-1.5"><dt>Logistics shares owed (origin 40% / old-parcel 60%)</dt><dd class="font-semibold tabular-nums">{{ $peso($position['originPayableMinor']) }} / {{ $peso($position['destinationPayableMinor']) }}</dd></div>
-                    <div class="flex justify-between gap-4 py-1.5"><dt>Refunds still to record ({{ $position['refundsToRecordCount'] }})</dt><dd class="font-semibold tabular-nums">{{ $peso($position['refundsToRecordMinor']) }}</dd></div>
-                    <div class="mt-1 flex justify-between gap-4 border-t border-neutral-200 pt-2.5"><dt class="font-semibold">Total owed by Zefanya</dt><dd class="font-serif text-lg font-bold tabular-nums">{{ $peso($position['totalLiabilitiesMinor']) }}</dd></div>
-                </div>
-                <div class="rounded-xl bg-primary-50 p-4">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.6px] text-neutral-600">Owed to Zefanya</p>
-                    <div class="mt-2 flex justify-between gap-4 py-1.5"><dt>Seller debts owed to Zefanya</dt><dd class="font-semibold tabular-nums">{{ $peso($position['sellerDebtMinor']) }}</dd></div>
-                </div>
-                <div class="rounded-xl bg-primary-50 p-4">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.6px] text-neutral-600">Cash in transit</p>
-                    <div class="mt-2 flex justify-between gap-4 py-1.5"><dt>Cash not yet received (riders {{ $peso($position['cashWithRidersMinor']) }}, companies {{ $peso($position['cashAtCompaniesMinor']) }}, awaiting confirmation {{ $peso($position['cashSentAwaitingMinor']) }})</dt><dd class="font-semibold tabular-nums">{{ $peso($position['outstandingCashMinor']) }}</dd></div>
-                </div>
-            </dl>
-            <p class="mt-3 font-sans text-xs text-neutral-600">Refund adjustments: {{ $peso($position['refundsRecordedMonthMinor']) }} refunded this month. Commission already counted on refunded orders: {{ $peso($position['commissionOnRefundedMinor']) }}, not removed from the net.</p>
+            <div class="flex flex-wrap items-center gap-3"><h2 class="{{ $panelTitle }}">Money to settle</h2><span class="rounded-full bg-primary-100 px-2.5 py-1 font-sans text-[13px] font-semibold text-primary-800">Live</span></div>
+            <p class="mt-2 font-sans text-[13px] text-neutral-600">Current balances, independent of the selected month.</p>
+            <div data-platform-position class="mt-5 grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+                <section class="min-w-0 rounded-xl bg-primary-50 p-5" aria-labelledby="liabilitiesTitle">
+                    <h3 id="liabilitiesTitle" class="font-sans text-sm font-semibold text-neutral-950">Zefanya owes</h3>
+                    <p class="mt-2 break-words font-sans text-[28px] font-semibold leading-tight text-primary-800 tabular-nums">{{ $peso($position['totalLiabilitiesMinor']) }}</p>
+                    <details class="mt-4 border-t border-primary-200 pt-3 font-sans text-[13px] text-neutral-700">
+                        <summary class="w-fit cursor-pointer rounded font-semibold text-primary-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary-700">View breakdown</summary>
+                        <dl class="mt-3 space-y-3">
+                            <div class="flex items-start justify-between gap-4"><dt class="min-w-0">Seller payouts</dt><dd class="min-w-0 break-words text-right font-semibold tabular-nums">{{ $peso($position['sellerPayableMinor']) }}</dd></div>
+                            <div class="flex items-start justify-between gap-4"><dt class="min-w-0">Origin logistics share</dt><dd class="min-w-0 break-words text-right font-semibold tabular-nums">{{ $peso($position['originPayableMinor']) }}</dd></div>
+                            <div class="flex items-start justify-between gap-4"><dt class="min-w-0">Legacy destination share</dt><dd class="min-w-0 break-words text-right font-semibold tabular-nums">{{ $peso($position['destinationPayableMinor']) }}</dd></div>
+                            <div class="flex items-start justify-between gap-4"><dt class="min-w-0">Refunds to record ({{ $position['refundsToRecordCount'] }})</dt><dd class="min-w-0 break-words text-right font-semibold tabular-nums">{{ $peso($position['refundsToRecordMinor']) }}</dd></div>
+                        </dl>
+                        <p class="mt-3 leading-relaxed">Origin shares are 40%. Destination shares of 60% apply to legacy parcels.</p>
+                    </details>
+                </section>
+                <section class="min-w-0 rounded-xl bg-primary-50 p-5" aria-labelledby="sellerDebtTitle">
+                    <h3 id="sellerDebtTitle" class="font-sans text-sm font-semibold text-neutral-950">Owed to Zefanya</h3>
+                    <p class="mt-2 break-words font-sans text-[28px] font-semibold leading-tight text-primary-800 tabular-nums">{{ $peso($position['sellerDebtMinor']) }}</p>
+                    <p class="mt-3 font-sans text-[13px] leading-relaxed text-neutral-600">Outstanding seller debts.</p>
+                </section>
+                <section class="min-w-0 rounded-xl bg-primary-50 p-5" aria-labelledby="cashTransitTitle">
+                    <h3 id="cashTransitTitle" class="font-sans text-sm font-semibold text-neutral-950">Cash in transit</h3>
+                    <p class="mt-2 break-words font-sans text-[28px] font-semibold leading-tight text-primary-800 tabular-nums">{{ $peso($position['outstandingCashMinor']) }}</p>
+                    <dl class="mt-4 space-y-3 border-t border-primary-200 pt-4 font-sans text-[13px] text-neutral-700">
+                        <div class="flex items-start justify-between gap-4"><dt class="min-w-0">With riders</dt><dd class="min-w-0 break-words text-right font-semibold tabular-nums">{{ $peso($position['cashWithRidersMinor']) }}</dd></div>
+                        <div class="flex items-start justify-between gap-4"><dt class="min-w-0">With companies</dt><dd class="min-w-0 break-words text-right font-semibold tabular-nums">{{ $peso($position['cashAtCompaniesMinor']) }}</dd></div>
+                        <div class="flex items-start justify-between gap-4"><dt class="min-w-0">Awaiting confirmation</dt><dd class="min-w-0 break-words text-right font-semibold tabular-nums">{{ $peso($position['cashSentAwaitingMinor']) }}</dd></div>
+                    </dl>
+                </section>
+            </div>
+            <details class="mt-5 border-t border-neutral-200 pt-4 font-sans text-[13px] leading-relaxed text-neutral-600">
+                <summary class="w-fit cursor-pointer rounded font-semibold text-primary-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary-700">Refund details</summary>
+                <dl class="mt-3 space-y-3 sm:max-w-xl">
+                    <div class="flex items-start justify-between gap-4"><dt class="min-w-0">Refunds recorded this month</dt><dd class="min-w-0 break-words text-right font-semibold tabular-nums">{{ $peso($position['refundsRecordedMonthMinor']) }}</dd></div>
+                    <div class="flex items-start justify-between gap-4"><dt class="min-w-0">Commission on refunded orders</dt><dd class="min-w-0 break-words text-right font-semibold tabular-nums">{{ $peso($position['commissionOnRefundedMinor']) }}</dd></div>
+                </dl>
+                <p class="mt-3">Recorded refunds refer to the current month, regardless of the month selected above. Commission already counted on refunded orders remains included in net earnings.</p>
+                <p class="mt-2">Live liabilities and cash in transit are not revenue or part of monthly net earnings. COD cash, seller payouts and logistics shares only pass through Zefanya.</p>
+            </details>
         </section>
     @endif
 

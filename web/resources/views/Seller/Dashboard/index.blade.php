@@ -12,7 +12,7 @@
         sellerConfirm('Accept this order? You can pack it in the next step.', () => btn.closest('form').submit());
     }
     function confirmMarkReady(btn) {
-        sellerConfirm('Mark this packed parcel ready? This schedules the current eligible or next pickup window. Logistics arranges the pickup rider.', () => btn.closest('form').submit());
+        sellerConfirm('Request pickup for this packed order? This schedules the current eligible or next pickup window. Logistics chooses the rider. No rider is assigned yet.', () => btn.closest('form').submit());
     }
 </script>
 @endpush
@@ -63,7 +63,7 @@
                             @if ($decisionUrgent)
                                 <span class="rounded-md bg-[var(--pill-warning-bg)] px-2 py-1 text-[11px] font-semibold text-[var(--status-warning)]">{{ $decisionOverdue ? 'Overdue - auto-approval pending' : 'Due within 24 hours' }}</span>
                             @endif
-                            <p class="text-xs text-[var(--text-muted)]">{{ $decisionDue ? 'Deadline: '.$decisionDue->format('M j, Y g:i A').' Philippine time' : 'Deadline not available - review in Returns' }}</p>
+                            <p class="text-xs text-[var(--text-muted)]">{{ $decisionDue ? 'Deadline: '.manila($decisionDue, 'M j, Y g:i A').' Philippine time' : 'Deadline not available - review in Returns' }}</p>
                         </div>
                     </li>
                 @endforeach
@@ -85,7 +85,7 @@
                     ₱{{ number_format($totalSales, 2) }}
                 @endif
             </p>
-            <p class="font-sans text-xs text-[var(--text-muted)] mt-1">All delivered and completed orders.</p>
+            <p class="font-sans text-xs text-[var(--text-muted)] mt-1">Delivered and completed orders, excluding returns and refunds.</p>
         </a>
 
         <a href="{{ route('seller.earnings.index') }}" data-net-earnings class="block no-underline bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm transition-colors hover:border-[var(--brand)]">
@@ -217,7 +217,7 @@
     {{-- =========================== RECENT ORDERS ======================== --}}
     <section class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg p-5 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-            <div><h2 class="font-sans text-base font-semibold text-[var(--text-ink)]">Recent orders</h2><p class="mt-1 text-xs text-[var(--text-muted)]">1. Accept &nbsp; 2. Pack &nbsp; 3. Mark ready</p></div>
+            <div><h2 class="font-sans text-base font-semibold text-[var(--text-ink)]">Recent orders</h2><p class="mt-1 text-xs text-[var(--text-muted)]">1. Accept &nbsp; 2. Pack &nbsp; 3. Request pickup</p></div>
             <a href="{{ route('seller.orders.index') }}" class="inline-flex items-center gap-1 font-sans text-[12.5px] font-semibold text-[var(--link)] no-underline">
                 All orders <i data-lucide="arrow-right" class="w-[14px] h-[14px]" aria-hidden="true"></i>
             </a>
@@ -259,7 +259,7 @@
                                           $nextAction = match ($sellerOrder->status) {
                                               OrderStatus::Placed => ['route' => 'seller.orders.accept', 'label' => 'Accept order', 'confirm' => 'confirmAccept(this)'],
                                               OrderStatus::Confirmed => ['route' => 'seller.orders.pack', 'label' => 'Pack order', 'confirm' => 'this.form.submit()'],
-                                              OrderStatus::Preparing => ['route' => 'seller.orders.markReady', 'label' => 'Mark ready', 'confirm' => 'confirmMarkReady(this)'],
+                                              OrderStatus::Preparing => ['route' => 'seller.orders.markReady', 'label' => 'Request Pickup', 'confirm' => 'confirmMarkReady(this)'],
                                           };
                                       @endphp
                                       <form method="POST" action="{{ route($nextAction['route'], $sellerOrder) }}">

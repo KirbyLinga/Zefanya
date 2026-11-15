@@ -47,6 +47,39 @@ class BuyerAddressBookTest extends TestCase
         $this->assertSame(1, BuyerAddress::query()->where('buyer_id', $buyer->id)->where('is_default', true)->count());
     }
 
+    public function test_invalid_address_fields_have_associated_errors_and_a_summary(): void
+    {
+        $buyer = Buyer::factory()->create();
+        $values = $this->payload('');
+        $values['postal_code'] = str_repeat('1', 11);
+
+        $this->actingAs($buyer, 'buyer')->from(route('buyer.account.address'))->followingRedirects()
+            ->post(route('buyer.account.addresses.store'), $values)->assertOk()
+            ->assertSee('id="address-error-summary"', false)
+            ->assertSee('aria-describedby="address-error-street"', false)
+            ->assertSee('id="address-error-street"', false)
+            ->assertSee('aria-describedby="address-error-postal_code"', false)
+            ->assertSee('id="address-error-postal_code"', false);
+    }
+
+    public function test_sidebar_shows_actual_saved_address_count(): void
+    {
+        $buyer = Buyer::factory()->create(['street' => 'Legacy profile street']);
+        $this->actingAs($buyer, 'buyer');
+        $count = function (): string {
+            $html = $this->get(route('buyer.account.index'))->assertOk()->getContent();
+            $document = new \DOMDocument;
+            @$document->loadHTML($html);
+            $xpath = new \DOMXPath($document);
+
+            return trim($xpath->query('//nav[@aria-label="Buyer account navigation"]//a[@href="'.route('buyer.account.address').'"]/span[last()]')->item(0)->textContent);
+        };
+        $this->assertSame('0', $count());
+        $this->post(route('buyer.account.addresses.store'), $this->payload('First street'))->assertSessionHasNoErrors();
+        $this->post(route('buyer.account.addresses.store'), $this->payload('Second street'))->assertSessionHasNoErrors();
+        $this->assertSame('2', $count());
+    }
+
     public function test_editing_the_default_address_keeps_it_default_and_updates_the_profile(): void
     {
         $buyer = Buyer::factory()->create();

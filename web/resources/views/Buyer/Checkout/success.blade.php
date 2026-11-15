@@ -15,11 +15,7 @@
             @if ($order->sellerOrders->count() > 1)<p class="mt-2 text-xs leading-relaxed text-[var(--text-muted)]">Each shop sends a separate parcel. Your shipments can progress at different stages; track each one in your order details.</p>@endif
         </div>
 
-        @if (session('voucher_notice'))
-            <div class="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                {{ session('voucher_notice') }}
-            </div>
-        @endif
+        <x-flash type="warning" :message="session('voucher_notice')" spacing="mt-4" />
 
         @foreach ($order->sellerOrders as $sellerOrder)
             <div class="mt-6 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5">

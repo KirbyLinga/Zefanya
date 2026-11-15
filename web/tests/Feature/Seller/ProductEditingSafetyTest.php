@@ -128,6 +128,7 @@ class ProductEditingSafetyTest extends TestCase
         $data['variants'][2]['price'] = 199;
         $data['variants'][2]['is_available'] = false;
         $product = app(ProductPublishingService::class)->save(new Product, $seller, $data);
+        $product->forceFill(['status' => 'active', 'approved_at' => now()])->save();
         $expected = "\u{20B1}299.00\u{2013}\u{20B1}349.00";
         $this->assertSame($expected, $product->load('variants')->formattedPriceRange());
         $this->assertSame($expected, Product::query()->withBuyerCardData()->findOrFail($product->id)->formattedPriceRange());

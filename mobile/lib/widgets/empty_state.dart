@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import 'editorial_shapes.dart';
+import 'motion/ease_in_frame.dart';
 
 class EmptyState extends StatelessWidget {
   const EmptyState({
@@ -30,52 +31,65 @@ class EmptyState extends StatelessWidget {
   /// Optional button/widget below the copy.
   final Widget? action;
 
-  /// Arch background tint. Defaults to AppColors.secondary (blush).
+  /// Arch fill hue. A *hue*, not a fill: it's composited over the dark
+  /// ground by [AppColors.hueOnSurface], so the arch reads as a tinted
+  /// dark panel. Passing a pastel token ([AppColors.secondary]) and
+  /// painting it directly — even at 55% — made the one graphic moment
+  /// on an otherwise empty screen the brightest rectangle in the app,
+  /// at roughly 8:1 against the background instead of ~2:1.
   final Color? tint;
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
-    final color = tint ?? AppColors.secondary;
+    final color = AppColors.hueOnSurface(tint ?? AppColors.secondary);
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Arch(
-              footRadius: 14,
-              child: Container(
-                width: 96,
-                height: 116,
-                color: color.withValues(alpha: 0.55),
-                alignment: Alignment.center,
-                child: Icon(
-                  icon,
-                  size: 40,
-                  color: AppColors.primaryDark.withValues(alpha: 0.7),
+    // Empty states are usually the first frame after a load, so they get the
+    // same canonical entrance as the content that failed to arrive: a short
+    // rise and fade. EaseInFrame returns the settled child immediately under
+    // reduced motion, so this cannot hide the only copy on the screen.
+    return EaseInFrame(
+      index: 0,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Arch(
+                footRadius: 14,
+                child: Container(
+                  width: 96,
+                  height: 116,
+                  color: color,
+                  alignment: Alignment.center,
+                  // tintInk on the arch fill: the fill is a pale wash in
+                  // light mode and a dark lean in dark mode, so the glyph
+                  // has to invert with it to stay visible.
+                  child: Icon(icon, size: 40, color: AppColors.tintInk),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(title, style: theme.textTheme.titleSmall, textAlign: TextAlign.center),
-            if (subtitle != null) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 20),
               Text(
-                subtitle!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                  height: 1.5,
-                ),
+                title,
+                style: theme.textTheme.titleSmall,
                 textAlign: TextAlign.center,
               ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  subtitle!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              if (action != null) ...[const SizedBox(height: 20), action!],
             ],
-            if (action != null) ...[
-              const SizedBox(height: 20),
-              action!,
-            ],
-          ],
+          ),
         ),
       ),
     );

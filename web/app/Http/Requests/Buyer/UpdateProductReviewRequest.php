@@ -21,7 +21,7 @@ class UpdateProductReviewRequest extends FormRequest
             'rating' => ['required', 'integer', 'between:1,5'],
             'body' => ['nullable', 'string', 'max:'.Review::MAX_BODY_LENGTH],
             'photos' => ['nullable', 'array', 'max:'.Review::MAX_PHOTOS],
-            'photos.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:3072'],
+            'photos.*' => ['file', 'image', 'mimes:jpg,jpeg,png', 'max:5120'],
             'remove_photos' => ['nullable', 'array'],
             'remove_photos.*' => ['integer'],
         ];

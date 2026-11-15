@@ -9,6 +9,7 @@ use App\Models\Seller\Seller;
 use App\Models\Shared\Category;
 use App\Models\Shared\OrderItem;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -31,6 +32,28 @@ class ProductControllerTest extends TestCase
     private function mine(array $attributes = []): Product
     {
         return Product::factory()->create(['seller_id' => $this->seller->id] + $attributes);
+    }
+
+    public function test_list_uses_the_buyer_image_url_even_when_storage_is_served_outside_php(): void
+    {
+        Storage::fake('public');
+        $product = $this->mine(['name' => 'ASUS ROG Strix Z390-F Gaming Motherboard']);
+        $product->images()->create(['path' => 'products/motherboard/gallery.jpg', 'is_primary' => false]);
+
+        $this->actingAs($this->seller, 'seller')->get(route('seller.products.index'))
+            ->assertOk()
+            ->assertSee('src="/storage/products/motherboard/gallery.jpg"', false);
+    }
+
+    public function test_list_renders_a_placeholder_without_javascript_when_there_is_no_image(): void
+    {
+        Storage::fake('public');
+        $this->mine(['name' => 'Product without an image']);
+
+        $this->actingAs($this->seller, 'seller')->get(route('seller.products.index'))
+            ->assertOk()
+            ->assertSee('<svg data-product-image-placeholder', false)
+            ->assertDontSee('src=""', false);
     }
 
     // ── Index: ownership + isolation ────────────────────────────────────────
@@ -309,10 +332,10 @@ class ProductControllerTest extends TestCase
         $this->actingAs($this->seller, 'seller')
             ->patchJson(route('seller.products.toggleStatus', $product), ['status' => 'active'])
             ->assertOk()
-            ->assertJsonPath('status', 'active')
-            ->assertJsonPath('label', 'Active');
+            ->assertJsonPath('status', 'pending')
+            ->assertJsonPath('label', 'Pending');
 
-        $this->assertSame('active', $product->fresh()->status);
+        $this->assertSame('pending', $product->fresh()->status);
     }
 
     public function test_toggle_status_sets_a_product_inactive(): void

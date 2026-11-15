@@ -98,3 +98,13 @@ Keep responses concise. Avoid repeated explanations and unnecessary file reads.
 - Read-only audits and non-destructive tests never require approval.
 - Stop and ask only when scope changes materially, destructive operations are necessary, or protected resources are involved.
 - Never modify production data, `.env`, or execute destructive database commands without separate explicit authorization.
+
+## Zefanya dependency-analysis workflow
+
+For every audit, bug fix, and development task, read and follow [`../CLAUDE_GRAPH_WORKFLOW.md`](../CLAUDE_GRAPH_WORKFLOW.md).
+
+Before starting, verify whether ClaudeGraphFlow, Graphify, or an equivalent dependency-graph tool is installed and usable for the affected repository and languages. Use actual documented commands and configured integrations; if unavailable or unsuitable, continue with targeted repository searches and source tracing. An installed CLI is not proof of a configured or current graph.
+
+Before editing, trace callers and downstream dependencies across relevant routes/middleware, controllers/form requests, services, models/tables, financial ledgers, jobs/commands, Web/Flutter API consumers, and tests. Assess authorization, concurrency, financial integrity, and existing business rules; apply the smallest safe fix while preserving uncommitted work and policy.
+
+After editing, retrace affected dependencies, run focused regressions and relevant concurrency tests, and check COD/remittance, settlements/debts, earnings, commission, shipping allocations, return/refund accounting, and parcel custody/inventory for unintended effects. Report tool availability, actual analysis commands, dependencies traced, impact findings, exact test results, and remaining unverified scenarios. Verify graph findings against actual code and tests; a generated graph never proves correctness. Do not commit or push without explicit authorization.

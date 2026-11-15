@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Logistics;
 
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
+use App\Models\Logistics\LogisticsHub;
 use App\Models\Shared\SellerOrder;
 use App\Services\Logistics\LogisticsStatusOverrideService;
+use App\Services\Logistics\StationInventoryService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -38,7 +41,24 @@ class DeliveryMonitoringController extends Controller
 
     public function index(Request $request): View
     {
-        $request->validate(['search' => ['nullable', 'string', 'max:100']]);
+        $request->validate(['search' => ['nullable', 'string', 'max:100'], 'station' => ['nullable', 'integer', 'min:1']]);
+        if ($request->filled('station')) {
+            $station = LogisticsHub::query()
+                ->where('logistics_provider_id', $request->user('logistics')->id)
+                ->where('hub_type', LogisticsHub::STATION)
+                ->findOrFail($request->integer('station'));
+            $inventory = app(StationInventoryService::class);
+            $rows = $inventory->rows((int) $request->user('logistics')->id, collect([$station->id]));
+            $page = LengthAwarePaginator::resolveCurrentPage();
+            $inventoryRows = new LengthAwarePaginator(
+                $rows->forPage($page, 25)->values(), $rows->count(), 25, $page,
+                ['path' => $request->url(), 'query' => $request->query()],
+            );
+
+            return view('Logistics.DeliveryMonitoring.index', [
+                'station' => $station, 'inventoryRows' => $inventoryRows, 'inventoryCounts' => $inventory->counts($rows),
+            ]);
+        }
         $search = trim((string) $request->query('search', ''));
         $provider = $request->user('logistics');
 

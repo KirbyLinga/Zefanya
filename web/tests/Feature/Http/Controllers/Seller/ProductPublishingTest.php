@@ -70,6 +70,8 @@ class ProductPublishingTest extends TestCase
         foreach ($general as $image) {
             Storage::disk('public')->assertExists($image->path);
         }
+        $this->assertSame('pending', $product->status);
+        $product->forceFill(['status' => 'active', 'approved_at' => now()])->save();
         $this->get(route('buyer.products.show', $product))->assertOk()
             ->assertViewHas('galleryImages', function ($images) use ($general, $additional): bool {
                 $this->assertSame(Storage::disk('public')->url($general[$additional]->path), $images[0]);
@@ -114,6 +116,7 @@ class ProductPublishingTest extends TestCase
         $general = $product->images()->whereNull('variant_id')->orderBy('sort_order')->get();
         $this->assertTrue($general[1]->is_primary);
         $this->assertFalse($general[0]->is_primary);
+        $product->forceFill(['status' => 'active', 'approved_at' => now()])->save();
 
         $this->get(route('buyer.products.show', $product))->assertViewHas('variantData', function ($rows) {
             $this->assertCount(12, $rows);

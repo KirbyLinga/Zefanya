@@ -119,6 +119,16 @@ class SellerWorkflowGuidanceTest extends TestCase
         }
     }
 
+    public function test_order_primary_action_follows_status_and_has_a_single_form(): void
+    {
+        $parcel = SellerOrder::factory()->status(OrderStatus::Preparing)->create();
+        $response = $this->actingAs($parcel->seller, 'seller')->get(route('seller.orders.show', $parcel))->assertOk();
+        $html = $response->getContent();
+        $this->assertLessThan(strpos($html, 'Request Pickup'), strpos($html, 'Current status'));
+        $this->assertSame(1, substr_count($html, 'action="'.route('seller.orders.markReady', $parcel).'"'));
+        $response->assertSee('onclick="return confirmMarkReady(this)"', false);
+    }
+
     public function test_unassigned_ready_pickup_does_not_claim_a_rider_or_recorded_window(): void
     {
         $parcel = SellerOrder::factory()->status(OrderStatus::ReadyForPickup)->create();

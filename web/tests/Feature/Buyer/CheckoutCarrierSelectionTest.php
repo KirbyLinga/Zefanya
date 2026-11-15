@@ -82,7 +82,7 @@ class CheckoutCarrierSelectionTest extends TestCase
             ->assertSee('Checkout Carrier')
             ->assertSee('Second Cargo')
             ->assertDontSee('No Coverage Cargo')
-            ->assertSee('₱49.00')
+            ->assertSee('₱50.00')
             ->assertSee('name="carriers['.$this->sellerA->id.']"', false);
     }
 
@@ -143,7 +143,7 @@ class CheckoutCarrierSelectionTest extends TestCase
         session([CheckoutController::SESSION_KEY => [$this->buyer->cartItems()->sole()->id]]);
 
         $this->post(route('buyer.checkout.store'), [
-            'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+            'checkout_token' => session(CheckoutController::TOKEN_KEY) ?? CheckoutToken::issue($this->buyer->id)->token,
         ])
             ->assertRedirect()
             ->assertSessionHas('error')
@@ -178,7 +178,7 @@ class CheckoutCarrierSelectionTest extends TestCase
         session([CheckoutController::SESSION_KEY => [$cartA->id, $cartB->id]]);
 
         $this->post(route('buyer.checkout.store'), [
-            'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+            'checkout_token' => session(CheckoutController::TOKEN_KEY) ?? CheckoutToken::issue($this->buyer->id)->token,
             'carriers' => [$this->sellerA->id => $carrier->id],
         ])
             ->assertRedirect()
@@ -187,7 +187,7 @@ class CheckoutCarrierSelectionTest extends TestCase
         $this->assertSame(0, Order::query()->count());
 
         $this->post(route('buyer.checkout.store'), [
-            'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+            'checkout_token' => session(CheckoutController::TOKEN_KEY) ?? CheckoutToken::issue($this->buyer->id)->token,
             'carriers' => [
                 $this->sellerA->id => $carrier->id,
                 $this->sellerB->id => $carrier->id,
@@ -211,10 +211,10 @@ class CheckoutCarrierSelectionTest extends TestCase
         $options = $this->actingAs($this->buyer, 'buyer')
             ->get(route('buyer.checkout.index'))
             ->assertOk()
-            ->assertSee('₱49.00')
+            ->assertSee('₱50.00')
             ->viewData('carrierOptions');
 
-        $this->assertSame(4900, $options[0]['carriers'][0]['fee_minor']);
+        $this->assertSame(5000, $options[0]['carriers'][0]['fee_minor']);
     }
 
     public function test_a_shipping_voucher_reduces_buyer_payable_but_not_the_carrier_fee(): void
@@ -225,7 +225,7 @@ class CheckoutCarrierSelectionTest extends TestCase
             'product_id' => $this->productA->id,
             'quantity' => 1,
         ]);
-        $voucher = Voucher::factory()->shipping()->fixed(4900)->create();
+        $voucher = Voucher::factory()->shipping()->fixed(5000)->create();
 
         $this->actingAs($this->buyer, 'buyer')
             ->withSession([
@@ -233,14 +233,14 @@ class CheckoutCarrierSelectionTest extends TestCase
                 VoucherSessionService::SESSION_KEY => ['shipping' => $voucher->code],
             ])
             ->post(route('buyer.checkout.store'), [
-                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+                'checkout_token' => session(CheckoutController::TOKEN_KEY) ?? CheckoutToken::issue($this->buyer->id)->token,
                 'carriers' => [$this->sellerA->id => $carrier->id],
             ])
             ->assertSessionHasNoErrors();
 
         $parcel = SellerOrder::query()->sole();
-        $this->assertSame(4900, $parcel->shipping_fee_minor);
-        $this->assertSame(4900, $parcel->shipping_discount_minor);
+        $this->assertSame(5000, $parcel->shipping_fee_minor);
+        $this->assertSame(5000, $parcel->shipping_discount_minor);
     }
 
     public function test_forged_shipping_price_fields_are_rejected(): void
@@ -255,7 +255,7 @@ class CheckoutCarrierSelectionTest extends TestCase
 
         $this->actingAs($this->buyer, 'buyer')
             ->post(route('buyer.checkout.store'), [
-                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+                'checkout_token' => session(CheckoutController::TOKEN_KEY) ?? CheckoutToken::issue($this->buyer->id)->token,
                 'carriers' => [$this->sellerA->id => $carrier->id],
                 'shipping_fee' => 1,
             ])
@@ -278,7 +278,7 @@ class CheckoutCarrierSelectionTest extends TestCase
 
         $this->actingAs($this->buyer, 'buyer')
             ->post(route('buyer.checkout.store'), [
-                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+                'checkout_token' => session(CheckoutController::TOKEN_KEY) ?? CheckoutToken::issue($this->buyer->id)->token,
                 'carriers' => [$this->sellerA->id => $foreign->id],
             ])
             ->assertRedirect()
@@ -358,7 +358,7 @@ class CheckoutCarrierSelectionTest extends TestCase
 
         $this->actingAs($this->buyer, 'buyer')
             ->post(route('buyer.checkout.store'), [
-                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+                'checkout_token' => session(CheckoutController::TOKEN_KEY) ?? CheckoutToken::issue($this->buyer->id)->token,
                 'carriers' => [$this->sellerA->id => $carrier->id],
             ])
             ->assertRedirect()
@@ -395,9 +395,9 @@ class CheckoutCarrierSelectionTest extends TestCase
             ],
         );
 
-        $this->assertSame(4900, $quote['fees'][$this->sellerA->id]);
-        $this->assertSame(4900, $quote['fees'][$this->sellerB->id]);
-        $this->assertSame(9800, $quote['shipping_total_minor']);
+        $this->assertSame(5000, $quote['fees'][$this->sellerA->id]);
+        $this->assertSame(5000, $quote['fees'][$this->sellerB->id]);
+        $this->assertSame(10000, $quote['shipping_total_minor']);
     }
 
     public function test_array_carrier_payload_is_rejected(): void
@@ -412,7 +412,7 @@ class CheckoutCarrierSelectionTest extends TestCase
 
         $this->actingAs($this->buyer, 'buyer')
             ->post(route('buyer.checkout.store'), [
-                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+                'checkout_token' => session(CheckoutController::TOKEN_KEY) ?? CheckoutToken::issue($this->buyer->id)->token,
                 'carriers' => [$this->sellerA->id => ['id' => $carrier->id]],
             ])
             ->assertRedirect()
@@ -444,8 +444,8 @@ class CheckoutCarrierSelectionTest extends TestCase
             [$this->sellerA->id => $carrier->id],
         );
 
-        $this->assertSame(4900, $quote['fees'][$this->sellerA->id]);
-        $this->assertSame(4900, $quote['shipping_total_minor']);
+        $this->assertSame(5000, $quote['fees'][$this->sellerA->id]);
+        $this->assertSame(5000, $quote['shipping_total_minor']);
         $this->assertSame($carrier->id, $quote['selections'][$this->sellerA->id]);
         $this->assertSame(0, Order::query()->count());
         $this->assertTrue($cart->fresh()->exists);

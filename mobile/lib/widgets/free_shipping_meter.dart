@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 
 import '../config/pricing.dart';
 import '../theme/app_theme.dart';
+import '../utils/money_format.dart';
 import '../utils/motion.dart';
 import 'editorial_shapes.dart';
 
@@ -23,6 +24,7 @@ class FreeShippingMeter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
     final threshold = kFreeShippingThreshold;
     final unlocked = subtotal >= threshold;
@@ -33,9 +35,9 @@ class FreeShippingMeter extends StatelessWidget {
     if (unlocked) {
       message = 'Free shipping unlocked';
     } else if (subtotal <= 0) {
-      message = 'Free shipping on orders over \u20b1${threshold.toStringAsFixed(0)}';
+      message = 'Free shipping on orders over ${formatPeso(threshold)}';
     } else {
-      message = 'Add \u20b1${remaining.toStringAsFixed(0)} more for free shipping';
+      message = 'Add ${formatPeso(remaining)} more for free shipping';
     }
 
     return Semantics(
@@ -45,7 +47,7 @@ class FreeShippingMeter extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
         decoration: BoxDecoration(
           color: AppColors.tertiary.withValues(alpha: 0.22),
-          borderRadius: editorialRadius(0, big: 24, small: 8),
+          borderRadius: editorialRadius(0, ShapeTier.card),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -75,7 +77,7 @@ class FreeShippingMeter extends StatelessWidget {
               duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 420),
               curve: Curves.easeOutCubic,
               builder: (context, value, _) => ClipRRect(
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: radiusOf(ShapeTier.pill),
                 child: LinearProgressIndicator(
                   value: value,
                   minHeight: 6,

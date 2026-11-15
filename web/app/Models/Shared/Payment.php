@@ -69,6 +69,16 @@ class Payment extends Model
             && $this->status === PaymentStatus::Pending;
     }
 
+    public function refundableCollectedMinor(): int
+    {
+        if ($this->status !== PaymentStatus::Paid) {
+            return 0;
+        }
+
+        // Older paid records can predate the COD collection amount snapshot.
+        return min($this->amount_minor, $this->collected_amount_minor ?? $this->amount_minor);
+    }
+
     /**
      * Record the cash handed over by the buyer to the rider.
      *

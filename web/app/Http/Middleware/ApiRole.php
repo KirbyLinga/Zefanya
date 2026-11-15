@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Http\Controllers\Api\Traits\ValidatesRoleAbilities;
+use App\Http\Middleware\Rider\EnsureRiderActive;
 use App\Models\Buyer\Buyer;
 use App\Models\Rider\Rider;
 use Closure;
@@ -26,7 +27,13 @@ class ApiRole
 
     public function __construct(private readonly Auth $auth) {}
 
-    public function handle(Request $request, Closure $next, string $role): Response
+    /**
+     * $mode "wind-down" (rider routes only) also admits a rider whose company
+     * is suspended inside an Admin-granted wind-down, mirroring the web's
+     * EnsureRiderActive allow-list. The services still refuse every step
+     * except finishing a parcel already out for delivery.
+     */
+    public function handle(Request $request, Closure $next, string $role, ?string $mode = null): Response
     {
         $role = strtolower($role);
 
@@ -64,7 +71,18 @@ class ApiRole
             ], 403);
         }
 
-        if (! $this->accountIsLoginable($user)) {
+        $windDown = $mode === 'wind-down' && $user instanceof Rider && $user->isInWindDown();
+
+        if (! $windDown && ! $this->accountIsLoginable($user)) {
+            if ($user instanceof Rider && $user->isInWindDown()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => EnsureRiderActive::WIND_DOWN_MESSAGE,
+                    'data' => null,
+                    'errors' => ['account' => [EnsureRiderActive::WIND_DOWN_MESSAGE]],
+                ], 403);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Your account is not eligible for API access.',

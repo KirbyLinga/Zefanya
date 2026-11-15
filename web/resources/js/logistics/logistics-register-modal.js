@@ -8,7 +8,7 @@
 // seller modals share generic ids on the register-type page, so a third modal using
 // getElementById('birthday') would bind to the first modal's node.
 
-import '../registration-validation.js';
+import { normalizeMobile } from '../registration-validation.js';
 import { registrationAddress } from '../registration-address.js';
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -231,20 +231,8 @@ document.addEventListener('DOMContentLoaded', function () {
         dtiPermitName.textContent = dtiPermitInput.files.length ? dtiPermitInput.files[0].name : 'Choose a DTI permit';
     });
 
-    // ===== Contact number: numeric input only =====
-    var logisticsContactNo = document.getElementById('logisticsContactNo');
-    if (logisticsContactNo) {
-        logisticsContactNo.addEventListener('input', function () {
-            // Remove any non-digit characters
-            this.value = this.value.replace(/\D/g, '');
-        });
-        logisticsContactNo.addEventListener('keypress', function (e) {
-            // Prevent non-numeric characters from being typed
-            if (!/\d/.test(String.fromCharCode(e.which))) {
-                e.preventDefault();
-            }
-        });
-    }
+    // Contact number typing is handled by registration-validation.js: digits
+    // and one leading "+" (for +639XXXXXXXXX), normalised to 09XXXXXXXXX on blur.
 
     // Name fields are validated (never rewritten) by registration-validation.js,
     // so names keep their spaces, ñ, hyphens, apostrophes and periods as typed.
@@ -313,8 +301,9 @@ document.addEventListener('DOMContentLoaded', function () {
             } else if (!field.value) {
                 showFieldError(field, 'This field is required.');
                 valid = false;
-            } else if (field.id === 'logisticsContactNo' && !/^09\d{9}$/.test(field.value)) {
-                showFieldError(field, 'Enter a valid PH mobile number (09XXXXXXXXX).');
+            } else if (field.id === 'logisticsContactNo' && normalizeMobile(field.value).error) {
+                // Same rule as the server (PhilippineMobile): 09XXXXXXXXX or +639XXXXXXXXX.
+                showFieldError(field, normalizeMobile(field.value).error);
                 valid = false;
             } else if (field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(field.value)) {
                 showFieldError(field, 'Enter a valid email address.');

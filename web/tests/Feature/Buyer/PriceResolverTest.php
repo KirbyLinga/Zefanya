@@ -437,12 +437,35 @@ class PriceResolverTest extends TestCase
         $this->assertSame(1, preg_match('/name="price_fingerprint" value="([0-9a-f]{64})"/', $page->getContent(), $match));
 
         $this->post(route('buyer.checkout.store'), [
-            'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+            'checkout_token' => $page->viewData('checkoutToken'),
             'price_fingerprint' => $match[1],
             ...$this->checkoutCarrierPayload([$this->seller]),
-        ])->assertRedirect();
+        ])->assertRedirect()->assertSessionMissing('error');
 
         $this->assertSame(50000, OrderItem::query()->sole()->price_minor);
+        $this->assertTrue(CheckoutToken::query()->where('token', $page->viewData('checkoutToken'))->sole()->used);
+    }
+
+    public function test_a_different_valid_token_cannot_replace_the_token_from_the_reviewed_checkout_page(): void
+    {
+        $item = CartItem::factory()->create(['buyer_id' => $this->buyer->id, 'product_id' => $this->product->id,
+            'variant_id' => $this->variant->id, 'quantity' => 1]);
+        $this->bootstrapCheckoutCarriers($this->buyer, [$this->seller]);
+        $this->actingAs($this->buyer, 'buyer');
+        $page = $this->get(route('buyer.checkout.index', ['items' => [$item->id]]))->assertOk();
+        $replacement = CheckoutToken::issue($this->buyer->id);
+
+        $this->post(route('buyer.checkout.store'), [
+            'checkout_token' => $replacement->token,
+            'price_fingerprint' => session('checkout_reviewed_price'),
+            ...$this->checkoutCarrierPayload([$this->seller]),
+        ])->assertRedirect()->assertSessionHas('error', 'Your checkout session changed. Please review your cart and place your order again.');
+
+        $this->assertSame(0, OrderItem::query()->count());
+        $this->assertSame(10, (int) $this->variant->fresh()->stock_quantity);
+        $this->assertModelExists($item);
+        $this->assertFalse($replacement->fresh()->used);
+        $this->assertFalse(CheckoutToken::query()->where('token', $page->viewData('checkoutToken'))->sole()->used);
     }
 
     public function test_price_sort_and_filters_use_the_sale_price(): void

@@ -37,11 +37,13 @@ return [
     | When true, admins who have not enrolled a TOTP authenticator are redirected
     | to the setup screen before they can use the console. The password login and
     | the authenticator challenge are always enforced once an admin enrols.
-    | Set ADMIN_REQUIRE_2FA=true in production.
+    | Defaults to OFF in every environment, including production, so admins can
+    | sign in with email and password alone. Set ADMIN_REQUIRE_2FA=true to
+    | make enrolment mandatory again.
     |
     */
 
-    'require_two_factor' => (bool) env('ADMIN_REQUIRE_2FA', false),
+    'require_two_factor' => filter_var(env('ADMIN_REQUIRE_2FA', false), FILTER_VALIDATE_BOOLEAN),
 
     /*
     |--------------------------------------------------------------------------

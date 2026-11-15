@@ -10,9 +10,7 @@
         <p class="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">Withdraw available funds and track each request through approval and payment. Use Earnings for order-level amounts, commission and fund availability.</p>
         <p class="mt-2 text-sm text-[var(--text-muted)]">Request a withdrawal from your completed, reconciled earnings.</p>
     </div>
-    @if(session('success'))
-        <div role="status" class="rounded-md border border-tertiary-300 bg-tertiary-50 p-4 text-sm text-tertiary-800">{{ session('success') }}</div>
-    @endif
+    <x-flash type="success" :message="session('success')" spacing="" />
     @if($errors->any())
         <div role="alert" class="rounded-md border border-error p-4 text-sm text-error">
             <ul class="list-disc pl-5">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>

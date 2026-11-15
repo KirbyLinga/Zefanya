@@ -75,9 +75,9 @@ class DashboardController extends Controller
                 OrderStatus::Preparing->value,
             ])->count();
 
-        // Sales = sum of fully delivered/completed subtotals (centavos → float).
+        // Use the same return-aware gross sales query as the sales chart.
         $deliveredSalesMinor = (int) (clone $baseQuery)
-            ->whereIn('status', [OrderStatus::Delivered->value, OrderStatus::Completed->value])
+            ->salesWithoutReturns()
             ->sum('subtotal_minor');
         $totalSales = $deliveredSalesMinor > 0 ? $deliveredSalesMinor / 100 : null;
 

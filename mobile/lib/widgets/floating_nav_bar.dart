@@ -5,9 +5,13 @@
 // Reused by both the Buyer shell and the Courier shell — just pass in
 // a different `items` list.
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import '../utils/motion.dart';
+import 'editorial_shapes.dart';
 import 'nav_icons.dart';
 
 class NavBarItem {
@@ -18,9 +22,9 @@ class NavBarItem {
     required this.label,
     this.badgeCount = 0,
   }) : assert(
-          glyph != null || (icon != null && activeIcon != null),
-          'Provide either glyph, or both icon and activeIcon.',
-        );
+         glyph != null || (icon != null && activeIcon != null),
+         'Provide either glyph, or both icon and activeIcon.',
+       );
 
   final NavGlyph? glyph;
   final IconData? icon;
@@ -45,6 +49,7 @@ class FloatingNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     return SafeArea(
       minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Container(
@@ -52,11 +57,15 @@ class FloatingNavBar extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: radiusOf(ShapeTier.hero),
           boxShadow: [
             BoxShadow(
-              color: AppColors.neutral.withValues(alpha: 0.18),
-              blurRadius: 20,
+              // Palette, not a literal: a 35%-black shadow reads on ink,
+              // where a soft warm-grey shadow is the one that reads on
+              // paper. Shadows and surface tiers are the same idea — depth
+              // — expressed with whatever the current ground supports.
+              color: AppColors.navShadow,
+              blurRadius: 24,
               offset: const Offset(0, 8),
             ),
           ],
@@ -83,7 +92,11 @@ class FloatingNavBar extends StatelessWidget {
 }
 
 class _NavIcon extends StatelessWidget {
-  const _NavIcon({required this.item, required this.selected, required this.onTap});
+  const _NavIcon({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
 
   final NavBarItem item;
   final bool selected;
@@ -91,6 +104,10 @@ class _NavIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
+    final duration = reduceMotion(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 200);
     return Semantics(
       button: true,
       selected: selected,
@@ -99,87 +116,106 @@ class _NavIcon extends StatelessWidget {
       excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: radiusOf(ShapeTier.card),
         // TweenAnimationBuilder drives the icon/label color in sync with
         // the AnimatedContainer pill fill — they were previously instant
         // while the background eased, making the transition read as two
         // separate events rather than one.
         child: TweenAnimationBuilder<double>(
           tween: Tween(begin: 0, end: selected ? 1.0 : 0.0),
-          duration: const Duration(milliseconds: 200),
+          duration: duration,
           curve: Curves.easeOut,
           builder: (context, t, _) {
-            final color = Color.lerp(AppColors.textSecondary, AppColors.primaryDark, t)!;
+            final color = Color.lerp(
+              AppColors.textSecondary,
+              AppColors.primaryDark,
+              t,
+            )!;
             final strokeWidth = 2.0 + 0.4 * t;
             return AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
+              duration: duration,
               curve: Curves.easeOut,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: selected ? AppColors.secondary : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
+                // A tint, not a fill: enough to read as "selected" on the
+                // nav surface without overwhelming the icon. The value is
+                // per mode — light blush was near-invisible on the dark
+                // nav ground, and a dark rose tint would be on white.
+                color: selected
+                    ? AppColors.navSelectedFill
+                    : Colors.transparent,
+                borderRadius: radiusOf(ShapeTier.card),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  item.glyph != null
-                      ? Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            NavIcon(
-                              glyph: item.glyph!,
-                              size: 20,
-                              color: color,
-                              strokeWidth: strokeWidth,
-                            ),
-                            if (item.badgeCount > 0)
-                              Positioned(
-                                right: -4,
-                                top: -4,
-                                child: Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.primaryDark,
-                                    shape: BoxShape.circle,
+                  // The selected icon pulses a fraction as the pill fills.
+                  // The sine curve starts and ends at 1.0, so the selected
+                  // glyph gains about a pixel at the midpoint and then
+                  // settles back to the same size as its neighbours — a
+                  // reaction to the tap rather than a permanently oversized
+                  // icon that would make the bar look unbalanced at rest.
+                  Transform.scale(
+                    scale: selected ? 1 + 0.06 * math.sin(math.pi * t) : 1,
+                    child: item.glyph != null
+                        ? Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              NavIcon(
+                                glyph: item.glyph!,
+                                size: 20,
+                                color: color,
+                                strokeWidth: strokeWidth,
+                              ),
+                              if (item.badgeCount > 0)
+                                Positioned(
+                                  right: -4,
+                                  top: -4,
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryDark,
+                                      shape: BoxShape.circle,
+                                    ),
                                   ),
                                 ),
+                            ],
+                          )
+                        : Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Icon(
+                                selected ? item.activeIcon : item.icon,
+                                size: 20,
+                                color: color,
                               ),
-                          ],
-                        )
-                      : Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Icon(
-                              selected ? item.activeIcon : item.icon,
-                              size: 20,
-                              color: color,
-                            ),
-                            if (item.badgeCount > 0)
-                              Positioned(
-                                right: -4,
-                                top: -4,
-                                child: Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.primaryDark,
-                                    shape: BoxShape.circle,
+                              if (item.badgeCount > 0)
+                                Positioned(
+                                  right: -4,
+                                  top: -4,
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryDark,
+                                      shape: BoxShape.circle,
+                                    ),
                                   ),
                                 ),
-                              ),
-                          ],
-                        ),
+                            ],
+                          ),
+                  ),
                   const SizedBox(height: 2),
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
                       item.label,
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: color,
-                            fontWeight: t > 0.5 ? FontWeight.w600 : FontWeight.w400,
-                          ),
+                        color: color,
+                        fontWeight: t > 0.5 ? FontWeight.w600 : FontWeight.w400,
+                      ),
                     ),
                   ),
                 ],

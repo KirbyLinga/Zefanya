@@ -55,7 +55,8 @@ class BuyerAccountDeletionService
         if ($returns->contains(fn (ParcelReturn $return) => $return->isActive())) {
             return 'You have an open return. You can delete your account after it is resolved.';
         }
-        if ($returns->contains(fn (ParcelReturn $return) => $return->financial_review_required && $return->refunded_at === null)) {
+        // Only an established, unpaid refund obligation (the same rule as Admin reporting) holds the account.
+        if (ParcelReturn::query()->whereKey($returns->modelKeys())->awaitingRefundRecording()->exists()) {
             return 'You have a refund being processed. You can delete your account after you receive it.';
         }
 
@@ -65,7 +66,8 @@ class BuyerAccountDeletionService
     /** @throws ValidationException when the buyer still has unfinished business */
     public function delete(Buyer $buyer): void
     {
-        $identityDocument = DB::transaction(function () use ($buyer): ?string {
+        $profilePhoto = null;
+        $identityDocument = DB::transaction(function () use ($buyer, &$profilePhoto): ?string {
             $current = Buyer::query()->whereKey($buyer->id)->lockForUpdate()->firstOrFail();
 
             $reason = $this->blockingReason($current);
@@ -74,6 +76,8 @@ class BuyerAccountDeletionService
             }
 
             $identityDocument = $current->upload_id_path ?: null;
+            // `settings` (which holds the photo path) is cleared by anonymize().
+            $profilePhoto = $current->profilePhotoPath();
             $this->eraseSavedData($current);
             $this->eraseOrderContactDetails($current);
             $this->anonymize($current);
@@ -84,6 +88,7 @@ class BuyerAccountDeletionService
         // Sessions and the file can't be rolled back, so they go only once the erasure has committed.
         $this->sessions->revoke(AuthRole::Buyer->value, $buyer->id);
         $this->deleteIdentityDocument($identityDocument, $buyer->id);
+        $this->deleteIdentityDocument($profilePhoto, $buyer->id);
 
         Log::info('Buyer account anonymized.', ['buyer_id' => $buyer->id]);
     }

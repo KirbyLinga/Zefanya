@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>Zefanya — @yield('title', 'Buyer')</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <x-fonts />
   {{-- Buyer phase: `design-system.css` DELIBERATELY REMOVED from this array.
       It was compiled UNLAYERED (no @layer in the built asset) and therefore
       BEAT every Tailwind utility on `h1-h6`, `p`, `span`, `label`, `button`,
@@ -76,6 +74,12 @@
   @guest('buyer')
     @include('Components.buyer-register-modal')
   @endguest
+
+  @auth('buyer')
+    @unless(request()->routeIs('buyer.messages.*', 'buyer.chat.*'))
+      @include('Buyer.Messages._floating-host')
+    @endunless
+  @endauth
 
   @include('Buyer.Layouts.footer')
 

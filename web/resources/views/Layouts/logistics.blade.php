@@ -23,7 +23,7 @@
         })();
     </script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;800&family=Playfair+Display:wght@400&display=swap" rel="stylesheet">
+    <x-fonts />
 
     @vite([
         'resources/css/app.css',
@@ -40,7 +40,7 @@
         <x-logistics.sidebar />
 
         {{-- ============================ MAIN ============================= --}}
-        <div class="flex-1 min-w-0 p-4 sm:p-6 xl:p-8 bg-[var(--bg-page)]">
+        <div data-mobile-drawer-content class="flex-1 min-w-0 p-4 sm:p-6 xl:p-8 bg-[var(--bg-page)]">
             {{-- Pages that host the bell in their own header define a non-empty
                  @section('logistics-toolbar'). An empty section does not pass
                  @hasSection, so those pages put a hidden marker in it.

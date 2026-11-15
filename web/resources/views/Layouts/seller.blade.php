@@ -22,9 +22,7 @@
         })();
     </script>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;800&family=Playfair+Display:wght@400&display=swap" rel="stylesheet">
+    <x-fonts />
 
     @vite([
         'resources/css/app.css',
@@ -40,7 +38,7 @@
         <x-seller.sidebar />
 
         {{-- ============================ MAIN ============================= --}}
-        <div class="flex-1 min-w-0 bg-[var(--bg-page)]">
+        <div data-mobile-drawer-content class="flex-1 min-w-0 bg-[var(--bg-page)]">
             <div class="sticky top-0 z-30 flex items-center gap-3 border-b border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] px-4 py-3 lg:hidden">
                 <button type="button" id="sellerSidebarOpen" aria-label="Open menu" aria-controls="sellerSidebar" aria-expanded="false"
                     class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover)]">

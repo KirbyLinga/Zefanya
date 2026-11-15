@@ -40,7 +40,7 @@
         </article>
     </section>
 
-    <p class="text-sm text-[var(--text-muted)]">Net is gross minus store sales, seller vouchers, and 5% commission. Platform vouchers ({{ $peso($platformVoucherMinor) }}) and shipping ({{ $peso($shippingMinor) }}) are not deducted.</p>
+    <p class="text-sm text-[var(--text-muted)]">Net is gross minus store sales, seller vouchers, and Zefanya's {{ \App\Services\Shared\CommissionFinalizationService::percentLabel() }} commission. Seller-funded refunds and return charges are deducted as well. Platform vouchers ({{ $peso($platformVoucherMinor) }}) and shipping ({{ $peso($shippingMinor) }}) are not deducted.@if ($returnAdjustmentMinor !== 0) Returns and charges: −{{ $peso($returnAdjustmentMinor) }}.@endif</p>
 
     <section class="rounded-lg border border-[var(--border-input)] bg-[var(--bg-surface)] p-5">
         <h2 class="mb-4 font-serif text-xl text-[var(--text-ink)]">Orders in this range</h2>

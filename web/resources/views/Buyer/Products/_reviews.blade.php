@@ -47,9 +47,7 @@
     @unless ($product->reviews_count)
         <p class="mt-3 rounded-xl bg-secondary-50 px-4 py-3 text-sm text-buyer-ink-soft">No reviews yet. Ratings from buyers will appear here.</p>
     @endunless
-    @if (session('success'))
-        <p role="status" class="mt-3 text-sm text-buyer-ink">{{ session('success') }}</p>
-    @endif
+    <x-flash type="success" :message="session('success')" spacing="mt-3" />
 
     @auth('buyer')
         @if ($canReview)
@@ -109,7 +107,7 @@
                             </span>
                             <span class="text-sm font-semibold text-buyer-ink">{{ $myReview->rating }}/5</span>
                             @if ($myReview->buyer_edited_at)
-                                <span class="text-xs font-normal text-buyer-ink-soft">Edited {{ $myReview->buyer_edited_at->format('M j, Y') }}</span>
+                                <span class="text-xs font-normal text-buyer-ink-soft">Edited {{ manila($myReview->buyer_edited_at, 'M j, Y') }}</span>
                             @endif
                         </div>
                         @if ($myReview->body)
@@ -202,7 +200,7 @@
                         @endfor
                     </span>
                     <span class="text-xs font-semibold text-buyer-ink">{{ $review->rating }}/5</span>
-                    <time class="text-xs text-buyer-ink-soft">{{ $review->created_at->format('M j, Y') }}</time>
+                    <time class="text-xs text-buyer-ink-soft">{{ $review->created_at->timezone(config('app.schedule_timezone'))->format('M j, Y') }}</time>
                 </div>
                 @if ($review->body)
                     <p class="mt-2 whitespace-pre-line text-sm text-buyer-ink">{{ $review->body }}</p>

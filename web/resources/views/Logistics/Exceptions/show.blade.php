@@ -44,14 +44,14 @@
             <div><dt class="text-xs text-[var(--text-muted)]">Status</dt><dd class="font-semibold">{{ strtoupper(str_replace('_', ' ', $statusValue)) }}</dd></div>
             <div><dt class="text-xs text-[var(--text-muted)]">Type</dt><dd class="font-semibold">{{ $incident->typeLabel() }}</dd></div>
             <div><dt class="text-xs text-[var(--text-muted)]">Reporter</dt><dd>{{ $incident->reporter_type }} #{{ $incident->reporter_id ?? '—' }}</dd></div>
-            <div><dt class="text-xs text-[var(--text-muted)]">Reported</dt><dd>{{ $incident->created_at?->format('M d, Y H:i') ?? '—' }}</dd></div>
+            <div><dt class="text-xs text-[var(--text-muted)]">Reported</dt><dd>{{ manila($incident->created_at, 'M d, Y H:i', '—') }}</dd></div>
             <div class="sm:col-span-2"><dt class="text-xs text-[var(--text-muted)]">Reason</dt><dd>{{ $incident->reason ?? '—' }}</dd></div>
             @if ($incident->description)
                 <div class="sm:col-span-2"><dt class="text-xs text-[var(--text-muted)]">Notes</dt><dd>{{ $incident->description }}</dd></div>
             @endif
             @if ($incident->resolution)
                 <div><dt class="text-xs text-[var(--text-muted)]">Resolution</dt><dd class="font-semibold">{{ $incident->resolution }}</dd></div>
-                <div><dt class="text-xs text-[var(--text-muted)]">Resolved</dt><dd>{{ $incident->resolved_at?->format('M d, Y H:i') ?? '—' }}</dd></div>
+                <div><dt class="text-xs text-[var(--text-muted)]">Resolved</dt><dd>{{ manila($incident->resolved_at, 'M d, Y H:i', '—') }}</dd></div>
             @endif
         </dl>
     </section>
@@ -73,7 +73,7 @@
     <p class="mt-1 text-sm text-[var(--text-muted)]">
         Origin: {{ $route->originHub?->name ?? '—' }} → Destination: {{ $route->destinationHub?->name ?? '—' }}
         · current leg index {{ $route->current_leg_index }} of {{ count($legs) }}
-        @if ($route->isCompleted()) · completed {{ $route->route_completed_at?->format('M d, Y H:i') }} @endif
+        @if ($route->isCompleted()) · completed {{ manila($route->route_completed_at, 'M d, Y H:i') }} @endif
     </p>
     <ol class="mt-3 space-y-2 text-sm">
         @forelse ($legs as $index => $leg)
@@ -168,7 +168,7 @@
         @forelse ($custodyHistory as $movement)
             <li class="rounded-lg border border-[var(--border-strong)] p-3">
                 <p class="font-semibold">{{ $movement['title'] }}</p>
-                <p class="text-xs text-[var(--text-muted)]">{{ $movement['at']?->format('M d, Y H:i') }}</p>
+                <p class="text-xs text-[var(--text-muted)]">{{ manila($movement['at'], 'M d, Y H:i') }}</p>
                 @if (! empty($movement['custody']))<p>{{ $movement['custody'] }}</p>@endif
             </li>
         @empty
@@ -184,7 +184,7 @@
             <div class="rounded-lg border border-[var(--border-strong)] bg-[var(--bg-page)] p-3 text-sm">
                 <p class="font-semibold text-[var(--text-ink)]">{{ $event->label ?? $event->event }}</p>
                 <p class="text-xs text-[var(--text-muted)]">
-                    {{ $event->occurred_at?->format('M d, Y H:i') ?? '—' }}
+                    {{ manila($event->occurred_at, 'M d, Y H:i', '—') }}
                     @if ($event->actor_type) · {{ $event->actor_type }} #{{ $event->actor_id ?? '—' }} @endif
                     @if ($event->from_status || $event->to_status) · {{ $event->from_status ?? '—' }} → {{ $event->to_status ?? '—' }} @endif
                 </p>
@@ -202,7 +202,7 @@
     <div class="mt-3 space-y-3 text-sm">
         @foreach ($rereoutes as $rereoute)
             <div class="rounded-lg border border-[var(--border-strong)] p-3">
-                <p class="font-semibold">{{ $rereoute->rerouted_at?->format('M d, Y H:i') ?? $rereoute->created_at?->format('M d, Y H:i') }} · {{ $rereoute->reason }}</p>
+                <p class="font-semibold">{{ manila($rereoute->rerouted_at, 'M d, Y H:i') ?? manila($rereoute->created_at, 'M d, Y H:i') }} · {{ $rereoute->reason }}</p>
                 <p class="text-xs text-[var(--text-muted)]">Authorized by {{ $rereoute->authorized_by_type ?? '—' }} #{{ $rereoute->authorized_by_id ?? '—' }}</p>
                 <p class="mt-1 text-xs">Previous path: {{ count($rereoute->previous_path ?? []) }} leg(s) · New path: {{ count($rereoute->new_path ?? []) }} leg(s)</p>
             </div>

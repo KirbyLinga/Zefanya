@@ -7,6 +7,28 @@ use Tests\TestCase;
 
 class PublicStorageTest extends TestCase
 {
+    public function test_flutter_web_can_fetch_public_images_cross_origin(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('products/15/photo.jpg', 'product image');
+
+        $this->get('/storage/products/15/photo.jpg', ['Origin' => 'http://localhost:5000'])
+            ->assertOk()
+            ->assertHeader('Access-Control-Allow-Origin', '*')
+            ->assertHeaderMissing('Access-Control-Allow-Credentials')
+            ->assertStreamedContent('product image');
+    }
+
+    public function test_private_files_do_not_gain_public_image_cors_headers(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('documents/id.jpg', 'private document');
+
+        $this->get('/private-storage/documents/id.jpg', ['Origin' => 'http://localhost:5000'])
+            ->assertForbidden()
+            ->assertHeaderMissing('Access-Control-Allow-Origin');
+    }
+
     public function test_guests_can_load_product_images_without_a_storage_symlink(): void
     {
         Storage::fake('public');

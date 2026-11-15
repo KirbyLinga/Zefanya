@@ -15,6 +15,8 @@ import 'package:provider/provider.dart';
 import '../../data/mock_data.dart';
 import '../../state/wishlist_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/microcopy.dart';
+import '../../utils/money_format.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_header.dart';
 import '../../widgets/editorial_shapes.dart';
@@ -23,6 +25,7 @@ import '../../widgets/heart_button.dart';
 import '../../widgets/pressable_scale.dart';
 import '../../widgets/staggered_reveal.dart';
 import 'product_details_screen.dart';
+import 'seller_screen.dart';
 import 'widgets/product_card.dart';
 
 class SavedScreen extends StatelessWidget {
@@ -30,6 +33,7 @@ class SavedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -48,32 +52,50 @@ class SavedScreen extends StatelessWidget {
               child: Consumer<WishlistState>(
                 builder: (context, wishlist, _) {
                   final products = wishlist.items;
-                  if (products.isEmpty) return _buildEmpty(theme);
+                  final followed = wishlist.followedSellers;
+                  if (products.isEmpty && followed.isEmpty) {
+                    return _buildEmpty(context, theme);
+                  }
 
-                  return GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 0.68,
-                    ),
-                    itemCount: products.length,
-                    itemBuilder: (context, i) {
-                      final product = products[i];
-                      return StaggeredReveal(
-                        index: i,
-                        child: _SavedCard(
-                          product: product,
-                          index: i,
-                          onTap: () => Navigator.of(context).push(
-                            AppPageRoute(
-                              builder: (_) => ProductDetailsScreen(product: product),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (followed.isNotEmpty)
+                        _FollowingStrip(sellers: followed),
+                      Expanded(
+                        child: products.isEmpty
+                            ? _buildEmpty(context, theme)
+                            : GridView.builder(
+                                padding:
+                                    const EdgeInsets.fromLTRB(20, 8, 20, 100),
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  mainAxisSpacing: 16,
+                                  crossAxisSpacing: 16,
+                                  childAspectRatio: 0.68,
+                                ),
+                                itemCount: products.length,
+                                itemBuilder: (context, i) {
+                                  final product = products[i];
+                                  return StaggeredReveal(
+                                    index: i,
+                                    child: _SavedCard(
+                                      product: product,
+                                      index: i,
+                                      onTap: () => Navigator.of(context).push(
+                                        AppPageRoute(
+                                          builder: (_) => ProductDetailsScreen(
+                                            product: product,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
                   );
                 },
               ),
@@ -84,14 +106,97 @@ class SavedScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildEmpty(ThemeData theme) {
-    return const EmptyState(
+  Widget _buildEmpty(BuildContext context, ThemeData theme) {
+    return EmptyState(
       icon: Icons.favorite_border,
-      title: 'Nothing saved yet',
-      subtitle: 'Tap the heart on any product to add it here.',
+      title: Microcopy.savedEmptyTitle,
+      subtitle: Microcopy.savedEmptySubtitle,
+      action: OutlinedButton(
+        onPressed: () => Navigator.of(context).maybePop(),
+        child: const Text('Browse products'),
+      ),
     );
   }
 }
+
+/// The shops this buyer follows, above the saved products.
+///
+/// It lives here rather than in a separate "Following" tab because following a
+/// store and saving a piece are both shortlists; splitting them would mean the
+/// buyer has to remember which pile a shop is in. The count is explicit so
+/// "did the follow save?" does not depend on counting tiles.
+class _FollowingStrip extends StatelessWidget {
+  const _FollowingStrip({required this.sellers});
+
+  final List<String> sellers;
+
+  @override
+  Widget build(BuildContext context) {
+    AppColors.watch(context);
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'STORES YOU FOLLOW · ${sellers.length}',
+            style: AppType.eyebrow,
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 58,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: sellers.length,
+              separatorBuilder: (_, index) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final seller = sellers[i];
+                return InkWell(
+                  borderRadius: editorialRadius(i, ShapeTier.accent),
+                  onTap: () => Navigator.of(context).push(
+                    AppPageRoute(
+                      builder: (_) => SellerScreen(sellerName: seller),
+                    ),
+                  ),
+                  child: Container(
+                    width: 190,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceMuted,
+                      borderRadius: editorialRadius(i, ShapeTier.accent),
+                      border: Border.all(color: AppColors.divider),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.storefront_outlined,
+                          size: 20,
+                          color: AppColors.primaryDark,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            seller,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelLarge,
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right, size: 18),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 
 /// ProductCard wrapper that always shows the heart — on a Saved screen
 /// every tile is hearted, so the heart is an affordance to unsave rather
@@ -109,15 +214,15 @@ class _SavedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.watch(context);
     final theme = Theme.of(context);
-    final tint = productTint(product.category);
 
     return PressableScale(
       onTap: onTap,
-      semanticLabel: '${product.name}, ₱${product.price.toStringAsFixed(0)}',
+      semanticLabel: '${product.name}, ${formatPeso(product.price)}',
       child: Card(
         clipBehavior: Clip.antiAlias,
-        shape: editorialShape(index),
+        shape: editorialShape(index, ShapeTier.card),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -126,7 +231,7 @@ class _SavedCard extends StatelessWidget {
                 children: [
                   Hero(
                     tag: 'saved-${product.id}',
-                    child: ProductImage(productId: product.id, tint: tint),
+                    child: ProductImage(product: product),
                   ),
                   // Heart always visible — tapping it unsaves and the
                   // item disappears from the grid (Consumer rebuilds).
@@ -153,21 +258,25 @@ class _SavedCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  Text('₱${product.price.toStringAsFixed(0)}', style: AppType.priceNumeral(22)),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      const Icon(Icons.star_rounded, size: 13, color: AppColors.sageIcon),
-                      const SizedBox(width: 2),
-                      Text(
-                        product.rating.toStringAsFixed(1),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textSecondary,
+                  Text(formatPeso(product.price), style: AppType.priceNumeral(22)),
+                  // Only a real average. A product with zero reviews gets
+                  // no star row rather than "★ 0.0".
+                  if (product.ratingCount > 0) ...[
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(Icons.star_rounded, size: 13, color: AppColors.sageIcon),
+                        const SizedBox(width: 2),
+                        Text(
+                          product.rating.toStringAsFixed(1),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

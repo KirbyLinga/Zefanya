@@ -7,22 +7,37 @@ use App\Http\Controllers\Controller;
 use App\Models\Logistics\LogisticsHub;
 use App\Models\Logistics\LogisticsReturnCharge;
 use App\Models\Logistics\ParcelReturn;
+use App\Models\Seller\StoreSale;
+use App\Services\Admin\BuyerReturnHistoryService;
 use App\Services\Logistics\ParcelHandoffService;
 use App\Services\Logistics\ParcelReturnService;
 use App\Services\Logistics\ReturnChargeService;
 use App\Services\Seller\SellerOrderStatusService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReturnController extends Controller
 {
-    public function index()
+    /** Refunds, voids, fault and charge settlement decide who pays: Admin/Super Admin only. */
+    private function authorizeFinancialDecision(Request $request): void
     {
-        $returns = ParcelReturn::query()->with(['sellerOrder.originStation', 'sellerOrder.custodyHub', 'sellerOrder.seller', 'sellerOrder.manifestItems.manifest', 'sellerOrder.parcelHandoffs', 'sellerOrder.parcelHandoffExceptions', 'sellerOrder.payment', 'sellerOrder.sellerDebt', 'returnCharges.provider', 'originHub', 'originProvider', 'events'])->latest('id')->paginate(20)->withQueryString();
-        $hubs = LogisticsHub::query()->operational()->with('provider')->orderBy('name')->get();
+        abort_unless(in_array($request->user('admin')?->role, [AdminRole::Admin->value, AdminRole::SuperAdmin->value], true), 403);
+    }
 
-        return view('Admin.Returns.index', compact('returns', 'hubs'));
+    public function index(Request $request, BuyerReturnHistoryService $buyerHistory)
+    {
+        // ?return= narrows the directory to one record, for links from a buyer's return history.
+        $only = filter_var($request->query('return'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: null;
+        $returns = ParcelReturn::query()->with(['sellerOrder.order.buyer', 'sellerOrder.originStation', 'sellerOrder.custodyHub', 'sellerOrder.seller', 'sellerOrder.manifestItems.manifest', 'sellerOrder.parcelHandoffs', 'sellerOrder.parcelHandoffExceptions', 'sellerOrder.payment', 'sellerOrder.sellerDebt', 'returnCharges.provider', 'originHub', 'originProvider', 'events'])
+            ->withMax('refundHistory as refund_revision', 'id')
+            ->when($only, fn ($query) => $query->whereKey($only))
+            ->latest('id')->paginate(20)->withQueryString();
+        $hubs = LogisticsHub::query()->operational()->with('provider')->orderBy('name')->get();
+        $buyerHistories = $buyerHistory->forReturns($returns->getCollection());
+
+        return view('Admin.Returns.index', compact('returns', 'hubs', 'buyerHistories', 'only'));
     }
 
     public function verifyOrigin(Request $request, ParcelReturn $return, ParcelReturnService $service)
@@ -73,6 +88,7 @@ class ReturnController extends Controller
 
     public function setFault(Request $request, ParcelReturn $return, ParcelReturnService $service)
     {
+        $this->authorizeFinancialDecision($request);
         $data = $request->validate([
             'fault_party' => ['required', 'in:'.ParcelReturn::FAULT_SELLER.','.ParcelReturn::FAULT_LOGISTICS],
             'fault_note' => ['required', 'string', 'min:10', 'max:1000'],
@@ -90,15 +106,91 @@ class ReturnController extends Controller
             : 'Saved: the Seller pays for this return.');
     }
 
+    public function authorizeRefund(Request $request, ParcelReturn $return, ParcelReturnService $service)
+    {
+        $this->authorizeFinancialDecision($request);
+        $data = $request->validate([
+            'amount' => ['required', 'string', 'regex:/\A\d{1,9}(?:\.\d{1,2})?\z/'],
+            'payer' => ['required', 'in:seller,logistics,platform'],
+            'authorization_note' => ['required', 'string', 'min:10', 'max:1000'],
+            'refund_exception_basis' => ['nullable', 'in:legal_requirement,separate_approval'],
+            'exception_proof' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+        ]);
+        [$pesos, $centavos] = array_pad(explode('.', $data['amount'], 2), 2, '0');
+        $amount = ((int) $pesos) * 100 + (int) str_pad($centavos, 2, '0');
+        $path = $request->file('exception_proof')?->store('refund-proofs/'.$return->id, 'local');
+        try {
+            $service->authorizeRefund($return, $request->user('admin'), $amount, $data['payer'], $data['authorization_note'], $data['refund_exception_basis'] ?? null, $path);
+        } catch (\Throwable $exception) {
+            if ($path !== null) {
+                Storage::disk('local')->delete($path);
+            }
+            throw $exception;
+        }
+
+        return back()->with('success', 'Refund authorized. Payment remains pending; submit external payment evidence separately.');
+    }
+
+    public function submitRefundEvidence(Request $request, ParcelReturn $return, ParcelReturnService $service)
+    {
+        $this->authorizeFinancialDecision($request);
+        $data = $request->validate([
+            'authorization_id' => ['required', 'integer', 'min:1'],
+            'amount' => ['required', 'string', 'regex:/\A\d{1,9}(?:\.\d{1,2})?\z/'],
+            'payer' => ['required', 'in:seller,logistics,platform'],
+            'reference' => ['required', 'string', 'max:255'], 'recipient' => ['required', 'string', 'max:255'],
+            'paid_on' => ['required', 'date_format:Y-m-d', 'before_or_equal:'.Carbon::now(StoreSale::TIMEZONE)->toDateString()],
+            'proof' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'refund_reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+        [$pesos, $centavos] = array_pad(explode('.', $data['amount'], 2), 2, '0');
+        $amount = ((int) $pesos) * 100 + (int) str_pad($centavos, 2, '0');
+        $path = $request->file('proof')->store('refund-proofs/'.$return->id, 'local');
+        try {
+            $service->submitRefundEvidence($return, $request->user('admin'), (int) $data['authorization_id'], $data['reference'], $data['recipient'], $data['paid_on'], $path, $data['refund_reason'] ?? null, $amount, $data['payer']);
+        } catch (\Throwable $exception) {
+            Storage::disk('local')->delete($path);
+            throw $exception;
+        }
+
+        return back()->with('success', 'Payment evidence submitted. An authorized Admin must review it before confirming payment.');
+    }
+
+    public function confirmRefund(Request $request, ParcelReturn $return, ParcelReturnService $service)
+    {
+        $this->authorizeFinancialDecision($request);
+        $data = $request->validate(['evidence_id' => ['required', 'integer', 'min:1'], 'verification_note' => ['required', 'string', 'min:10', 'max:1000']]);
+        $service->confirmRefundPayment($return, $request->user('admin'), (int) $data['evidence_id'], $data['verification_note']);
+
+        return back()->with('success', 'Refund payment confirmed after Admin evidence review. COD remittance remains a separate obligation.');
+    }
+
+    public function refundEvidence(Request $request, ParcelReturn $return, int $event): StreamedResponse
+    {
+        $this->authorizeFinancialDecision($request);
+        $record = $return->events()->whereKey($event)->where(fn ($query) => $query
+            ->where('event_key', 'like', 'refund_authorized%')->orWhere('event_key', 'like', 'refund_evidence_submitted%'))->firstOrFail();
+        $path = $record->metadata['proof_path'] ?? $record->metadata['exception_proof_path'] ?? null;
+        abort_unless(is_string($path) && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path);
+    }
+
     public function recordRefund(Request $request, ParcelReturn $return, ParcelReturnService $service)
     {
+        $this->authorizeFinancialDecision($request);
         $data = $request->validate([
             'reference' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'string', 'regex:/\A\d{1,9}(?:\.\d{1,2})?\z/'],
             'recipient' => ['required', 'string', 'max:255'],
-            'paid_on' => ['required', 'date', 'before_or_equal:today'],
+            'paid_on' => ['required', 'date', 'before_or_equal:'.Carbon::now(StoreSale::TIMEZONE)->toDateString()],
             'proof' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'refund_reason' => ['nullable', 'string', 'max:1000'],
+            'refund_revision' => ['sometimes', 'integer', 'min:0'],
+            'refund_exception_basis' => ['nullable', 'string', 'in:'.implode(',', array_keys(ParcelReturn::REFUND_EXCEPTION_BASES))],
+            'refund_exception_note' => ['nullable', 'string', 'max:1000'],
+            'refund_funding_party' => ['nullable', 'string', 'in:'.ParcelReturn::FAULT_SELLER.','.ParcelReturn::FAULT_LOGISTICS.','.ParcelReturn::FAULT_PLATFORM],
+            'refund_funding_note' => ['nullable', 'string', 'max:1000'],
         ], [
             'reference.required' => 'A refund reference of at most 255 characters is required.',
             'amount.required' => 'Enter the amount that was refunded.',
@@ -112,7 +204,9 @@ class ReturnController extends Controller
         $proofPath = $request->file('proof')?->store('refund-proofs/'.$return->id, 'local');
 
         try {
-            $service->recordRefund($return, $request->user('admin'), $data['reference'], ((int) $pesos) * 100 + (int) str_pad($centavos, 2, '0'), $data['recipient'], $data['paid_on'], $proofPath, $data['refund_reason'] ?? null);
+            $service->recordRefund($return, $request->user('admin'), $data['reference'], ((int) $pesos) * 100 + (int) str_pad($centavos, 2, '0'), $data['recipient'], $data['paid_on'], $proofPath, $data['refund_reason'] ?? null, (int) ($data['refund_revision'] ?? 0),
+                $data['refund_exception_basis'] ?? null, $data['refund_exception_note'] ?? null,
+                $data['refund_funding_party'] ?? null, $data['refund_funding_note'] ?? null);
         } catch (\Throwable $exception) {
             // Files are not transactional: remove the upload if the record was not saved.
             if ($proofPath !== null) {
@@ -127,12 +221,17 @@ class ReturnController extends Controller
 
     public function voidRefund(Request $request, ParcelReturn $return, ParcelReturnService $service)
     {
-        $data = $request->validate(['void_reason' => ['required', 'string', 'min:10', 'max:1000']], [
+        $this->authorizeFinancialDecision($request);
+        $data = $request->validate([
+            'void_reason' => ['required', 'string', 'min:10', 'max:1000'],
+            'refund_revision' => ['required', 'integer', 'min:0'],
+        ], [
             'void_reason.required' => 'Explain why the refund failed in 10 to 1000 characters.',
             'void_reason.min' => 'Explain why the refund failed in 10 to 1000 characters.',
             'void_reason.max' => 'Explain why the refund failed in 10 to 1000 characters.',
+            'refund_revision.required' => 'Reload this return and verify the recorded transfer before voiding it.',
         ]);
-        $service->voidRefund($return, $request->user('admin'), $data['void_reason']);
+        $service->voidRefund($return, $request->user('admin'), $data['void_reason'], (int) $data['refund_revision']);
 
         return back()->with('success', 'Refund voided. It stays in the history; record the new refund once it is paid.');
     }
@@ -140,7 +239,7 @@ class ReturnController extends Controller
     public function settleCharge(Request $request, LogisticsReturnCharge $charge, ReturnChargeService $service)
     {
         // Money moves, so moderators can see charges but not settle them.
-        abort_unless(in_array($request->user('admin')->role, [AdminRole::Admin->value, AdminRole::SuperAdmin->value], true), 403);
+        $this->authorizeFinancialDecision($request);
         $data = $request->validate(['reference' => ['required', 'string', 'max:100']], [
             'reference.required' => 'Enter the payment reference, at most 100 characters.',
             'reference.max' => 'Enter the payment reference, at most 100 characters.',
@@ -152,11 +251,77 @@ class ReturnController extends Controller
             : 'Recorded: Zefanya paid the Logistics company for this charge.');
     }
 
-    public function refundProof(ParcelReturn $return): StreamedResponse
+    public function refundProof(Request $request, ParcelReturn $return): StreamedResponse
     {
+        if ((int) $return->getAttribute('refund_policy_version') === 1) {
+            $this->authorizeFinancialDecision($request);
+        }
         abort_unless($return->refund_proof_path !== null && Storage::disk('local')->exists($return->refund_proof_path), 404);
 
         return Storage::disk('local')->response($return->refund_proof_path);
+    }
+
+    public function close(Request $request, ParcelReturn $return, ParcelReturnService $service)
+    {
+        $data = $request->validate(['close_reason' => ['required', 'string', 'min:10', 'max:1000']], [
+            'close_reason.required' => 'Explain why this return is closed, in 10 to 1000 characters.',
+            'close_reason.min' => 'Explain why this return is closed, in 10 to 1000 characters.',
+            'close_reason.max' => 'Explain why this return is closed, in 10 to 1000 characters.',
+        ]);
+        $service->closeByAdmin($return, $request->user('admin'), $data['close_reason']);
+
+        return back()->with('success', $return->fresh()->isCancelled()
+            ? 'Return closed before collection. The buyer keeps the item and the Seller\'s held earnings are restored.'
+            : 'Return closed. Custody, refund and who pays are unchanged; record them separately if needed.');
+    }
+
+    public function authorizeCollectionRetry(Request $request, ParcelReturn $return, ParcelReturnService $service)
+    {
+        $data = $request->validate(['retry_note' => ['required', 'string', 'min:10', 'max:1000']], [
+            'retry_note.required' => 'Explain why another collection is authorized, in 10 to 1000 characters.',
+            'retry_note.min' => 'Explain why another collection is authorized, in 10 to 1000 characters.',
+            'retry_note.max' => 'Explain why another collection is authorized, in 10 to 1000 characters.',
+        ]);
+        $service->authorizeCollectionRetry($return, $request->user('admin'), $data['retry_note']);
+
+        return back()->with('success', 'One extra buyer collection authorized. No custody, refund or fault decision changed.');
+    }
+
+    public function recordDisposition(Request $request, ParcelReturn $return, ParcelReturnService $service)
+    {
+        $data = $request->validate([
+            'disposition' => ['required', 'in:'.implode(',', array_keys(ParcelReturn::DISPOSITIONS))],
+            'disposition_note' => ['required', 'string', 'min:10', 'max:1000'],
+        ], [
+            'disposition.required' => 'Choose what physically happened to this parcel.',
+            'disposition.in' => 'Choose what physically happened to this parcel.',
+            'disposition_note.required' => 'Describe the physical disposition in 10 to 1000 characters.',
+            'disposition_note.min' => 'Describe the physical disposition in 10 to 1000 characters.',
+            'disposition_note.max' => 'Describe the physical disposition in 10 to 1000 characters.',
+        ]);
+        $service->recordDisposition($return, $request->user('admin'), $data['disposition'], $data['disposition_note']);
+
+        return back()->with('success', 'Physical disposition recorded. Custody, refund and stock were not changed.');
+    }
+
+    public function resumeHandover(Request $request, ParcelReturn $return, ParcelReturnService $service)
+    {
+        $data = $request->validate(['resume_note' => ['required', 'string', 'min:10', 'max:1000']], [
+            'resume_note.required' => 'Explain the decision in 10 to 1000 characters.',
+            'resume_note.min' => 'Explain the decision in 10 to 1000 characters.',
+            'resume_note.max' => 'Explain the decision in 10 to 1000 characters.',
+        ]);
+        $service->resumeHandoverAfterDispute($return, $request->user('admin'), $data['resume_note']);
+
+        return back()->with('success', 'Sent back to handover. Logistics must hand the parcel to the Seller with a new verified code.');
+    }
+
+    public function receiptDisputePhoto(ParcelReturn $return, int $index): StreamedResponse
+    {
+        $path = $return->receipt_dispute_photos[$index] ?? null;
+        abort_unless($path !== null && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path);
     }
 
     public function stock(Request $request, ParcelReturn $return, SellerOrderStatusService $status)

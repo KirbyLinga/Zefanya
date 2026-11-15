@@ -14,6 +14,7 @@
     ])->filter()->implode(', ');
 @endphp
 
+<div data-rider-details>
 <div class="mb-6 flex items-center justify-between gap-4">
     <div>
         <h1 class="font-serif text-2xl text-[var(--text-ink)]">{{ $rider->first_name }} {{ $rider->last_name }}</h1>
@@ -40,7 +41,7 @@
                 <div class="col-span-2 max-sm:col-span-1"><p class="text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-500">Status Reason</p><p class="mt-0.5 text-neutral-900">{{ $rider->status_reason }}</p></div>
             @endif
             @if ($rider->status_changed_at)
-                <div><p class="text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-500">Status Changed</p><p class="mt-0.5 text-neutral-900">{{ $rider->status_changed_at->format('m/d/Y g:i A') }}</p></div>
+                <div><p class="text-[11px] font-semibold uppercase tracking-[0.8px] text-neutral-500">Status Changed</p><p class="mt-0.5 text-neutral-900">{{ manila($rider->status_changed_at, 'm/d/Y g:i A') }}</p></div>
             @endif
         </div>
 
@@ -163,5 +164,6 @@
             </section>
         @endif
     </aside>
+</div>
 </div>
 @endsection

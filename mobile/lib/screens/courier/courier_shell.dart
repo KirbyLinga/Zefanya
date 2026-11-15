@@ -10,7 +10,11 @@
 // whatever's currently assigned to this courier.
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../state/notification_state.dart';
 import '../../widgets/floating_nav_bar.dart';
+import '../../widgets/motion/fade_through.dart';
+import '../../widgets/nav_icons.dart';
 import '../shared/profile_screen.dart';
 import 'courier_profit_screen.dart';
 import 'delivery_dashboard_screen.dart';
@@ -27,11 +31,25 @@ class _CourierShellState extends State<CourierShell> {
   int _index = 0;
 
   static const _items = [
-    NavBarItem(icon: Icons.inbox_outlined, activeIcon: Icons.inbox, label: 'For Pickup'),
-    NavBarItem(icon: Icons.local_shipping_outlined, activeIcon: Icons.local_shipping, label: 'For Delivery'),
-    NavBarItem(icon: Icons.payments_outlined, activeIcon: Icons.payments, label: 'Earnings'),
-    NavBarItem(icon: Icons.person_outline, activeIcon: Icons.person, label: 'Profile'),
+    NavBarItem(glyph: NavGlyph.parcel, label: 'For Pickup'),
+    NavBarItem(glyph: NavGlyph.scooter, label: 'For Delivery'),
+    NavBarItem(glyph: NavGlyph.peso, label: 'Earnings'),
+    NavBarItem(glyph: NavGlyph.profile, label: 'Profile'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Live mode: this inbox is the rider's (`/api/rider/notifications`).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        context.read<NotificationState>().useInbox(rider: true);
+      } on ProviderNotFoundException {
+        // A test that pumps the shell alone has no inbox to point.
+      }
+    });
+  }
 
   static const _screens = [
     PickupDashboardScreen(),
@@ -44,12 +62,14 @@ class _CourierShellState extends State<CourierShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      body: IndexedStack(index: _index, children: _screens),
+      body: FadeThroughIndexedStack(index: _index, children: _screens),
       bottomNavigationBar: FloatingNavBar(
         items: _items,
         currentIndex: _index,
         onTap: (i) => setState(() => _index = i),
       ),
+      // Dev tooling lives behind Settings > About (seven taps). Nothing
+      // developer-only floats over the app by default in any build.
     );
   }
 }
