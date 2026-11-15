@@ -87,8 +87,8 @@
                             <td class="px-5 py-4">{{ $definitions[$entry->setting_key]['label'] ?? $entry->setting_key }}</td>
                             <td class="max-w-xs break-words px-5 py-4">{{ $entry->previous_value }}</td>
                             <td class="max-w-xs break-words px-5 py-4">{{ $entry->new_value }}</td>
-                            <td class="px-5 py-4">{{ $entry->admin->name }} <span class="text-xs">(ID {{ $entry->admin_id }})</span></td>
-                            <td class="whitespace-nowrap px-5 py-4">{{ $entry->created_at->format('Y-m-d H:i:s') }}</td>
+                            <td class="px-5 py-4">{{ $entry->admin?->name ?? 'Removed admin' }} <span class="text-xs">(ID {{ $entry->admin_id }})</span></td>
+                            <td class="whitespace-nowrap px-5 py-4">{{ manila($entry->created_at, 'Y-m-d H:i:s') }}</td>
                         </tr>
                     @empty
                         <tr><td colspan="5" class="px-5 py-8 text-center text-neutral-600">No settings have been changed.</td></tr>
