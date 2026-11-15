@@ -111,7 +111,7 @@ class AreaManagementTest extends TestCase
 
     public function test_migration_preserves_existing_single_area_links(): void
     {
-        $migration = require database_path('migrations/2026_10_25_141946_create_area_courier_table.php');
+        $migration = require base_path('tests/Support/LegacyMigrations/2026_10_25_141946_create_area_courier_table.php');
         $migration->down();
         $migration->up();
 
@@ -120,7 +120,7 @@ class AreaManagementTest extends TestCase
 
     public function test_page_and_dispatch_use_existing_links_when_the_pivot_migration_is_pending(): void
     {
-        $migration = require database_path('migrations/2026_10_25_141946_create_area_courier_table.php');
+        $migration = require base_path('tests/Support/LegacyMigrations/2026_10_25_141946_create_area_courier_table.php');
         $migration->down();
         try {
             $this->get(route('logistics.areas.index'))->assertOk()
@@ -142,7 +142,7 @@ class AreaManagementTest extends TestCase
 
     public function test_pending_migration_blocks_new_links_and_allows_unlinking_the_existing_link(): void
     {
-        $migration = require database_path('migrations/2026_10_25_141946_create_area_courier_table.php');
+        $migration = require base_path('tests/Support/LegacyMigrations/2026_10_25_141946_create_area_courier_table.php');
         $migration->down();
         try {
             $this->post(route('logistics.areas.couriers.linkBarangays'), [

@@ -180,7 +180,7 @@ DB::table('areas')->insert([
     ['logistics_provider_id' => 1, 'name' => 'First retained', 'municipality' => 'City', 'city_municipality_code' => 'city-a', 'barangay_code' => 'duplicate'],
     ['logistics_provider_id' => 1, 'name' => 'Second retained', 'municipality' => 'City', 'city_municipality_code' => 'city-b', 'barangay_code' => 'duplicate'],
 ]);
-$migration = require __DIR__.'/../../database/migrations/2026_10_21_083944_add_barangay_coverage_to_areas_table.php';
+$migration = require __DIR__.'/LegacyMigrations/2026_10_21_083944_add_barangay_coverage_to_areas_table.php';
 $failed = false;
 try {
     $migration->up();

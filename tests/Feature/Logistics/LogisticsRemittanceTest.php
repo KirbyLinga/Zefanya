@@ -246,7 +246,7 @@ class LogisticsRemittanceTest extends TestCase
             $parcel->forceFill(['logistics_remittance_id' => $payment->id, 'zefanya_received_at' => now()])->save();
         }
 
-        $migration = require database_path('migrations/2026_11_03_100000_add_allocation_snapshot_to_cod_remittances.php');
+        $migration = require base_path('tests/Support/LegacyMigrations/2026_11_03_100000_add_allocation_snapshot_to_cod_remittances.php');
         Schema::table('cod_remittances', fn ($table) => $table->dropConstrainedForeignId('origin_share_payout_id'));
         $migration->down();
         $migration->up();

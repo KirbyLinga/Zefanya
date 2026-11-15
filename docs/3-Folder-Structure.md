@@ -192,7 +192,7 @@ resources/views/
 
 ## 6. `database/`
 
-- **Migrations (49):** chronological. Order/fulfilment core from `2026_09_22_110001…110005`; logistics `2026_09_21_*`, `2026_09_25_000002`, `2026_10_03`, `2026_10_04`; variants `2026_09_27_*`; the 2026-10-16 set is `postal_code`, `handover_at`, `delivery_attempts`, `areas` (+`couriers.area_id`, `seller_orders.destination_area_id`), `delivery_assignments`. See `2-Design.md §3` for the schema.
+- **Migrations (103):** one file per table (97), a safety gate (`2026_01_01_000000_verify_old_migration_history`), 3 Laravel framework files and 2 separate drop migrations. The table files replaced 183 incremental migrations; see `database/migrations/README.md` for the table map, the relationship diagrams and how existing databases recognise the change. Backfill fixtures for six replaced migrations live in `tests/Support/LegacyMigrations/`. Migration file names cited elsewhere in these docs (for example `2026_09_22_110001`) refer to the replaced files. See `2-Design.md §3` for the schema.
 - **Factories:** mirror the model folders, because Laravel finds a factory from its model's path: `Admin/`, `Buyer/`, `Catalog/`, `Logistics/`, `Rider/`, `Seller/`, `Shared/`.
 - **Seeders:** `DatabaseSeeder`, `AdminSeeder` (refuses without `ADMIN_SEED_EMAIL` + `ADMIN_SEED_PASSWORD`), `DemoRidersSeeder`, `TestCouriersSeeder`.
 

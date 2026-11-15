@@ -291,7 +291,7 @@ class BarangayCoverageTest extends TestCase
     public function test_populated_legacy_schema_upgrades_without_inventing_barangays_and_rolls_back(): void
     {
         $station = $this->station();
-        $migration = require database_path('migrations/2026_10_21_083944_add_barangay_coverage_to_areas_table.php');
+        $migration = require base_path('tests/Support/LegacyMigrations/2026_10_21_083944_add_barangay_coverage_to_areas_table.php');
         $migration->down();
         $id = DB::table('areas')->insertGetId([
             'logistics_provider_id' => $station->logistics_provider_id, 'station_hub_id' => $station->id,
@@ -310,7 +310,7 @@ class BarangayCoverageTest extends TestCase
         $station = $this->station();
         $this->cover($station);
         $this->cover($station, '0305401002');
-        $migration = require database_path('migrations/2026_10_21_083944_add_barangay_coverage_to_areas_table.php');
+        $migration = require base_path('tests/Support/LegacyMigrations/2026_10_21_083944_add_barangay_coverage_to_areas_table.php');
         try {
             $migration->down();
             $this->fail('Rollback must refuse incompatible municipality uniqueness.');

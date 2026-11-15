@@ -76,7 +76,7 @@ class ParcelReturnMigrationTest extends TestCase
             $this->assertFalse(Schema::hasColumn('parcel_returns', 'delivery_attempts'));
 
             // Run the additive migration — should add the column back safely.
-            $migration = require database_path('migrations/2026_10_24_143000_add_delivery_attempts_to_parcel_returns.php');
+            $migration = require base_path('tests/Support/LegacyMigrations/2026_10_24_143000_add_delivery_attempts_to_parcel_returns.php');
             $migration->up();
             $this->assertTrue(Schema::hasColumn('parcel_returns', 'delivery_attempts'));
 

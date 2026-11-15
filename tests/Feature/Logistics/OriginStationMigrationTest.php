@@ -52,7 +52,7 @@ class OriginStationMigrationTest extends TestCase
             ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
 
             // Only execute after confirming this unique test target and its backup.
-            $migration = require database_path('migrations/2026_10_21_124707_add_origin_station_hub_id_to_seller_orders_table.php');
+            $migration = require base_path('tests/Support/LegacyMigrations/2026_10_21_124707_add_origin_station_hub_id_to_seller_orders_table.php');
             $migration->up();
             $parcel = DB::table('seller_orders')->find(9);
             $this->assertNull($parcel->origin_station_hub_id);

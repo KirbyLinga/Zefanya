@@ -291,7 +291,7 @@ class PurchasedVariantSnapshotTest extends TestCase
         $item = OrderItem::factory()->create(['seller_order_id' => $sellerOrder->id, 'product_id' => $product->id,
             'variant_id' => $this->variant($product)->id, 'product_name' => 'Original legacy snapshot',
             'quantity' => 2, 'price_minor' => 4321]);
-        $migration = require database_path('migrations/2026_10_18_042755_add_variant_options_to_order_items_table.php');
+        $migration = require base_path('tests/Support/LegacyMigrations/2026_10_18_042755_add_variant_options_to_order_items_table.php');
 
         // Reproduce an existing pre-T06 row in the disposable SQLite schema.
         $migration->down();
