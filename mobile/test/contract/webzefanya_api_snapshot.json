@@ -1,0 +1,428 @@
+{
+  "description": "Read-only snapshot of WebZefanya /api routes (artisan route:list --path=api). Paths are relative to /api. Regenerate only from WebZefanya without modifying it.",
+  "source": "WebZefanya working tree (branch webzefanya-live)",
+  "source_head": "00eea861",
+  "generated_on": "2026-11-14",
+  "note": "The working tree had uncommitted changes when generated; the snapshot reflects the served tree, not HEAD.",
+  "route_count": 68,
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/buyer/addresses",
+      "name": "api.buyer.addresses.index",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/addresses",
+      "name": "api.buyer.addresses.store",
+      "middleware": []
+    },
+    {
+      "method": "DELETE",
+      "path": "/buyer/addresses/{address}",
+      "name": "api.buyer.addresses.destroy",
+      "middleware": []
+    },
+    {
+      "method": "PUT",
+      "path": "/buyer/addresses/{address}",
+      "name": "api.buyer.addresses.update",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/addresses/{address}/default",
+      "name": "api.buyer.addresses.default",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/buyer/cart",
+      "name": "api.buyer.cart.show",
+      "middleware": []
+    },
+    {
+      "method": "DELETE",
+      "path": "/buyer/cart/items",
+      "name": "api.buyer.cart.items.destroyMany",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/cart/items",
+      "name": "api.buyer.cart.items.store",
+      "middleware": []
+    },
+    {
+      "method": "DELETE",
+      "path": "/buyer/cart/items/{item}",
+      "name": "api.buyer.cart.items.destroy",
+      "middleware": []
+    },
+    {
+      "method": "PATCH",
+      "path": "/buyer/cart/items/{item}",
+      "name": "api.buyer.cart.items.update",
+      "middleware": []
+    },
+    {
+      "method": "DELETE",
+      "path": "/buyer/cart/vouchers",
+      "name": "api.buyer.cart.vouchers.remove",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/cart/vouchers",
+      "name": "api.buyer.cart.vouchers.apply",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/buyer/categories",
+      "name": "api.buyer.categories",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/checkout",
+      "name": "api.buyer.checkout.store",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/checkout/quote",
+      "name": "api.buyer.checkout.quote",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/login",
+      "name": "api.buyer.login",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/logout",
+      "name": "api.buyer.logout",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/buyer/messages",
+      "name": "api.buyer.messages.index",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/messages",
+      "name": "api.buyer.messages.store",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/messages/open",
+      "name": "api.buyer.messages.open",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/buyer/messages/{conversation}",
+      "name": "api.buyer.messages.show",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/buyer/messages/{conversation}/images/{message}",
+      "name": "api.buyer.messages.image",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/buyer/notifications",
+      "name": "api.buyer.notifications.index",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/notifications/read-all",
+      "name": "api.buyer.notifications.readAll",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/notifications/{notification}/read",
+      "name": "api.buyer.notifications.read",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/buyer/orders",
+      "name": "api.buyer.orders.index",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/buyer/orders/{order}",
+      "name": "api.buyer.orders.show",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/orders/{order}/shipments/{shipment}/cancel",
+      "name": "api.buyer.orders.cancel",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/orders/{order}/shipments/{shipment}/confirm-received",
+      "name": "api.buyer.shipments.confirm",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/orders/{order}/shipments/{shipment}/return",
+      "name": "api.buyer.orders.return",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/orders/{order}/shipments/{shipment}/return/escalate",
+      "name": "api.buyer.orders.return.escalate",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/buyer/products",
+      "name": "api.buyer.products.index",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/buyer/products/{product}",
+      "name": "api.buyer.products.show",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/buyer/profile",
+      "name": "api.buyer.profile",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/buyer/shipments",
+      "name": "api.buyer.shipments.index",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/buyer/shipments/{shipment}",
+      "name": "api.buyer.shipments.show",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/buyer/vouchers",
+      "name": "api.buyer.vouchers.index",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/buyer/wishlist",
+      "name": "api.buyer.wishlist.index",
+      "middleware": []
+    },
+    {
+      "method": "DELETE",
+      "path": "/buyer/wishlist/{product}",
+      "name": "api.buyer.wishlist.destroy",
+      "middleware": []
+    },
+    {
+      "method": "PUT",
+      "path": "/buyer/wishlist/{product}",
+      "name": "api.buyer.wishlist.store",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/logistics/rider-applications",
+      "name": "api.logistics.rider-applications.index",
+      "middleware": [
+        "web"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/logistics/rider-applications/{rider}/approve",
+      "name": "api.logistics.rider-applications.approve",
+      "middleware": [
+        "web"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/logistics/rider-applications/{rider}/documents/{document}",
+      "name": "api.logistics.rider-applications.document",
+      "middleware": [
+        "web"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/logistics/rider-applications/{rider}/reject",
+      "name": "api.logistics.rider-applications.reject",
+      "middleware": [
+        "web"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/rider/availability",
+      "name": "api.rider.availability",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/deliveries/{sellerOrder}/deliver",
+      "name": "api.rider.deliveries.deliver",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/deliveries/{sellerOrder}/failed",
+      "name": "api.rider.deliveries.failed",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/deliveries/{sellerOrder}/otp",
+      "name": "api.rider.deliveries.otp",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/deliveries/{sellerOrder}/start",
+      "name": "api.rider.deliveries.start",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/rider/earnings",
+      "name": "api.rider.earnings",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/rider/history",
+      "name": "api.rider.history",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/rider/jobs",
+      "name": "api.rider.jobs.index",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/jobs/{sellerOrder}/incidents",
+      "name": "api.rider.jobs.incidents.store",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/login",
+      "name": "api.rider.login",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/logout",
+      "name": "api.rider.logout",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/rider/notifications",
+      "name": "api.rider.notifications.index",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/notifications/read-all",
+      "name": "api.rider.notifications.readAll",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/notifications/{notification}/read",
+      "name": "api.rider.notifications.read",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/parcels/{sellerOrder}/incidents",
+      "name": "api.rider.parcels.incidents.store",
+      "middleware": [
+        "web"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/rider/pickups/{sellerOrder}/confirm",
+      "name": "api.rider.pickups.confirm",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/rider/profile",
+      "name": "api.rider.profile",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/rider/providers",
+      "name": "api.rider.providers",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/register",
+      "name": "api.rider.register",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/registration/resume",
+      "name": "api.rider.resume",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/registration/{rider}/resend-otp",
+      "name": "api.rider.resend",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/registration/{rider}/verify-otp",
+      "name": "api.rider.verify",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/scan/verify",
+      "name": "api.rider.scan.verify",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/token/refresh",
+      "name": "api.rider.token.refresh",
+      "middleware": []
+    }
+  ]
+}

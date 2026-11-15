@@ -16,6 +16,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_info.dart';
+import '../../config/backend_profile.dart' show kActiveApiBaseUrl;
 import '../../config/dev_flags.dart';
 import '../../state/auth_state.dart';
 import '../../state/courier_state.dart';
@@ -29,6 +30,9 @@ import '../buyer/address_book_screen.dart';
 import '../courier/dev_qr_generator_screen.dart';
 import '../courier/rider_vehicle_screen.dart';
 import 'account_security_screen.dart';
+import '../../data/repositories/repositories.dart';
+import '../../data/repositories/linehaul_repository.dart';
+import '../courier/linehaul_profile_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -61,6 +65,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final theme = Theme.of(context);
     final auth = context.watch<AuthState>();
     final isCourier = auth.role == UserRole.courier;
+    final isLinehaul = auth.role == UserRole.linehaul;
+    final isBuyer = !isCourier && !isLinehaul;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -75,7 +81,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           Text('ACCOUNT', style: AppType.eyebrow),
           const SizedBox(height: 12),
-          if (!isCourier)
+          if (isBuyer)
             _SettingsTile(
               key: const ValueKey('settings-account-security'),
               icon: Icons.shield_outlined,
@@ -85,16 +91,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 AppPageRoute(builder: (_) => const AccountSecurityScreen()),
               ),
             ),
-          if (!isCourier) const SizedBox(height: 12),
-          if (!isCourier)
+          if (isBuyer) const SizedBox(height: 12),
+          if (isBuyer)
             _SettingsTile(
               key: const ValueKey('settings-addresses'),
               icon: Icons.location_city_outlined,
               title: 'Addresses',
               subtitle: 'Save up to 10 delivery addresses.',
-              onTap: () => Navigator.of(context).push(
-                AppPageRoute(builder: (_) => const AddressBookScreen()),
-              ),
+              onTap: () => Navigator.of(
+                context,
+              ).push(AppPageRoute(builder: (_) => const AddressBookScreen())),
             ),
           if (isCourier)
             _SettingsTile(
@@ -102,9 +108,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: Icons.two_wheeler_outlined,
               title: 'Vehicle & documents',
               subtitle: 'Plate, licence and OR/CR on file.',
-              onTap: () => Navigator.of(context).push(
-                AppPageRoute(builder: (_) => const RiderVehicleScreen()),
-              ),
+              onTap: () => Navigator.of(
+                context,
+              ).push(AppPageRoute(builder: (_) => const RiderVehicleScreen())),
+            ),
+          if (isLinehaul)
+            _SettingsTile(
+              key: const ValueKey('settings-linehaul-profile'),
+              icon: Icons.local_shipping_outlined,
+              title: 'Company, vehicle & documents',
+              subtitle: 'Your Logistics company and reviewed Courier records.',
+              onTap: () {
+                final client = context.read<Repositories>().client;
+                if (client != null) {
+                  Navigator.of(context).push(
+                    AppPageRoute(
+                      builder: (_) => LinehaulProfileScreen(
+                        repository: LinehaulRepository(client),
+                      ),
+                    ),
+                  );
+                }
+              },
             ),
           const SizedBox(height: 26),
           Text('APPEARANCE', style: AppType.eyebrow),
@@ -125,9 +150,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.help_outline,
             title: 'Help & Support',
             subtitle: 'Answers to the questions this build can answer.',
-            onTap: () => Navigator.of(context).push(
-              AppPageRoute(builder: (_) => const HelpSupportScreen()),
-            ),
+            onTap: () => Navigator.of(
+              context,
+            ).push(AppPageRoute(builder: (_) => const HelpSupportScreen())),
           ),
           const SizedBox(height: 12),
           _SettingsTile(
@@ -135,9 +160,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.description_outlined,
             title: 'Terms & Privacy',
             subtitle: 'How this demo handles your data.',
-            onTap: () => Navigator.of(context).push(
-              AppPageRoute(builder: (_) => const TermsPrivacyScreen()),
-            ),
+            onTap: () => Navigator.of(
+              context,
+            ).push(AppPageRoute(builder: (_) => const TermsPrivacyScreen())),
           ),
           const SizedBox(height: 26),
           Text('ABOUT', style: AppType.eyebrow),
@@ -225,8 +250,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Expanded(
                       child: TextButton(
                         key: const ValueKey('settings-logout-stay'),
-                        onPressed: () =>
-                            Navigator.of(dialogContext).pop(false),
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
                         child: const Text('Stay'),
                       ),
                     ),
@@ -234,8 +258,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Expanded(
                       child: ElevatedButton(
                         key: const ValueKey('settings-logout-confirm'),
-                        onPressed: () =>
-                            Navigator.of(dialogContext).pop(true),
+                        onPressed: () => Navigator.of(dialogContext).pop(true),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.danger,
                           foregroundColor: AppColors.textOnDark,
@@ -252,16 +275,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
       },
     );
     if (confirmed != true || !context.mounted) return;
-    await CloudTransition.run(
-      context,
-      swap: () {
-        if (context.read<AuthState>().role == UserRole.courier) {
-          context.read<CourierState>().goOffline();
-        }
-        context.read<AuthState>().logout();
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      },
-    );
+    final auth = context.read<AuthState>();
+    final wasRider = auth.role == UserRole.courier;
+    try {
+      await auth.logout();
+    } on ApiException catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+      // AuthState already cleared the local session. Leave account settings
+      // even if the server could not revoke the previous token.
+    }
+    if (!context.mounted) return;
+    void unwind() {
+      if (!context.mounted) return;
+      if (wasRider) context.read<CourierState>().goOffline();
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+
+    if (kUseLiveApi) {
+      unwind();
+    } else {
+      await CloudTransition.run(context, swap: unwind);
+    }
   }
 }
 
@@ -532,12 +570,12 @@ class DeveloperOptionsScreen extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   kUseLiveApi
-                      ? (kApiBaseUrl.isEmpty
-                          ? 'Live mode is on but no API base URL was supplied. '
-                              'Requests will report a configuration error.'
-                          : 'Requests go to $kApiBaseUrl.')
+                      ? (kActiveApiBaseUrl.isEmpty
+                            ? 'Live mode is on but no API base URL was supplied. '
+                                  'Requests will report a configuration error.'
+                            : 'Requests go to $kActiveApiBaseUrl.')
                       : 'Everything on screen comes from the app\'s own '
-                          'fixtures. No network requests are made.',
+                            'fixtures. No network requests are made.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: AppColors.textSecondary,
                     height: 1.45,
@@ -551,10 +589,10 @@ class DeveloperOptionsScreen extends StatelessWidget {
             key: const ValueKey('developer-qr-generator'),
             icon: Icons.qr_code,
             title: 'QR generator',
-            subtitle: 'Render a Zefanya delivery pass for handover testing.',
-            onTap: () => Navigator.of(context).push(
-              AppPageRoute(builder: (_) => const DevQrGeneratorScreen()),
-            ),
+            subtitle: 'Render a parcel tracking QR for scanner testing.',
+            onTap: () => Navigator.of(
+              context,
+            ).push(AppPageRoute(builder: (_) => const DevQrGeneratorScreen())),
           ),
         ],
       ),

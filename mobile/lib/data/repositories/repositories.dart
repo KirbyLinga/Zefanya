@@ -32,10 +32,13 @@
 // `live_stub.dart`) rather than guessing. A live build is therefore runnable
 // and honest, not complete.
 
+import '../../config/backend_profile.dart';
 import '../../config/dev_flags.dart' show GoogleConfig;
 import '../../services/google_sign_in_service.dart';
 import '../api/api_client.dart';
+import '../api/backend_scope.dart';
 import '../api/token_store.dart';
+import '../api/webzefanya_contract.dart';
 import 'account_security_repository.dart';
 import 'address_repository.dart';
 import 'auth_repository.dart';
@@ -44,6 +47,7 @@ import 'catalog_repository.dart';
 import 'chat_repository.dart';
 import 'courier_repository.dart';
 import 'google_auth_repository.dart';
+import 'linehaul_repository.dart';
 import 'order_repository.dart';
 import 'return_repository.dart';
 import 'review_repository.dart';
@@ -67,8 +71,15 @@ class Repositories {
     required this.courier,
     required this.returns,
     AddressRepository? address,
+    this.linehaul,
     this.client,
+    this.capabilities = const BackendCapabilities.demo(),
   }) : address = address ?? const MockAddressRepository();
+
+  /// What the connected backend supports. The demo profile (and mock mode)
+  /// has everything; the WebZefanya profile turns off what it lacks, and
+  /// screens hide those actions from this one value.
+  final BackendCapabilities capabilities;
 
   final AuthRepository auth;
   final AccountSecurityRepository accountSecurity;
@@ -89,6 +100,7 @@ class Repositories {
   final ChatRepository chat;
   final CourierRepository courier;
   final ReturnRepository returns;
+  final LinehaulRepository? linehaul;
 
   /// The network client, present only in live mode.
   ///
@@ -120,6 +132,7 @@ class Repositories {
     returns: MockReturnRepository(),
     chat: MockChatRepository(),
     courier: const MockCourierRepository(),
+    linehaul: const LinehaulRepository.demo(),
   );
 
   /// The live set, built against [client].
@@ -143,7 +156,52 @@ class Repositories {
     returns: LiveReturnRepository(client),
     chat: LiveChatRepository(client),
     courier: LiveCourierRepository(client),
+    linehaul: LinehaulRepository(client),
     client: client,
+  );
+
+  /// The live set for WebZefanya, built against [client].
+  ///
+  /// Reuses the live repositories (WebZefanya has those routes) and swaps in
+  /// the adapters where the two backends differ. Courier (linehaul) sign-in is
+  /// not wired: WebZefanya has no Courier authentication yet.
+  ///
+  /// [client] must carry the WebZefanya route contract (build it with
+  /// [guardedWebZefanyaClient]); a client without it is refused so no caller can
+  /// reach WebZefanya through an unguarded path.
+  factory Repositories.webzefanya(ApiClient client) {
+    if (client.routePolicy is! WebZefanyaContract) {
+      throw ArgumentError(
+        'A WebZefanya bundle needs a client built with guardedWebZefanyaClient.',
+      );
+    }
+    return Repositories._webzefanya(client);
+  }
+
+  factory Repositories._webzefanya(ApiClient client) => Repositories(
+    auth: LiveAuthRepository(client),
+    accountSecurity: LiveAccountSecurityRepository(client),
+    googleAuth: LiveGoogleAuthRepository(client),
+    googleSignIn: NativeGoogleSignInService(
+      clientId: GoogleConfig.current.iosClientId,
+      serverClientId: GoogleConfig.current.serverClientId,
+    ),
+    catalog: LiveCatalogRepository(client),
+    cart: LiveCartRepository(client),
+    address: LiveAddressRepository(client),
+    order: LiveOrderRepository(
+      client,
+      quotePath: '/buyer/checkout/quote',
+      deliveryDisputesSupported: false,
+      previewThroughCart: true,
+    ),
+    review: LiveReviewRepository(client, listSupported: false),
+    returns: LiveReturnRepository(client),
+    chat: LiveChatRepository(client),
+    courier: WebZefanyaCourierRepository(client),
+    linehaul: null,
+    client: client,
+    capabilities: const BackendCapabilities.webzefanya(),
   );
 
   /// Resolves the bundle for [useLive].
@@ -157,21 +215,73 @@ class Repositories {
   /// so the first request throws `ApiNotConfiguredException` naming the flag.
   /// Falling back would mean a misconfigured build appears to work — with mock
   /// data — which is the worst of both worlds.
+  ///
+  /// [profile] selects the backend a live build talks to. The default keeps
+  /// today's behaviour (the demo fork). [WebZefanyaContract] guards every
+  /// request in the WebZefanya profile, and writes stay disabled unless
+  /// [allowWrites] is set. Mock mode ignores the profile.
   static Repositories forMode({
     required bool useLive,
     String baseUrl = '',
     TokenStore? tokenStore,
     ApiClient? client,
+    BackendProfile profile = BackendProfile.courierDemo,
+    bool allowWrites = false,
+    String otherBaseUrl = '',
   }) {
     if (!useLive) return Repositories.mock();
+
+    _refuseCrossBackendOrigin(profile, baseUrl, otherBaseUrl);
+
+    if (profile == BackendProfile.webzefanya) {
+      // Always built here with the contract installed. An injected client
+      // is accepted only if it already carries it ([Repositories.webzefanya]
+      // refuses one that does not).
+      final resolved =
+          client ??
+          guardedWebZefanyaClient(
+            baseUrl: baseUrl,
+            tokenStore:
+                tokenStore ??
+                scopedTokenStore(BackendProfile.webzefanya, baseUrl),
+            allowWrites: allowWrites,
+          );
+      return Repositories.webzefanya(resolved);
+    }
 
     final resolved =
         client ??
         ApiClient(
           baseUrl: baseUrl,
-          tokenStore: tokenStore ?? SecureTokenStore(),
+          tokenStore:
+              tokenStore ??
+              scopedTokenStore(BackendProfile.courierDemo, baseUrl),
         );
     return Repositories.live(resolved);
+  }
+
+  /// A live build must not be pointed at the *other* backend's host: the demo
+  /// profile refuses the configured WebZefanya origin and vice versa. Separate
+  /// flag names are not host identity checks, so the origins are compared.
+  static void _refuseCrossBackendOrigin(
+    BackendProfile profile,
+    String baseUrl,
+    String otherBaseUrl,
+  ) {
+    if (baseUrl.trim().isEmpty || otherBaseUrl.trim().isEmpty) return;
+    final a = Uri.tryParse(baseUrl.trim());
+    final b = Uri.tryParse(otherBaseUrl.trim());
+    if (a == null || b == null) return;
+    int port(Uri u) => u.hasPort ? u.port : (u.isScheme('https') ? 443 : 80);
+    if (a.scheme.toLowerCase() == b.scheme.toLowerCase() &&
+        a.host.toLowerCase() == b.host.toLowerCase() &&
+        port(a) == port(b)) {
+      throw StateError(
+        'The ${profile.wireName} profile is configured with the same host as '
+        'the other backend. Check zefanya.apiBaseUrl and '
+        'zefanya.webzefanya.apiBaseUrl.',
+      );
+    }
   }
 
   /// Restores whatever each data source keeps locally, before the first frame.

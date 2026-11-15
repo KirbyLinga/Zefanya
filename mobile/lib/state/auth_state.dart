@@ -67,7 +67,8 @@ import '../utils/order_tab_memory.dart';
 import '../utils/rider_validators.dart';
 import '../utils/validators.dart';
 
-enum UserRole { buyer, courier }
+// `courier` is the persisted legacy Rider role; linehaul is the separate Courier.
+enum UserRole { buyer, courier, linehaul }
 
 enum AccountStatus {
   /// No session — show the login screen.
@@ -99,7 +100,10 @@ class AuthState extends ChangeNotifier {
   final AuthRepository _repository;
   final AccountSecurityRepository _accountSecurity;
   final GoogleAuthRepository _googleAuth;
+  // This Laravel checkout exposes browser OAuth only.
+  bool get supportsGoogleSignIn => _googleAuth is! LiveGoogleAuthRepository;
   final GoogleSignInService _googleSignIn;
+  bool _demoSession = false;
 
   UserRole? role;
   AccountStatus status = AccountStatus.loggedOut;
@@ -210,6 +214,10 @@ class AuthState extends ChangeNotifier {
 
   static const _roleKey = 'auth_role';
   static const _statusKey = 'auth_status';
+
+  /// Kept after logout so an existing installation can skip first-run UI.
+  static bool hasSavedSessionHistory(SharedPreferences preferences) =>
+      preferences.containsKey(_statusKey);
   // Additive: an existing install has no value here, `load()` reads that as
   // null, and null renders as the admin-gate copy — which is what that build
   // was already showing. No migration needed and nothing changes on upgrade.
@@ -315,8 +323,10 @@ class AuthState extends ChangeNotifier {
   /// Call once before runApp (see main.dart) to restore the last
   /// session from disk.
   Future<void> load() async {
+    final generation = _authGeneration;
     try {
       final prefs = await SharedPreferences.getInstance();
+      if (generation != _authGeneration) return;
       final roleStr = prefs.getString(_roleKey);
       final statusStr = prefs.getString(_statusKey);
       role = roleStr == null ? null : UserRole.values.byName(roleStr);
@@ -375,6 +385,19 @@ class AuthState extends ChangeNotifier {
       role = null;
       status = AccountStatus.loggedOut;
     }
+
+    final repository = _repository;
+    final savedRole = role;
+    if (status == AccountStatus.active &&
+        savedRole != null &&
+        repository is LiveAuthRepository) {
+      final valid = await repository.verifySavedSession(savedRole);
+      if (generation != _authGeneration || valid) return;
+      _clearLocalAccount();
+      await clearOrdersTab();
+      await _save();
+      notifyListeners();
+    }
   }
 
   List<AddressEntry> _decodeAddresses(String? raw) {
@@ -413,7 +436,38 @@ class AuthState extends ChangeNotifier {
         : await prefs.setString(key, value);
   }
 
-  Future<void> _save() async {
+  /// Saves run one at a time, in call order, so two sessions' saves can never
+  /// interleave field by field. Each save writes the state current when it
+  /// runs; stale operations do not call it.
+  Future<void> _save() {
+    final previous = _saveTail;
+    final run = previous == null
+        ? _saveNow()
+        : previous.then((_) => _saveNow());
+    _saveTail = run.then<void>((_) {}, onError: (_) {});
+    return run;
+  }
+
+  Future<void>? _saveTail;
+
+  /// Advances on every sign-in, activation and sign-out. An operation applies
+  /// its result only if no newer one started since.
+  int _authGeneration = 0;
+
+  int _beginAuthOperation() {
+    final repository = _repository;
+    if (repository is LiveAuthRepository) repository.client.beginSession();
+    return ++_authGeneration;
+  }
+
+  void _ensureCurrent(int generation) {
+    if (generation != _authGeneration) {
+      throw const SessionSupersededException();
+    }
+  }
+
+  Future<void> _saveNow() async {
+    if (_demoSession) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_statusKey, status.name);
     // Stored as the *wire* string rather than the enum's name, so what sits on
@@ -484,13 +538,64 @@ class AuthState extends ChangeNotifier {
     required String password,
     String? name,
   }) async {
+    final generation = _beginAuthOperation();
     final result = await _repository.login(
       role: role,
       email: email,
       password: password,
     );
+    _ensureCurrent(generation);
     _applyResult(result, fallbackName: name);
     await _save();
+    _ensureCurrent(generation);
+  }
+
+  /// First sign-in of a WebZefanya Courier with the login ID and one-time
+  /// access code from their logistics company. The server creates the session;
+  /// it is applied exactly like a password login.
+  Future<void> activateCourier({
+    required String loginId,
+    required String activationCode,
+    required String password,
+  }) async {
+    final repository = _repository;
+    if (repository is! LiveAuthRepository) {
+      throw const ApiNotConfiguredException();
+    }
+    final generation = _beginAuthOperation();
+    final result = await repository.activateCourier(
+      loginId: loginId,
+      activationCode: activationCode,
+      password: password,
+    );
+    _ensureCurrent(generation);
+    _applyResult(result);
+    await _save();
+    _ensureCurrent(generation);
+  }
+
+  /// A demo session only uses the mock repository and stays in memory.
+  Future<void> startDemo(UserRole role) async {
+    if (_repository is! MockAuthRepository ||
+        status != AccountStatus.loggedOut) {
+      return;
+    }
+    final generation = _beginAuthOperation();
+    final (name, email) = switch (role) {
+      UserRole.buyer => ('Demo Buyer', 'buyer@demo.invalid'),
+      UserRole.courier => ('Demo Rider', 'rider@demo.invalid'),
+      UserRole.linehaul => ('Demo Transport Courier', 'transport@demo.invalid'),
+    };
+    final result = await _repository.login(
+      role: role,
+      email: email,
+      password: '',
+    );
+    if (generation != _authGeneration || status != AccountStatus.loggedOut) {
+      return;
+    }
+    _demoSession = true;
+    _applyResult(result, fallbackName: name);
   }
 
   /// Signs in with Google, or discovers that this identity has no account yet.
@@ -508,8 +613,11 @@ class AuthState extends ChangeNotifier {
   /// A cancelled or failed Google sheet throws from the service and leaves the
   /// session untouched.
   Future<GoogleAuthOutcome> signInWithGoogle() async {
+    final generation = _beginAuthOperation();
     final identity = await _googleSignIn.signIn();
+    _ensureCurrent(generation);
     final outcome = await _googleAuth.signIn(identity);
+    _ensureCurrent(generation);
     final result = outcome.result;
 
     if (result == null) {
@@ -520,6 +628,7 @@ class AuthState extends ChangeNotifier {
     pendingGoogleIdentity = null;
     _applyResult(result);
     await _save();
+    _ensureCurrent(generation);
     return outcome;
   }
 
@@ -547,11 +656,13 @@ class AuthState extends ChangeNotifier {
       throw StateError('No Google identity is waiting for registration.');
     }
 
+    final generation = _beginAuthOperation();
     final result = await _googleAuth.register(
       identity: identity,
       role: role,
       profile: profile,
     );
+    _ensureCurrent(generation);
     if (role == UserRole.courier) {
       saveRiderRegistration(
         company: profile.riderCompany,
@@ -567,6 +678,7 @@ class AuthState extends ChangeNotifier {
     _applyResult(result, fallbackName: name ?? identity.displayNameOrEmail);
     pendingGoogleIdentity = null;
     await _save();
+    _ensureCurrent(generation);
   }
 
   /// Changes the password after re-proving the current one.
@@ -602,7 +714,9 @@ class AuthState extends ChangeNotifier {
 
   /// Confirms the emailed code and moves the session onto the new address.
   Future<void> confirmEmailChange(String code) async {
+    final generation = _authGeneration;
     final changed = await _accountSecurity.confirmEmailChange(code);
+    _ensureCurrent(generation);
     email = changed;
     notifyListeners();
     await _save();
@@ -627,7 +741,9 @@ class AuthState extends ChangeNotifier {
   }
 
   Future<void> confirmPhoneChange(String code) async {
+    final generation = _authGeneration;
     final changed = await _accountSecurity.confirmPhoneChange(code);
+    _ensureCurrent(generation);
     phone = changed;
     notifyListeners();
     await _save();
@@ -656,12 +772,14 @@ class AuthState extends ChangeNotifier {
     required RegistrationProfile profile,
     String? name,
   }) async {
+    final generation = _beginAuthOperation();
     final result = await _repository.register(
       role: role,
       email: email,
       password: password,
       profile: profile,
     );
+    _ensureCurrent(generation);
     if (role == UserRole.courier) {
       saveRiderRegistration(
         company: profile.riderCompany,
@@ -676,6 +794,7 @@ class AuthState extends ChangeNotifier {
     }
     _applyResult(result, fallbackName: name);
     await _save();
+    _ensureCurrent(generation);
   }
 
   /// Submits the emailed code that closes the first of the two registration
@@ -697,11 +816,13 @@ class AuthState extends ChangeNotifier {
     final currentRole = role;
     if (id == null || currentRole == null) return;
 
+    final generation = _authGeneration;
     final result = await _repository.verifyOtp(
       role: currentRole,
       verificationId: id,
       code: code,
     );
+    _ensureCurrent(generation);
     _applyResult(result);
     await _save();
   }
@@ -722,10 +843,15 @@ class AuthState extends ChangeNotifier {
     final repository = _repository;
     final address = email;
     if (repository is! ResumesRiderRegistration || address == null) {
-      throw const ApiNotImplementedException('POST /api/rider/registration/resume');
+      throw const ApiNotImplementedException(
+        'POST /api/rider/registration/resume',
+      );
     }
-    verificationId = await (repository as ResumesRiderRegistration)
+    final generation = _authGeneration;
+    final handle = await (repository as ResumesRiderRegistration)
         .resumeRiderRegistration(email: address, password: password);
+    _ensureCurrent(generation);
+    verificationId = handle;
     notifyListeners();
     await _save();
   }
@@ -738,7 +864,9 @@ class AuthState extends ChangeNotifier {
     final currentRole = role;
     if (id == null || currentRole == null) return;
 
+    final generation = _authGeneration;
     await _repository.resendOtp(role: currentRole, verificationId: id);
+    _ensureCurrent(generation);
     otpSentAt = DateTime.now();
     notifyListeners();
     await _save();
@@ -1241,7 +1369,16 @@ class AuthState extends ChangeNotifier {
   Future<void> refresh() async {
     final currentRole = role;
     if (currentRole == null) return;
-    final result = await _repository.refresh(role: currentRole);
+    // Captured, not advanced: a refresh belongs to the current session, and a
+    // sign-in or sign-out that starts meanwhile makes its answer stale.
+    final generation = _authGeneration;
+    final AuthResult? result;
+    try {
+      result = await _repository.refresh(role: currentRole);
+    } on SessionSupersededException {
+      return;
+    }
+    if (generation != _authGeneration) return;
     if (result != null) {
       _applyResult(result);
       await _save();
@@ -1262,7 +1399,37 @@ class AuthState extends ChangeNotifier {
     // couriers), and `_repository.logout()` is called after the local state is
     // cleared — so we read it now.
     final sessionRole = role ?? UserRole.buyer;
+    // Every sign-in, activation or refresh still in flight is now stale.
+    final generation = _beginAuthOperation();
 
+    _clearLocalAccount();
+    notifyListeners();
+    if (_demoSession) {
+      _demoSession = false;
+      return;
+    }
+    // Started before any other `await`: the repository invalidates this
+    // session and takes its token right away, so a sign-in that completes
+    // while the rest of this sign-out runs keeps its own credentials.
+    // Its failure is held (not left unhandled) and rethrown at the end, as before.
+    final revoke = _repository
+        .logout(role: sessionRole)
+        .then<(Object, StackTrace)?>(
+          (_) => null,
+          onError: (Object error, StackTrace stack) => (error, stack),
+        );
+    // Navigation memory belongs to the account, not the device.
+    await clearOrdersTab();
+    // Always persist the current state, including when a newer login fails.
+    // The save queue reads current state, so a successful newer login is kept.
+    await _save();
+    // Offer the account chooser on the next Google sign-in.
+    if (generation == _authGeneration) await _googleSignIn.signOut();
+    final failure = await revoke;
+    if (failure != null) Error.throwWithStackTrace(failure.$1, failure.$2);
+  }
+
+  void _clearLocalAccount() {
     role = null;
     status = AccountStatus.loggedOut;
     registrationStatus = null;
@@ -1295,16 +1462,5 @@ class AuthState extends ChangeNotifier {
     riderOrCrPath = null;
     riderReverificationRequired = false;
     pendingGoogleIdentity = null;
-    // Navigation memory belongs to the account, not the device — same
-    // reason recentAddresses clears above.
-    await clearOrdersTab();
-    notifyListeners();
-    await _save();
-    // Best-effort, and before the repository call: the next Google tap should
-    // offer the account chooser, but a Google SDK failure must not stop the
-    // server-side revoke below.
-    await _googleSignIn.signOut();
-    await _repository.logout(role: sessionRole);
   }
 }
-

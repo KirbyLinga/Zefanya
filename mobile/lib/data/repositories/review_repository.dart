@@ -100,7 +100,11 @@ class MockReviewRepository implements ReviewRepository {
 // ---------------------------------------------------------------------------
 
 class LiveReviewRepository extends LiveRepository implements ReviewRepository {
-  LiveReviewRepository(super.client);
+  LiveReviewRepository(super.client, {this.listSupported = true});
+
+  /// False when the backend has no `GET /buyer/reviews/mine` (WebZefanya): the
+  /// list is then empty rather than an error.
+  final bool listSupported;
 
   @override
   Future<void> load() async {
@@ -110,6 +114,7 @@ class LiveReviewRepository extends LiveRepository implements ReviewRepository {
   @override
   Future<List<ProductReview>> all() async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
+    if (!listSupported) return const [];
 
     final body = await client.getJson(
       '/buyer/reviews/mine',

@@ -300,17 +300,30 @@ final class VerificationLinkExpiredException extends ApiException {
 }
 
 final class ApiNotImplementedException extends ApiException {
-  const ApiNotImplementedException(this.endpoint, {this.contractSection})
-      : super(
-          message: 'The live API for this is not built yet — '
-              'see docs/api-contract.md.',
-        );
+  const ApiNotImplementedException(
+    this.endpoint, {
+    this.contractSection,
+    super.message =
+        'The live API for this is not built yet — see docs/api-contract.md.',
+  });
 
   /// e.g. `GET /products`.
   final String endpoint;
 
   /// Which part of the contract specifies it, e.g. `§5.2`.
   final String? contractSection;
+
+  @override
+  bool get isRetryable => false;
+}
+
+/// An authentication operation (sign-in, activation, refresh) finished after a
+/// newer sign-in or a sign-out started. Its answer was discarded: nothing was
+/// stored and the newer session is untouched.
+final class SessionSupersededException extends ApiException {
+  const SessionSupersededException({
+    super.message = 'A newer sign-in or sign-out replaced this one.',
+  });
 
   @override
   bool get isRetryable => false;

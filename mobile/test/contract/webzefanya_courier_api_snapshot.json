@@ -1,0 +1,78 @@
+{
+  "description": "Read-only snapshot of the Courier Mobile API (artisan route:list --path=api/courier) from the ISOLATED WebZefanya Phase 3 build. Not served by the live WebZefanya until the owner releases it. Paths are relative to /api.",
+  "source": "C:/ProjectEcommerce/WebZefanya-courier-auth-dev (isolated, non-served copy of WebZefanya webzefanya-live @ 00eea861 plus Phase 3)",
+  "generated_on": "2026-11-15",
+  "route_count": 7,
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/courier/activate",
+      "name": "api.courier.activate",
+      "middleware": [
+        "api",
+        "App\\Http\\Middleware\\ApiCourier:guest",
+        "Illuminate\\Routing\\Middleware\\ThrottleRequests:courier-activate"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/courier/login",
+      "name": "api.courier.login",
+      "middleware": [
+        "api",
+        "App\\Http\\Middleware\\ApiCourier:guest",
+        "Illuminate\\Routing\\Middleware\\ThrottleRequests:courier-login"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/courier/logout",
+      "name": "api.courier.logout",
+      "middleware": [
+        "api",
+        "App\\Http\\Middleware\\ApiCourier",
+        "Illuminate\\Routing\\Middleware\\ThrottleRequests:courier-logout"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/courier/profile",
+      "name": "api.courier.profile",
+      "middleware": [
+        "api",
+        "App\\Http\\Middleware\\ApiCourier",
+        "Illuminate\\Routing\\Middleware\\ThrottleRequests:courier-reads"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/courier/token/refresh",
+      "name": "api.courier.token.refresh",
+      "middleware": [
+        "api",
+        "App\\Http\\Middleware\\ApiCourier",
+        "Illuminate\\Routing\\Middleware\\ThrottleRequests:courier-refresh"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/courier/transfers",
+      "name": "api.courier.transfers.index",
+      "middleware": [
+        "api",
+        "App\\Http\\Middleware\\ApiCourier",
+        "Illuminate\\Routing\\Middleware\\ThrottleRequests:courier-reads"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/courier/transfers/history",
+      "name": "api.courier.transfers.history",
+      "middleware": [
+        "api",
+        "App\\Http\\Middleware\\ApiCourier",
+        "Illuminate\\Routing\\Middleware\\ThrottleRequests:courier-reads"
+      ]
+    }
+  ]
+}

@@ -26,6 +26,7 @@ import '../../../state/catalog_state.dart';
 import '../../../data/mock_data.dart';
 import '../../../state/review_state.dart';
 import '../../../widgets/app_page_route.dart';
+import '../../../data/repositories/repositories.dart' show Repositories;
 import '../review_screen.dart';
 
 class ReviewButton extends StatelessWidget {
@@ -39,6 +40,10 @@ class ReviewButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!(context.read<Repositories?>()?.capabilities.buyerReviewSubmit ??
+        true)) {
+      return const SizedBox.shrink();
+    }
     final completedAt = order.completedAt;
     if (!order.isCompleted ||
         completedAt == null ||

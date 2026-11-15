@@ -59,7 +59,13 @@ OrderStatus orderStatusFromServer(String status) => switch (status) {
   'CONFIRMED' ||
   'PREPARING' ||
   'READY_FOR_PICKUP' => OrderStatus.toShip,
-  'PICKED_UP' || 'AT_SORTING_CENTER' || 'SORTED' => OrderStatus.inTransit,
+  'PICKED_UP' ||
+  'AT_SORTING_CENTER' ||
+  'SORTED' ||
+  // Hub-to-hub transfer: dispatched, and received at the next hub awaiting
+  // its sort (WebZefanya `OrderStatus::InTransit` / `ArrivedAtHub`).
+  'IN_TRANSIT' ||
+  'ARRIVED_AT_HUB' => OrderStatus.inTransit,
   'ASSIGNED_TO_RIDER' ||
   'OUT_FOR_DELIVERY' ||
   'DELIVERY_FAILED' => OrderStatus.outForDelivery,
@@ -175,13 +181,15 @@ Order orderFromShipmentJson(Map<String, Object?> json) {
     productQuantities: _productQuantities(rows),
     cancelled: wire == 'CANCELLED',
     buyerConfirmed: wire == 'COMPLETED',
-    cancellationAllowed:
-        json['can_cancel'] as bool? ??
-        wire == 'PLACED',
+    cancellationAllowed: json['can_cancel'] as bool? ?? wire == 'PLACED',
     completedAt: DateTime.tryParse(_text(json['completed_at'])),
-    deliveredAt: status == OrderStatus.toRate
-        ? DateTime.tryParse(_text(json['updated_at']))
-        : null,
+    deliveredAt: DateTime.tryParse(
+      _text(
+        json.containsKey('delivered_at')
+            ? json['delivered_at']
+            : (status == OrderStatus.toRate ? json['updated_at'] : null),
+      ),
+    ),
     serverOrderId: _text(json['order_id']).isEmpty
         ? null
         : _text(json['order_id']),

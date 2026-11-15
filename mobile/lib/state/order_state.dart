@@ -57,6 +57,27 @@ class OrderState extends ChangeNotifier {
 
   final OrderRepository _repository;
 
+  bool get supportsDeliveryDisputes =>
+      _repository is LiveOrderRepository &&
+      _repository.deliveryDisputesSupported;
+
+  Future<Map<String, Object?>> deliveryDispute(
+    String shipmentId, {
+    String? explanation,
+    ({List<int> bytes, String filename})? evidence,
+  }) => (_repository as LiveOrderRepository).deliveryDispute(
+    shipmentId,
+    explanation: explanation,
+    evidence: evidence,
+  );
+  int _ordersTabRequests = 0;
+  int get ordersTabRequests => _ordersTabRequests;
+
+  void requestOrdersTab() {
+    _ordersTabRequests++;
+    notifyListeners();
+  }
+
   /// The buyer's return/refund requests. Exposed so order screens can overlay
   /// the request status without adding another provider to every test.
   final ReturnState returns;
@@ -75,6 +96,58 @@ class OrderState extends ChangeNotifier {
   /// A cache over the repository's answer, refreshed by [load] and [place].
   /// Synchronous on purpose: this getter is called from `build()`.
   List<Order> _orders = const [];
+  int _shipmentPage = 1;
+  int _historyGeneration = 0;
+  bool _hasOlderShipments = false;
+  bool loadingOlder = false;
+  ApiException? olderFailure;
+  bool get hasOlder => _hasOlderShipments || returns.hasOlder;
+
+  Future<void> _readFirstOrders() async {
+    final generation = ++_historyGeneration;
+    final repository = _repository;
+    final page = repository is LiveOrderRepository
+        ? await repository.shipmentPage(1)
+        : (items: await repository.orders(), hasMore: false);
+    if (generation != _historyGeneration) return;
+    _orders = page.items;
+    _shipmentPage = 1;
+    _hasOlderShipments = page.hasMore;
+    olderFailure = null;
+  }
+
+  Future<void> loadOlder() async {
+    final repository = _repository;
+    if (repository is! LiveOrderRepository ||
+        loadingOlder ||
+        _loading ||
+        !hasOlder) {
+      return;
+    }
+    final generation = _historyGeneration;
+    loadingOlder = true;
+    olderFailure = null;
+    notifyListeners();
+    try {
+      if (_hasOlderShipments) {
+        final page = await repository.shipmentPage(_shipmentPage + 1);
+        if (generation != _historyGeneration) return;
+        final seen = _orders.map((order) => order.id).toSet();
+        _orders = [
+          ..._orders,
+          ...page.items.where((order) => seen.add(order.id)),
+        ];
+        _shipmentPage++;
+        _hasOlderShipments = page.hasMore;
+      }
+      await returns.loadOlder();
+    } on ApiException catch (error) {
+      if (generation == _historyGeneration) olderFailure = error;
+    } finally {
+      loadingOlder = false;
+      notifyListeners();
+    }
+  }
 
   /// Whether a load or refresh is in flight. Used by the Orders screen to
   /// show skeletons instead of an empty list while data arrives.
@@ -197,7 +270,7 @@ class OrderState extends ChangeNotifier {
     await Future.wait([_repository.load(), returns.load()]);
 
     try {
-      _orders = await _repository.orders();
+      await _readFirstOrders();
       _loadFailure = null;
     } on ApiNotConfiguredException {
       // A live build with no base URL is a *build* mistake rather than a runtime
@@ -225,7 +298,8 @@ class OrderState extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     try {
-      _orders = await _repository.orders();
+      await _readFirstOrders();
+      if (_repository is LiveOrderRepository) await returns.load();
       _loadFailure = null;
     } on ApiException catch (error) {
       _loadFailure = error;
@@ -301,7 +375,7 @@ class OrderState extends ChangeNotifier {
       await _repository.saveBuyerState(
         base.copyWith(cancelled: true, cancellationReason: reason.trim()),
       );
-      _orders = await _repository.orders();
+      await _readFirstOrders();
       notifyListeners();
       return null;
     } on ApiException {
@@ -343,7 +417,7 @@ class OrderState extends ChangeNotifier {
     await _repository.saveBuyerState(
       base.copyWith(buyerConfirmed: true, completedAt: DateTime.now()),
     );
-    _orders = await _repository.orders();
+    await _readFirstOrders();
     notifyListeners();
     return null;
   }
@@ -382,6 +456,39 @@ class OrderState extends ChangeNotifier {
     ], voucherCodes: voucherCodes);
   }
 
+  bool get usesServerCheckoutAddress => _repository is LiveOrderRepository;
+
+  Future<CheckoutReview?> reviewServerCheckout(
+    List<CartItem> items, {
+    List<String> voucherCodes = const [],
+  }) async {
+    final repository = _repository;
+    if (repository is! LiveOrderRepository || items.isEmpty) return null;
+    return repository.reviewCheckout(
+      items.map(_lineFor).toList(),
+      voucherCodes,
+    );
+  }
+
+  Future<int> reviewServerVouchers(List<CartItem> items, List<String> codes) {
+    final repository = _repository;
+    if (repository is! LiveOrderRepository || items.isEmpty) {
+      throw const ApiNotConfiguredException();
+    }
+    return repository.reviewVouchers(items.map(_lineFor).toList(), codes);
+  }
+
+  Future<List<({String code, String summary})>> serverVoucherOffers(
+    List<CartItem> items,
+  ) async {
+    final repository = _repository;
+    if (repository is! LiveOrderRepository) return const [];
+    return repository.voucherOffers({
+      for (final item in items)
+        if (item.product.sellerId case final sellerId?) sellerId,
+    });
+  }
+
   OrderLineRequest _lineFor(CartItem item) => OrderLineRequest(
     productId: item.product.id,
     productName: item.product.name,
@@ -391,24 +498,67 @@ class OrderState extends ChangeNotifier {
     variantId: item.product.variantForLabel(item.variant)?.id,
   );
 
+  void setBuyerCheckoutOwner(String? owner) {
+    final repository = _repository;
+    if (repository is LiveOrderRepository) repository.setCheckoutOwner(owner);
+  }
+
+  Future<bool> hasPendingCheckout() async {
+    final repository = _repository;
+    return repository is LiveOrderRepository &&
+        await repository.hasPendingCheckout();
+  }
+
+  Future<({String status, String? identity})> reconcileCheckout() async {
+    final repository = _repository;
+    if (repository is! LiveOrderRepository) {
+      return (status: 'unknown', identity: null);
+    }
+    return repository.reconcileCheckout();
+  }
+
+  String checkoutIdentity(List<CartItem> items) =>
+      LiveOrderRepository.checkoutIdentity(items.map(_lineFor).toList());
+
   Future<List<Order>> placeOrders(
     List<CartItem> items, {
     List<String> voucherCodes = const [],
     double? expectedTotal,
+    String? expectedAddressFingerprint,
   }) async {
     if (items.isEmpty) return const [];
 
-    final created = await _repository.place(
-      [for (final item in items) _lineFor(item)],
-      voucherCodes: voucherCodes,
-      expectedTotal: expectedTotal,
-    );
+    final repository = _repository;
+    final lines = items.map(_lineFor).toList();
+    final created = repository is LiveOrderRepository
+        ? await repository.place(
+            lines,
+            voucherCodes: voucherCodes,
+            expectedTotal: expectedTotal,
+            expectedAddressFingerprint: expectedAddressFingerprint,
+          )
+        : await repository.place(
+            lines,
+            voucherCodes: voucherCodes,
+            expectedTotal: expectedTotal,
+          );
 
     // Re-read rather than merging `created` by hand: in live mode the server's
     // list is authoritative (it may include orders placed on another device),
     // and in mock mode this is the same list plus the new ones. One code path,
     // so the two modes cannot disagree about ordering.
-    _orders = await _repository.orders();
+    try {
+      await _readFirstOrders();
+    } on ApiException {
+      // The write already succeeded. A failed history refresh must never
+      // send the buyer back through checkout for the same order.
+      final createdIds = created.map((order) => order.id).toSet();
+      _orders = [
+        ...created,
+        ..._orders.where((order) => !createdIds.contains(order.id)),
+      ];
+    }
+    _loadFailure = null;
     notifyListeners();
     return created;
   }

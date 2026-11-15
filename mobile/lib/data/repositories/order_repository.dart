@@ -36,6 +36,11 @@ import '../dto/remote_orders.dart';
 import '../mock_data.dart';
 import 'live_stub.dart';
 
+/// The final submission may have reached the server without a usable reply.
+class CheckoutOutcomeUnknown implements Exception {
+  const CheckoutOutcomeUnknown();
+}
+
 /// One line of an order being placed.
 ///
 /// A DTO, not a `CartItem`: the data layer must not depend on `state/`, and
@@ -303,9 +308,130 @@ abstract class QuotesCheckout {
   });
 }
 
+typedef CheckoutReview = ({
+  double total,
+  String address,
+  String addressFingerprint,
+});
+
 class LiveOrderRepository extends LiveRepository
     implements OrderRepository, QuotesCheckout {
-  LiveOrderRepository(super.client);
+  LiveOrderRepository(
+    super.client, {
+    this.quotePath = '/v1/buyer/checkout/quote',
+    this.deliveryDisputesSupported = true,
+    this.previewThroughCart = false,
+  });
+
+  /// True for WebZefanya, which has no raw-lines preview: its quote needs the
+  /// buyer's server cart ids. The preview then syncs the cart, applies vouchers
+  /// and requests the real quote (which issues a checkout token), exactly as
+  /// placing an order does. That is a **write** workflow, so a build with
+  /// writes disabled refuses it locally and sends no quote or cart request.
+  final bool previewThroughCart;
+
+  /// False when the backend has no delivery-dispute routes (WebZefanya).
+  final bool deliveryDisputesSupported;
+
+  /// Where the checkout quote is read. The demo fork serves it under `/v1`;
+  /// WebZefanya serves the same preview at `/buyer/checkout/quote`.
+  final String quotePath;
+
+  Future<Map<String, Object?>> deliveryDispute(
+    String shipmentId, {
+    String? explanation,
+    ({List<int> bytes, String filename})? evidence,
+  }) async {
+    final path = '/buyer/shipments/$shipmentId/delivery-dispute';
+    if (explanation == null) return unwrapMap(await client.getJson(path));
+    if (evidence == null) {
+      return unwrapMap(
+        await client.postJson(path, body: {'explanation': explanation}),
+      );
+    }
+    return unwrapMap(
+      await client.postMultipart(
+        path,
+        fields: {'explanation': explanation},
+        byteFiles: {'evidence': evidence},
+      ),
+    );
+  }
+
+  String? _checkoutOwner;
+  int _checkoutGeneration = 0;
+  final Set<String> _activeCheckouts = {};
+
+  void setCheckoutOwner(String? owner) {
+    if (_checkoutOwner == owner) return;
+    _checkoutOwner = owner;
+    _checkoutGeneration++;
+  }
+
+  String? get _pendingKey => _checkoutOwner == null
+      ? null
+      : 'live_checkout:${client.baseUrl}:$_checkoutOwner';
+
+  static String checkoutIdentity(List<OrderLineRequest> lines) {
+    final entries = [
+      for (final line in lines)
+        jsonEncode([line.productId, line.variantId, line.quantity]),
+    ]..sort();
+    return jsonEncode(entries);
+  }
+
+  Future<bool> hasPendingCheckout() async {
+    final key = _pendingKey;
+    return key != null &&
+        (await SharedPreferences.getInstance()).containsKey(key);
+  }
+
+  Future<({String status, String? identity})> reconcileCheckout() async {
+    final key = _pendingKey;
+    if (key == null || !_activeCheckouts.add(key)) {
+      return (status: 'unknown', identity: null);
+    }
+    final generation = _checkoutGeneration;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(key);
+      if (raw == null) return (status: 'rejected', identity: null);
+      final pending = jsonDecode(raw) as Map;
+      if (generation != _checkoutGeneration) {
+        return (status: 'unknown', identity: null);
+      }
+      final result = unwrapMap(
+        await client.postJson(
+          '/buyer/checkout/reconcile',
+          body: {'checkout_token': pending['token']},
+        ),
+      );
+      if (generation != _checkoutGeneration) {
+        return (status: 'unknown', identity: null);
+      }
+      final status = result['status'];
+      if (status != 'placed' && status != 'rejected') {
+        return (status: 'unknown', identity: null);
+      }
+      if (status == 'placed' &&
+          (result['order'] is! Map || (result['order'] as Map)['id'] == null)) {
+        return (status: 'unknown', identity: null);
+      }
+      await prefs.remove(key);
+      return (
+        status: status as String,
+        identity: pending['identity'] as String?,
+      );
+    } on ApiException {
+      return (status: 'unknown', identity: null);
+    } on FormatException {
+      return (status: 'unknown', identity: null);
+    } on TypeError {
+      return (status: 'unknown', identity: null);
+    } finally {
+      _activeCheckouts.remove(key);
+    }
+  }
 
   @override
   Future<void> load() async {
@@ -314,15 +440,29 @@ class LiveOrderRepository extends LiveRepository
 
   /// The buyer's per-seller shipments (WebZefanya `GET /api/buyer/shipments`).
   @override
-  Future<List<Order>> orders() async {
+  Future<List<Order>> orders() async => (await shipmentPage(1)).items;
+
+  Future<({List<Order> items, bool hasMore})> shipmentPage(int page) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
 
-    final data = unwrapMap(await client.getJson('/buyer/shipments'));
+    final data = unwrapMap(
+      await client.getJson(
+        '/buyer/shipments',
+        query: page == 1 ? null : {'page': '$page'},
+      ),
+    );
     final rows = data['data'];
-    return [
-      for (final row in rows is List ? rows : const [])
-        if (row is Map) orderFromShipmentJson(row.cast<String, Object?>()),
-    ];
+    final meta = data['meta'];
+    return (
+      hasMore:
+          meta is Map &&
+          meta['last_page'] is int &&
+          (meta['last_page'] as int) > page,
+      items: [
+        for (final row in rows is List ? rows : const [])
+          if (row is Map) orderFromShipmentJson(row.cast<String, Object?>()),
+      ],
+    );
   }
 
   /// Receipt confirmation and cancellation go to WebZefanya's own routes,
@@ -352,11 +492,107 @@ class LiveOrderRepository extends LiveRepository
   Future<double> quoteTotal(
     List<OrderLineRequest> lines, {
     List<String> voucherCodes = const [],
-  }) async {
+  }) async => _payable(await _preview(lines, voucherCodes)) / 100;
+
+  Future<CheckoutReview> reviewCheckout(
+    List<OrderLineRequest> lines,
+    List<String> voucherCodes,
+  ) async {
+    final quote = await _preview(lines, voucherCodes);
+    _checkVoucherReview(quote, voucherCodes);
+    final deliverTo = quote['deliver_to'];
+    final address = deliverTo is Map ? deliverTo['full'] : null;
+    // The demo preview returns the reviewed fingerprint at the top level and
+    // keeps preferring it; WebZefanya's quote has no such key and nests the
+    // fingerprint under `fingerprints.address`.
+    final nested = quote['fingerprints'];
+    final fingerprint =
+        quote['address_fingerprint'] ??
+        (nested is Map ? nested['address'] : null);
+    if (address is! String ||
+        address.trim().isEmpty ||
+        fingerprint is! String ||
+        fingerprint.isEmpty) {
+      throw const MalformedResponseException(
+        message:
+            'Could not verify your delivery address. Refresh and try again.',
+      );
+    }
+    return (
+      total: _payable(quote) / 100,
+      address: address,
+      addressFingerprint: fingerprint,
+    );
+  }
+
+  Future<int> reviewVouchers(
+    List<OrderLineRequest> lines,
+    List<String> voucherCodes,
+  ) async {
+    final quote = await _preview(lines, voucherCodes);
+    _checkVoucherReview(quote, voucherCodes);
+    return _payable(quote);
+  }
+
+  Future<List<({String code, String summary})>> voucherOffers(
+    Set<int> sellerIds,
+  ) async {
+    if (sellerIds.isEmpty) return const [];
+    final body = await client.getJson(
+      '/buyer/vouchers',
+      query: {
+        for (final (index, sellerId) in sellerIds.take(50).indexed)
+          'seller_ids[$index]': '$sellerId',
+      },
+    );
+    return [
+      for (final offer in unwrapList(body))
+        if (offer['code'] case final String code)
+          (code: code, summary: offer['summary']?.toString() ?? ''),
+    ];
+  }
+
+  void _checkVoucherReview(Map<String, Object?> quote, List<String> codes) {
+    if (codes.isEmpty) return;
+    final notice = quote['voucher_notice'];
+    if (notice is String && notice.trim().isNotEmpty) {
+      throw RequestRejectedException(statusCode: 422, message: notice);
+    }
+    final state = quote['vouchers_state'];
+    if (state is! Map || !codes.every(state.values.contains)) {
+      throw const RequestRejectedException(
+        statusCode: 422,
+        message:
+            'The store could not apply every voucher. Check the codes and try again.',
+      );
+    }
+  }
+
+  Future<Map<String, Object?>> _preview(
+    List<OrderLineRequest> lines,
+    List<String> voucherCodes,
+  ) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    final quote = unwrapMap(
+    if (previewThroughCart) {
+      // The same generation guard placement uses: capture the checkout owner
+      // before any await, and refuse to continue (or hand back a quote) once it
+      // has changed, so a preview begun for one account can never issue cart or
+      // quote writes under the next account's session.
+      final generation = _checkoutGeneration;
+      void ensureOwner() {
+        if (generation != _checkoutGeneration) {
+          throw const UnauthorizedException();
+        }
+      }
+
+      ensureOwner();
+      final quote = await _quote(lines, voucherCodes, ensureOwner);
+      ensureOwner();
+      return quote;
+    }
+    return unwrapMap(
       await client.postJson(
-        '/v1/buyer/checkout/quote',
+        quotePath,
         body: {
           'lines': [
             for (final line in lines)
@@ -370,7 +606,6 @@ class LiveOrderRepository extends LiveRepository
         },
       ),
     );
-    return _payable(quote) / 100;
   }
 
   /// Places a Cash-on-Delivery order through WebZefanya's checkout:
@@ -384,11 +619,50 @@ class LiveOrderRepository extends LiveRepository
     List<OrderLineRequest> lines, {
     List<String> voucherCodes = const [],
     double? expectedTotal,
+    String? expectedAddressFingerprint,
   }) async {
     if (lines.isEmpty) return const [];
     if (!client.isConfigured) throw const ApiNotConfiguredException();
+    final key = _pendingKey;
+    final generation = _checkoutGeneration;
+    final lock = key ?? '';
+    if (!_activeCheckouts.add(lock)) throw const CheckoutOutcomeUnknown();
+    try {
+      final prefs = key == null ? null : await SharedPreferences.getInstance();
+      if (key != null && prefs!.containsKey(key)) {
+        throw const CheckoutOutcomeUnknown();
+      }
+      return await _placeOnce(
+        lines,
+        voucherCodes,
+        expectedTotal,
+        expectedAddressFingerprint,
+        key,
+        prefs,
+        generation,
+      );
+    } finally {
+      _activeCheckouts.remove(lock);
+    }
+  }
 
-    final quote = await _quote(lines, voucherCodes);
+  Future<List<Order>> _placeOnce(
+    List<OrderLineRequest> lines,
+    List<String> voucherCodes,
+    double? expectedTotal,
+    String? expectedAddressFingerprint,
+    String? key,
+    SharedPreferences? prefs,
+    int generation,
+  ) async {
+    void ensureOwner() {
+      if (generation != _checkoutGeneration) {
+        throw const UnauthorizedException();
+      }
+    }
+
+    ensureOwner();
+    final quote = await _quote(lines, voucherCodes, ensureOwner);
     final payable = _payable(quote);
     if (expectedTotal != null && (expectedTotal * 100).round() != payable) {
       throw RequestRejectedException(
@@ -400,34 +674,82 @@ class LiveOrderRepository extends LiveRepository
     }
 
     final fingerprints = (quote['fingerprints'] as Map?) ?? const {};
-    final body = unwrapMap(
-      await client.postJson(
-        '/buyer/checkout',
-        body: {
-          'item_ids': quote['item_ids'],
-          'checkout_token': quote['checkout_token'],
-          'carriers': quote['carriers'],
-          'vouchers': quote['vouchers_state'],
-          if (expectedTotal != null)
-            'expected_total': expectedTotal.toStringAsFixed(2),
-          'price_fingerprint': fingerprints['price'],
-          'address_fingerprint': fingerprints['address'],
-          'shipping_fingerprint': fingerprints['shipping'],
-          'voucher_fingerprint': fingerprints['voucher'],
-        },
-      ),
-    );
+    if (expectedAddressFingerprint != null &&
+        fingerprints['address'] != expectedAddressFingerprint) {
+      throw const RequestRejectedException(
+        statusCode: 409,
+        message:
+            'Your delivery address changed. Review the updated order before placing it.',
+      );
+    }
+    ensureOwner();
+    if (key != null) {
+      final token = quote['checkout_token'];
+      if (token is! String || token.isEmpty) {
+        throw const MalformedResponseException();
+      }
+      final saved = await prefs!.setString(
+        key,
+        jsonEncode({'token': token, 'identity': checkoutIdentity(lines)}),
+      );
+      if (!saved) {
+        throw const RequestRejectedException(
+          statusCode: 422,
+          message: 'Could not save checkout safely. Try again.',
+        );
+      }
+    }
+    if (generation != _checkoutGeneration) throw const CheckoutOutcomeUnknown();
+    try {
+      final body = unwrapMap(
+        await client.postJson(
+          '/buyer/checkout',
+          body: {
+            'item_ids': quote['item_ids'],
+            'checkout_token': quote['checkout_token'],
+            'carriers': quote['carriers'],
+            'vouchers': quote['vouchers_state'],
+            if (expectedTotal != null)
+              'expected_total': expectedTotal.toStringAsFixed(2),
+            'price_fingerprint': fingerprints['price'],
+            'address_fingerprint': fingerprints['address'],
+            'shipping_fingerprint': fingerprints['shipping'],
+            'voucher_fingerprint': fingerprints['voucher'],
+          },
+        ),
+      );
 
-    final orderId = body['id']?.toString();
-    final shipments = body['shipments'];
-    return [
-      for (final row in shipments is List ? shipments : const [])
-        if (row is Map)
+      final orderId = body['id']?.toString();
+      final shipments = body['shipments'];
+      if (orderId == null ||
+          shipments is! List ||
+          shipments.isEmpty ||
+          shipments.any((row) => row is! Map<String, Object?>)) {
+        throw const CheckoutOutcomeUnknown();
+      }
+      final orders = [
+        for (final row in shipments)
           orderFromShipmentJson({
-            ...row.cast<String, Object?>(),
-            if (orderId != null) 'order_id': orderId,
+            ...row as Map<String, Object?>,
+            'order_id': orderId,
           }),
-    ];
+      ];
+      if (generation != _checkoutGeneration) {
+        throw const CheckoutOutcomeUnknown();
+      }
+      if (key != null) await prefs!.remove(key);
+      return orders;
+    } on ApiException catch (error) {
+      if (error.isRetryable || error is MalformedResponseException) {
+        throw const CheckoutOutcomeUnknown();
+      }
+      if (key != null) await prefs!.remove(key);
+      rethrow;
+    } on FormatException {
+      throw const CheckoutOutcomeUnknown();
+    } on TypeError {
+      throw const CheckoutOutcomeUnknown();
+    }
   }
 
   /// Syncs [lines] into the server cart, applies [voucherCodes] and returns
@@ -436,13 +758,15 @@ class LiveOrderRepository extends LiveRepository
   Future<Map<String, Object?>> _quote(
     List<OrderLineRequest> lines,
     List<String> voucherCodes,
+    void Function() ensureOwner,
   ) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
 
-    final itemIds = await _syncCart(lines);
+    final itemIds = await _syncCart(lines, ensureOwner);
 
     Map<String, Object?> vouchers = const {};
     for (final code in voucherCodes) {
+      ensureOwner();
       final applied = unwrapMap(
         await client.postJson(
           '/buyer/cart/vouchers',
@@ -453,6 +777,7 @@ class LiveOrderRepository extends LiveRepository
           .cast<String, Object?>();
     }
 
+    ensureOwner();
     var quote = unwrapMap(
       await client.postJson(
         '/buyer/checkout/quote',
@@ -481,22 +806,28 @@ class LiveOrderRepository extends LiveRepository
 
     // Re-quote with the explicit carrier choice so the token, fees and
     // fingerprints all describe exactly what will be submitted.
+    ensureOwner();
     quote = unwrapMap(
       await client.postJson(
         '/buyer/checkout/quote',
         body: {'item_ids': itemIds, 'vouchers': vouchers, 'carriers': carriers},
       ),
     );
+    ensureOwner();
     return {...quote, 'carriers': carriers};
   }
 
   /// Makes the server cart hold exactly these quantities for these lines and
   /// returns their server ids. Other lines in the server cart are left alone.
-  Future<List<int>> _syncCart(List<OrderLineRequest> lines) async {
+  Future<List<int>> _syncCart(
+    List<OrderLineRequest> lines,
+    void Function() ensureOwner,
+  ) async {
     var cart = unwrapMap(await client.getJson('/buyer/cart'));
     final ids = <int>[];
 
     for (final line in lines) {
+      ensureOwner();
       final productId = int.tryParse(line.productId);
       if (productId == null) {
         throw ValidationException(

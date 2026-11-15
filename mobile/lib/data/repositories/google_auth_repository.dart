@@ -161,6 +161,7 @@ class LiveGoogleAuthRepository extends LiveRepository
   @override
   Future<GoogleAuthOutcome> signIn(GoogleIdentity identity) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
+    final epoch = client.beginSession();
 
     final body = await client.postJson(
       '/auth/google',
@@ -168,6 +169,7 @@ class LiveGoogleAuthRepository extends LiveRepository
       body: {'id_token': identity.idToken},
     );
     final payload = unwrapMap(body);
+    if (epoch != client.sessionEpoch) throw const SessionSupersededException();
 
     // The identity is valid but has no account. This is the branch that opens
     // the role chooser; it deliberately does not mint a token, because there
@@ -176,7 +178,7 @@ class LiveGoogleAuthRepository extends LiveRepository
       return GoogleAuthOutcome(identity: identity);
     }
 
-    await _adoptToken(payload);
+    await _adoptToken(payload, epoch);
     return GoogleAuthOutcome(
       identity: identity,
       result: authResultFrom(payload, role: _roleFrom(payload['role'])),
@@ -189,6 +191,7 @@ class LiveGoogleAuthRepository extends LiveRepository
     required UserRole role,
     required RegistrationProfile profile,
   }) async {
+    final epoch = client.beginSession();
     if (role == UserRole.courier) {
       if (!client.isConfigured) throw const ApiNotConfiguredException();
 
@@ -200,10 +203,12 @@ class LiveGoogleAuthRepository extends LiveRepository
       }
 
       final files = <String, String>{'upload_id': idPath};
-      if (profile.riderLicensePath != null && profile.riderLicensePath!.trim().isNotEmpty) {
+      if (profile.riderLicensePath != null &&
+          profile.riderLicensePath!.trim().isNotEmpty) {
         files['license_doc'] = profile.riderLicensePath!.trim();
       }
-      if (profile.riderOrCrPath != null && profile.riderOrCrPath!.trim().isNotEmpty) {
+      if (profile.riderOrCrPath != null &&
+          profile.riderOrCrPath!.trim().isNotEmpty) {
         files['or_cr_doc'] = profile.riderOrCrPath!.trim();
       }
 
@@ -220,7 +225,7 @@ class LiveGoogleAuthRepository extends LiveRepository
         files: files,
       );
       final payload = unwrapMap(body);
-      await _adoptToken(payload);
+      await _adoptToken(payload, epoch);
       return authResultFrom(payload, role: role);
     }
 
@@ -249,18 +254,20 @@ class LiveGoogleAuthRepository extends LiveRepository
       files: {'upload_id': idPath},
     );
     final payload = unwrapMap(body);
-    await _adoptToken(payload);
+    await _adoptToken(payload, epoch);
     return authResultFrom(payload, role: role);
   }
 
-  Future<void> _adoptToken(Map<String, Object?> payload) async {
+  Future<void> _adoptToken(Map<String, Object?> payload, int epoch) async {
     final token = payload['token'];
     if (token is! String || token.isEmpty) {
       throw const MalformedResponseException(
         message: 'The server accepted the Google sign-in but sent no token.',
       );
     }
-    await client.adoptToken(token);
+    if (!await client.adoptToken(token, epoch: epoch)) {
+      throw const SessionSupersededException();
+    }
   }
 
   /// Reads the role the server detected.

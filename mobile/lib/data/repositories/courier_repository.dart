@@ -14,7 +14,7 @@
 //     which returns a short-lived token per allowed action, then performs that
 //     action (pickup confirm, start delivery, proof of delivery, failed
 //     delivery). Row locks, status transitions, the COD amount check, the
-//     delivery OTP, earnings and the attempt limit all live on the server.
+//     delivery evidence, earnings and the attempt limit all live on the server.
 //   * The app's own milestone machine and payout ledger remain the mock-mode
 //     simulation; in live mode they are display state that a refresh replaces.
 
@@ -50,21 +50,15 @@ abstract class CourierRepository {
     String milestoneValue, {
     String? trackingNumber,
     String? failureReason,
-    String? deliveryOtp,
     double? codAmount,
   });
 
-  /// Asks the server to send a fresh delivery code to the buyer. The code is
-  /// never returned to the rider.
-  Future<void> requestDeliveryCode(String jobId);
-
-  /// Submits proof of delivery: the live photo, the code the buyer read out,
-  /// and — for COD — the cash collected. The server checks all three and
-  /// records the delivery once; a repeat after a lost response is a no-op.
   Future<void> completeDelivery(
     String jobId, {
     required String proofPhotoPath,
-    required String deliveryOtp,
+    required String recipientCategory,
+    String? receivedBy,
+    String? recipientRelationship,
     double? codAmount,
   });
 }
@@ -93,7 +87,9 @@ abstract class RiderServerData {
   /// `GET /api/rider/providers`: companies a new rider may apply to. With
   /// [barangayCode], only those whose validated coverage serves that barangay
   /// (the server's own coverage rule).
-  Future<List<RiderProviderOption>> registrationProviders({String? barangayCode});
+  Future<List<RiderProviderOption>> registrationProviders({
+    String? barangayCode,
+  });
 
   /// What the last [CourierRepository.assignedJobs] read said beside the job
   /// lists: the rider's server-side availability, the seller stops, and the
@@ -167,20 +163,18 @@ class MockCourierRepository implements CourierRepository {
     String milestoneValue, {
     String? trackingNumber,
     String? failureReason,
-    String? deliveryOtp,
     double? codAmount,
   }) async {
     // Mock: no-op — the local state machine is the source of truth in mock mode.
   }
 
   @override
-  Future<void> requestDeliveryCode(String jobId) async {}
-
-  @override
   Future<void> completeDelivery(
     String jobId, {
     required String proofPhotoPath,
-    required String deliveryOtp,
+    required String recipientCategory,
+    String? receivedBy,
+    String? recipientRelationship,
     double? codAmount,
   }) async {}
 }
@@ -214,21 +208,29 @@ class LiveCourierRepository extends LiveRepository
     final photo = photoPath?.trim() ?? '';
     await client.postMultipart(
       '/rider/jobs/$jobId/incidents',
-      fields: {'type': type, 'reason': reason.trim(), 'description': description.trim()},
+      fields: {
+        'type': type,
+        'reason': reason.trim(),
+        'description': description.trim(),
+      },
       files: {if (photo.isNotEmpty) 'photo': photo},
     );
   }
 
   @override
-  Future<List<RiderProviderOption>> registrationProviders({String? barangayCode}) async {
+  Future<List<RiderProviderOption>> registrationProviders({
+    String? barangayCode,
+  }) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
     final code = barangayCode?.trim() ?? '';
     return riderProvidersFromJson(
-      unwrapMap(await client.getJson(
-        '/rider/providers',
-        query: code.isEmpty ? null : {'barangay': code},
-        authenticated: false,
-      )),
+      unwrapMap(
+        await client.getJson(
+          '/rider/providers',
+          query: code.isEmpty ? null : {'barangay': code},
+          authenticated: false,
+        ),
+      ),
     );
   }
 
@@ -239,6 +241,15 @@ class LiveCourierRepository extends LiveRepository
 
   @override
   RiderJobsMeta? get lastJobsMeta => _lastJobsMeta;
+
+  List<Map<String, Object?>> _lastReturnPickupRows = const [];
+
+  /// The `return_pickups` rows of the last `GET /rider/jobs` answer.
+  ///
+  /// WebZefanya lists return pickups inside the jobs response; the demo fork
+  /// does not send the key, so this is empty there.
+  List<Map<String, Object?>> get lastReturnPickupRows =>
+      List.unmodifiable(_lastReturnPickupRows);
 
   @override
   Future<bool> setAvailability({required bool online}) async {
@@ -275,9 +286,14 @@ class LiveCourierRepository extends LiveRepository
   @override
   Future<RiderCashSnapshot> cash({int limit = 20}) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return riderCashFromJson(
-      unwrapMap(await client.getJson('/rider/cod', query: {'limit': '$limit'})),
+    final data = unwrapMap(
+      await client.getJson('/rider/cod', query: {'limit': '$limit'}),
     );
+    final summary = data['summary'];
+    if (summary is! Map || summary['holding_minor'] is! int) {
+      throw const MalformedResponseException();
+    }
+    return riderCashFromJson(data);
   }
 
   @override
@@ -289,7 +305,10 @@ class LiveCourierRepository extends LiveRepository
   }
 
   @override
-  Future<void> collectReturn(String returnId, {required String trackingNumber}) async {
+  Future<void> collectReturn(
+    String returnId, {
+    required String trackingNumber,
+  }) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
     await client.postJson(
       '/rider/return-pickups/$returnId/collect',
@@ -300,21 +319,27 @@ class LiveCourierRepository extends LiveRepository
   @override
   Future<List<RiderHistoryEntry>> history() async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return riderHistoryFromJson(unwrapMap(await client.getJson('/rider/history')));
+    return riderHistoryFromJson(
+      unwrapMap(await client.getJson('/rider/history')),
+    );
   }
 
   @override
   Future<RiderPayoutsSnapshot> payouts({int limit = 20}) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
     return riderPayoutsFromJson(
-      unwrapMap(await client.getJson('/rider/payouts', query: {'limit': '$limit'})),
+      unwrapMap(
+        await client.getJson('/rider/payouts', query: {'limit': '$limit'}),
+      ),
     );
   }
 
   @override
   Future<RiderWaybill> waybill(String jobId) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return riderWaybillFromJson(unwrapMap(await client.getJson('/rider/waybills/$jobId')));
+    return riderWaybillFromJson(
+      unwrapMap(await client.getJson('/rider/waybills/$jobId')),
+    );
   }
 
   @override
@@ -326,7 +351,9 @@ class LiveCourierRepository extends LiveRepository
   @override
   Future<RiderCoverage> coverage() async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    return riderCoverageFromJson(unwrapMap(await client.getJson('/rider/profile')));
+    return riderCoverageFromJson(
+      unwrapMap(await client.getJson('/rider/profile')),
+    );
   }
 
   @override
@@ -336,15 +363,27 @@ class LiveCourierRepository extends LiveRepository
       await client.postJson('/rider/pickups/stops/$stopId/finish'),
     );
     final stop = data['stop'];
-    return stop is Map ? pickupStopFromJson(stop.cast<String, Object?>()) : null;
+    return stop is Map
+        ? pickupStopFromJson(stop.cast<String, Object?>())
+        : null;
   }
 
   @override
   bool get isServerAuthoritative => true;
 
+  int _riderGeneration = 0;
+
+  void resetRiderSession() {
+    _riderGeneration++;
+    _tracking.clear();
+    _lastJobsMeta = null;
+    _lastReturnPickupRows = const [];
+  }
+
   @override
   Future<List<DeliveryJob>> assignedJobs() async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
+    final generation = _riderGeneration;
     final data = unwrapMap(await client.getJson('/rider/jobs'));
     final jobs = <DeliveryJob>[
       for (final key in const ['pickups', 'deliveries'])
@@ -353,7 +392,12 @@ class LiveCourierRepository extends LiveRepository
             ?deliveryJobFromRiderParcel(row.cast<String, Object?>()),
     ];
 
+    if (generation != _riderGeneration) return const [];
     _lastJobsMeta = riderJobsMetaFromJson(data);
+    _lastReturnPickupRows = [
+      for (final row in (data['return_pickups'] as List?) ?? const [])
+        if (row is Map) row.cast<String, Object?>(),
+    ];
     _tracking
       ..clear()
       ..addEntries(
@@ -370,17 +414,16 @@ class LiveCourierRepository extends LiveRepository
     String milestoneValue, {
     String? trackingNumber,
     String? failureReason,
-    String? deliveryOtp,
     double? codAmount,
   }) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
 
     switch (milestoneValue) {
       case 'PICKED_UP':
-        final token = await _verify(jobId, 'confirm_pickup', trackingNumber);
-        await client.postJson(
-          '/rider/pickups/$jobId/confirm',
-          body: {'verification_token': token},
+        await _postParcelAction(
+          jobId,
+          pickup: true,
+          trackingNumber: trackingNumber,
         );
       case 'OUT_FOR_DELIVERY':
         final token = await _verify(jobId, 'start_delivery', trackingNumber);
@@ -389,17 +432,11 @@ class LiveCourierRepository extends LiveRepository
           body: {'verification_token': token},
         );
       case 'DELIVERY_FAILED' || 'RETURNED':
-        // The server records the failed attempt; whether the parcel goes back
-        // to the seller is Logistics' decision, not the app's.
-        final token = await _verify(jobId, 'mark_failed', trackingNumber);
-        final reason = failureReasonWire(failureReason);
-        await client.postJson(
-          '/rider/deliveries/$jobId/failed',
-          body: {
-            'verification_token': token,
-            'failure_reason': reason,
-            if (reason == 'other') 'failure_notes': failureReason ?? 'Other',
-          },
+        await _postParcelAction(
+          jobId,
+          pickup: false,
+          trackingNumber: trackingNumber,
+          failureReason: failureReason,
         );
       default:
         // Station/Logistics-owned steps, and DELIVERED (see completeDelivery).
@@ -407,13 +444,73 @@ class LiveCourierRepository extends LiveRepository
     }
   }
 
-  @override
-  Future<void> requestDeliveryCode(String jobId) async {
+  Future<bool?> deliveryCompletionStatus(String jobId) async {
+    final data = unwrapMap(
+      await client.getJson('/rider/deliveries/$jobId/completion-status'),
+    );
+    return switch (data['state']) {
+      'completed' => true,
+      'open' => false,
+      'unconfirmed' => null,
+      _ => throw const MalformedResponseException(),
+    };
+  }
+
+  Future<DeliveryJob> confirmParcelAction(
+    String jobId, {
+    required bool pickup,
+    String? trackingNumber,
+    String? failureReason,
+    String? failureNotes,
+  }) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
-    final token = await _verify(jobId, 'proof_of_delivery', null);
-    await client.postJson(
-      '/rider/deliveries/$jobId/otp',
-      body: {'verification_token': token},
+    final job = deliveryJobFromRiderParcel(
+      unwrapMap(
+        await _postParcelAction(
+          jobId,
+          pickup: pickup,
+          trackingNumber: trackingNumber,
+          failureReason: failureReason,
+          failureNotes: failureNotes,
+        ),
+      ),
+    );
+    if (job == null ||
+        job.id != jobId ||
+        job.serverStatus != (pickup ? 'PICKED_UP' : 'DELIVERY_FAILED')) {
+      throw const MalformedResponseException();
+    }
+    return job;
+  }
+
+  Future<Map<String, Object?>> _postParcelAction(
+    String jobId, {
+    required bool pickup,
+    String? trackingNumber,
+    String? failureReason,
+    String? failureNotes,
+  }) async {
+    final generation = _riderGeneration;
+    final token = await _verify(
+      jobId,
+      pickup ? 'confirm_pickup' : 'mark_failed',
+      trackingNumber,
+    );
+    if (generation != _riderGeneration) throw const UnauthorizedException();
+    final reason = failureReasonWire(failureReason);
+    final notes = failureNotes?.trim();
+    return client.postJson(
+      pickup
+          ? '/rider/pickups/$jobId/confirm'
+          : '/rider/deliveries/$jobId/failed',
+      body: {
+        'verification_token': token,
+        if (!pickup) 'failure_reason': reason,
+        if (!pickup && (reason == 'other' || (notes?.isNotEmpty ?? false)))
+          'failure_notes': notes?.isNotEmpty == true
+              ? notes
+              : failureReason ?? 'Other',
+      },
     );
   }
 
@@ -421,16 +518,25 @@ class LiveCourierRepository extends LiveRepository
   Future<void> completeDelivery(
     String jobId, {
     required String proofPhotoPath,
-    required String deliveryOtp,
+    required String recipientCategory,
+    String? receivedBy,
+    String? recipientRelationship,
     double? codAmount,
   }) async {
     if (!client.isConfigured) throw const ApiNotConfiguredException();
+    final generation = _riderGeneration;
     final token = await _verify(jobId, 'proof_of_delivery', null);
+    if (generation != _riderGeneration) throw const UnauthorizedException();
     await client.postMultipart(
       '/rider/deliveries/$jobId/deliver',
       fields: {
         'verification_token': token,
-        'delivery_otp': deliveryOtp.trim(),
+        'physical_handover': '1',
+        'recipient_accepted': '1',
+        'recipient_category': recipientCategory,
+        if (receivedBy != null) 'received_by': receivedBy,
+        if (recipientRelationship != null)
+          'recipient_relationship': recipientRelationship,
         if (codAmount != null) 'cod_amount': codAmount.toStringAsFixed(2),
       },
       files: {'proof_photo': proofPhotoPath},
@@ -463,7 +569,8 @@ class LiveCourierRepository extends LiveRepository
     if (parcelId != null && parcelId != jobId) {
       throw const ValidationException(
         fieldErrors: {
-          'tracking_number': 'That tracking number belongs to a different parcel.',
+          'tracking_number':
+              'That tracking number belongs to a different parcel.',
         },
       );
     }
@@ -475,15 +582,184 @@ class LiveCourierRepository extends LiveRepository
     }
     throw const RequestRejectedException(
       statusCode: 409,
-      message: 'This parcel changed on the server. Your jobs have been refreshed.',
+      message:
+          'This parcel changed on the server. Your jobs have been refreshed.',
     );
   }
 }
 
 /// The app's failure reasons in WebZefanya's `DeliveryFailureReason` values.
 String failureReasonWire(String? label) => switch (label?.trim()) {
-      'Buyer not available' => 'recipient_unavailable',
-      'Buyer refused' => 'refused_by_recipient',
-      'Wrong address' => 'wrong_address',
-      _ => 'other',
-    };
+  'Buyer not available' => 'recipient_unavailable',
+  'Buyer refused' => 'refused_by_recipient',
+  'Wrong address' => 'wrong_address',
+  _ => 'other',
+};
+
+// ---------------------------------------------------------------------------
+// WebZefanya profile
+// ---------------------------------------------------------------------------
+
+/// Delivery completion that carries the Buyer's delivery OTP.
+///
+/// A separate interface (like [RiderServerData]) so the mock repository and the
+/// test doubles of [CourierRepository] do not have to implement it. The
+/// WebZefanya server requires the OTP today; replacing it is the separately
+/// approved C-POD change, and nothing here removes or bypasses it.
+abstract class OtpDeliveryServer {
+  /// `POST /rider/deliveries/{id}/otp`: asks the server to send the Buyer a
+  /// code. The server never returns the code.
+  Future<void> sendDeliveryOtp(String jobId);
+
+  /// `POST /rider/deliveries/{id}/deliver` with `delivery_otp` and the proof
+  /// photo. Fields the WebZefanya request does not know are not sent.
+  Future<void> completeDeliveryWithOtp(
+    String jobId, {
+    required String proofPhotoPath,
+    required String deliveryOtp,
+    String? receivedBy,
+    String? notes,
+    double? codAmount,
+  });
+}
+
+/// The Rider data source for WebZefanya.
+///
+/// Reuses every existing live call (WebZefanya has them) and adapts the places
+/// the two backends differ:
+///
+///   * Return pickups come from `return_pickups` inside `GET /rider/jobs`, not
+///     from `/rider/return-pickups`, which WebZefanya does not have. The rows
+///     carry no id, so they are read-only: the tracking number identifies them
+///     and nothing can be collected from the app.
+///   * Delivery completion sends the Buyer's OTP ([OtpDeliveryServer]); the
+///     demo fork's recipient-acknowledgement fields are not sent.
+///   * Calls WebZefanya has no route for throw [ApiNotImplementedException]
+///     locally (also enforced by the client's endpoint guard).
+class WebZefanyaCourierRepository extends LiveCourierRepository
+    implements OtpDeliveryServer {
+  WebZefanyaCourierRepository(super.client);
+
+  @override
+  Future<List<RiderReturnPickup>> returnPickups() async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    return [
+      for (final row in lastReturnPickupRows)
+        if ('${row['tracking_number'] ?? ''}'.trim().isNotEmpty)
+          RiderReturnPickup(
+            id: '${row['tracking_number']}'.trim(),
+            trackingNumber: '${row['tracking_number']}'.trim(),
+            statusLabel: row['status_label']?.toString(),
+            readOnly: true,
+          ),
+    ];
+  }
+
+  @override
+  Future<void> collectReturn(
+    String returnId, {
+    required String trackingNumber,
+  }) async => throw const ApiNotImplementedException(
+    'POST /api/rider/return-pickups/{id}/collect',
+    contractSection: 'WebZefanya profile: not available',
+  );
+
+  @override
+  Future<RiderCashSnapshot> cash({int limit = 20}) async =>
+      throw const ApiNotImplementedException('GET /api/rider/cod');
+
+  @override
+  Future<RiderPayoutsSnapshot> payouts({int limit = 20}) async =>
+      throw const ApiNotImplementedException('GET /api/rider/payouts');
+
+  @override
+  Future<RiderWaybill> waybill(String jobId) async =>
+      throw const ApiNotImplementedException('GET /api/rider/waybills/{id}');
+
+  @override
+  Future<Uint8List> proofPhoto(String proofId) async =>
+      throw const ApiNotImplementedException('GET /api/rider/proofs/{id}');
+
+  @override
+  Future<PickupFailureResult> reportPickupFailure(
+    String jobId, {
+    required String reason,
+    required int expectedAttempt,
+    String? notes,
+  }) async => throw const ApiNotImplementedException(
+    'POST /api/rider/pickups/{id}/failed',
+  );
+
+  @override
+  Future<PickupStop?> finishPickupStop(String stopId) async =>
+      throw const ApiNotImplementedException(
+        'POST /api/rider/pickups/stops/{id}/finish',
+      );
+
+  @override
+  Future<bool?> deliveryCompletionStatus(String jobId) async =>
+      throw const ApiNotImplementedException(
+        'GET /api/rider/deliveries/{id}/completion-status',
+      );
+
+  /// The demo fork's OTP-free completion must never run against WebZefanya: it
+  /// would be refused (422) at best. Delivery goes through
+  /// [completeDeliveryWithOtp].
+  @override
+  Future<void> completeDelivery(
+    String jobId, {
+    required String proofPhotoPath,
+    required String recipientCategory,
+    String? receivedBy,
+    String? recipientRelationship,
+    double? codAmount,
+  }) async => throw const ApiNotImplementedException(
+    'POST /api/rider/deliveries/{id}/deliver (without the Buyer OTP)',
+    contractSection: 'WebZefanya profile: the Buyer OTP is required',
+  );
+
+  /// WebZefanya only sends the code after the Rider has scanned the parcel:
+  /// `sendOtp` asserts the `proof_of_delivery` (server: `complete_delivery`)
+  /// verification token without consuming it, so the same scan can still be
+  /// used to deliver. The token is bound to this Rider, parcel and action, and
+  /// lives ten minutes.
+  @override
+  Future<void> sendDeliveryOtp(String jobId) async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    final generation = _riderGeneration;
+    final token = await _verify(jobId, 'proof_of_delivery', null);
+    if (generation != _riderGeneration) throw const UnauthorizedException();
+    await client.postJson(
+      '/rider/deliveries/$jobId/otp',
+      body: {'verification_token': token},
+    );
+  }
+
+  @override
+  Future<void> completeDeliveryWithOtp(
+    String jobId, {
+    required String proofPhotoPath,
+    required String deliveryOtp,
+    String? receivedBy,
+    String? notes,
+    double? codAmount,
+  }) async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    final generation = _riderGeneration;
+    final token = await _verify(jobId, 'proof_of_delivery', null);
+    if (generation != _riderGeneration) throw const UnauthorizedException();
+    await client.postMultipart(
+      '/rider/deliveries/$jobId/deliver',
+      fields: {
+        'verification_token': token,
+        'delivery_otp': deliveryOtp.trim(),
+        if (receivedBy != null && receivedBy.trim().isNotEmpty)
+          'received_by': receivedBy.trim(),
+        if (notes != null && notes.trim().isNotEmpty)
+          'delivery_notes': notes.trim(),
+        if (codAmount != null) 'cod_amount': codAmount.toStringAsFixed(2),
+      },
+      files: {'proof_photo': proofPhotoPath},
+    );
+  }
+}

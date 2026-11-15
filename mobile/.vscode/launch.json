@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Zefanya (live zefanya.shop)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": ["--dart-define-from-file=env.webzefanya.production.json"]
+    },
+    {
+      "name": "Zefanya (mock data)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart"
+    }
+  ]
+}

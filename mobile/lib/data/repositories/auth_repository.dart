@@ -32,6 +32,7 @@
 import '../../config/dev_flags.dart';
 import '../../state/auth_state.dart';
 import '../api/api_client.dart';
+import '../api/webzefanya_contract.dart' show WebZefanyaContract;
 import '../api/api_exception.dart';
 import '../dto/registration_payload.dart';
 import '../dto/remote_status.dart';
@@ -203,7 +204,11 @@ class MockAuthRepository implements AuthRepository {
     final resolvedRole = lower.contains('courier') || lower.contains('rider')
         ? UserRole.courier
         : (lower.contains('buyer') ? UserRole.buyer : role);
-    return AuthResult(role: resolvedRole, status: AccountStatus.active, email: email);
+    return AuthResult(
+      role: resolvedRole,
+      status: AccountStatus.active,
+      email: email,
+    );
   }
 
   /// [password] is ignored here for the same reason the login one is: the mock
@@ -217,17 +222,16 @@ class MockAuthRepository implements AuthRepository {
     required String email,
     required String password,
     required RegistrationProfile profile,
-  }) async =>
-      AuthResult(
-        role: role,
-        status: AccountStatus.pendingApproval,
-        email: email,
-        // Mock registrations land on the *admin* gate, because there is no mail
-        // to send an OTP from. Claiming `pending_verification` would make the
-        // pending screen tell the person to check an inbox that will never
-        // receive anything.
-        registrationStatus: RemoteRegistrationStatus.pendingApproval,
-      );
+  }) async => AuthResult(
+    role: role,
+    status: AccountStatus.pendingApproval,
+    email: email,
+    // Mock registrations land on the *admin* gate, because there is no mail
+    // to send an OTP from. Claiming `pending_verification` would make the
+    // pending screen tell the person to check an inbox that will never
+    // receive anything.
+    registrationStatus: RemoteRegistrationStatus.pendingApproval,
+  );
 
   /// Accepts [kMockOtpCode] and rejects everything else the way the server does.
   ///
@@ -299,6 +303,9 @@ abstract class ResumesRiderRegistration {
   });
 }
 
+/// The `device_name` a Courier session is labelled with on the server.
+const String kCourierDeviceName = 'Zefanya Courier app';
+
 class LiveAuthRepository extends LiveRepository
     implements AuthRepository, ResumesRiderRegistration {
   LiveAuthRepository(super.client);
@@ -315,19 +322,74 @@ class LiveAuthRepository extends LiveRepository
     // /api/rider/login. Each mints a token with only that role's ability.
     final path = '${_prefix(role)}/login';
 
+    // A new session generation: any older sign-in, refresh or sign-out still
+    // in flight can no longer store, renew or erase credentials.
+    final epoch = client.beginSession();
+
+    // A WebZefanya Courier signs in with the login ID Logistics gave them,
+    // not an email (Transfer Couriers have no email on record).
+    final courier = _isWebZefanyaCourier(role);
     final Map<String, Object?> body;
     try {
       body = await client.postJson(
         path,
         authenticated: false,
-        body: {'email': email.trim(), 'password': password},
+        body: courier
+            ? {
+                'login_id': email.trim(),
+                'password': password,
+                'device_name': kCourierDeviceName,
+              }
+            : {'email': email.trim(), 'password': password},
       );
-    } on UnauthorizedException {
+    } on ApiException catch (error) {
+      // A delayed verification gate must not reopen another account's
+      // registration through the login screen's error-recovery callback.
+      if (epoch != client.sessionEpoch) {
+        throw const SessionSupersededException();
+      }
+      if (error is! UnauthorizedException) rethrow;
       // On the login route a 401 means wrong credentials (WebZefanya does not
       // say which field), not an expired session.
-      throw const UnauthorizedException(message: 'Incorrect email or password.');
+      throw const UnauthorizedException(
+        message: 'Incorrect email or password.',
+      );
     }
+    return _adoptSession(body, role, epoch);
+  }
 
+  /// First sign-in of a WebZefanya Courier: the login ID and one-time access
+  /// code Logistics handed over, plus the password the Courier chooses.
+  /// `POST /api/courier/activate` answers like a login.
+  Future<AuthResult> activateCourier({
+    required String loginId,
+    required String activationCode,
+    required String password,
+  }) async {
+    if (!client.isConfigured) throw const ApiNotConfiguredException();
+    final epoch = client.beginSession();
+    final body = await client.postJson(
+      '/courier/activate',
+      authenticated: false,
+      body: {
+        'login_id': loginId.trim(),
+        'activation_code': activationCode.trim(),
+        'password': password,
+        'password_confirmation': password,
+        'device_name': kCourierDeviceName,
+      },
+    );
+    return _adoptSession(body, UserRole.linehaul, epoch);
+  }
+
+  bool _isWebZefanyaCourier(UserRole role) =>
+      role == UserRole.linehaul && client.routePolicy is WebZefanyaContract;
+
+  Future<AuthResult> _adoptSession(
+    Map<String, Object?> body,
+    UserRole role,
+    int epoch,
+  ) async {
     // Kept before the result is read: every `200` from this route carries a
     // token, and a caller holding a result whose token was dropped is a session
     // that looks signed in and authenticates nothing.
@@ -342,14 +404,19 @@ class LiveAuthRepository extends LiveRepository
         message: 'The server accepted the sign-in but sent no token.',
       );
     }
-    await client.adoptToken(
+    final adopted = await client.adoptToken(
       token,
       // A token minted this instant: when the answer omits `expires_at`, the
       // server's default lifetime (`sanctum.expiration`, 60 minutes) applies.
-      expiresAt: DateTime.tryParse('${payload['expires_at']}')?.toLocal() ??
+      expiresAt:
+          DateTime.tryParse('${payload['expires_at']}')?.toLocal() ??
           DateTime.now().add(const Duration(minutes: 60)),
+      // Stored only if no newer sign-in or sign-out started meanwhile.
+      epoch: epoch,
     );
-    client.renewPath = _renewPath(role);
+    if (!adopted || !client.setRenewPath(_renewPathFor(role), epoch: epoch)) {
+      throw const SessionSupersededException();
+    }
 
     // A shut gate never reaches here: the server answers `403` with its own
     // `code` and `registration_status`, which `ApiClient` turns into
@@ -361,7 +428,11 @@ class LiveAuthRepository extends LiveRepository
     //
     // WebZefanya's login body carries the token only, not the account, so the
     // account (name, status) is read from the role's profile endpoint.
-    return _resultFrom(await client.getJson('${_prefix(role)}/profile'), role: role);
+    // Header construction is session-owned and serialized with token changes.
+    // Keep normal renewal here: even a newly issued token may be near expiry.
+    final profile = await client.getJson('${_prefix(role)}/profile');
+    if (client.sessionEpoch != epoch) throw const SessionSupersededException();
+    return _resultFrom(profile, role: role);
   }
 
   /// Posts to one of the rider's signed URLs.
@@ -400,23 +471,35 @@ class LiveAuthRepository extends LiveRepository
       authenticated: false,
       body: {'email': email.trim(), 'password': password},
     );
-    final handle = riderRegistrationResultFrom(body, email: email).verificationId;
+    final handle = riderRegistrationResultFrom(
+      body,
+      email: email,
+    ).verificationId;
     if (handle == null) {
       throw const MalformedResponseException(
-        message: 'The server resumed the registration but sent no verification link.',
+        message:
+            'The server resumed the registration but sent no verification link.',
       );
     }
     return handle;
   }
 
   /// `/buyer` or `/rider`: WebZefanya's per-role API prefix.
-  static String _prefix(UserRole role) =>
-      role == UserRole.buyer ? '/buyer' : '/rider';
+  static String _prefix(UserRole role) => switch (role) {
+    UserRole.buyer => '/buyer',
+    UserRole.courier => '/rider',
+    UserRole.linehaul => '/courier',
+  };
 
-  /// The role's token-renewal route. Only riders have one on WebZefanya
-  /// (`POST /api/rider/token/refresh`); a buyer token is not renewed.
-  static String? _renewPath(UserRole role) =>
-      role == UserRole.courier ? '/rider/token/refresh' : null;
+  /// The role's token-renewal route: riders (`/rider/token/refresh`) and,
+  /// on WebZefanya, Couriers (`/courier/token/refresh`). A buyer token is not
+  /// renewed, and the demo fork's Courier has no renewal route.
+  String? _renewPathFor(UserRole role) => switch (role) {
+    UserRole.courier => '/rider/token/refresh',
+    UserRole.linehaul when _isWebZefanyaCourier(role) =>
+      '/courier/token/refresh',
+    _ => null,
+  };
 
   @override
   Future<AuthResult> register({
@@ -433,14 +516,21 @@ class LiveAuthRepository extends LiveRepository
       final license = profile.riderLicensePath?.trim() ?? '';
       final orCr = profile.riderOrCrPath?.trim() ?? '';
       if (license.isEmpty || orCr.isEmpty) {
-        throw ValidationException(fieldErrors: {
-          if (license.isEmpty) 'drivers_license': "Upload a photo or PDF of your driver's license.",
-          if (orCr.isEmpty) 'or_cr': 'Upload a photo or PDF of your vehicle OR/CR.',
-        });
+        throw ValidationException(
+          fieldErrors: {
+            if (license.isEmpty)
+              'drivers_license':
+                  "Upload a photo or PDF of your driver's license.",
+            if (orCr.isEmpty)
+              'or_cr': 'Upload a photo or PDF of your vehicle OR/CR.',
+          },
+        );
       }
       if (profile.riderProviderId == null) {
         throw const ValidationException(
-          fieldErrors: {'logistics_provider_id': 'Select a logistics provider.'},
+          fieldErrors: {
+            'logistics_provider_id': 'Select a logistics provider.',
+          },
         );
       }
 
@@ -501,8 +591,8 @@ class LiveAuthRepository extends LiveRepository
   /// is mounted so far.
   static String verifyOtpPath(UserRole role, String verificationId) =>
       role == UserRole.buyer
-          ? '/register/buyer/verify-otp/$verificationId'
-          : '/register/logistics/verify-otp/$verificationId';
+      ? '/register/buyer/verify-otp/$verificationId'
+      : '/register/logistics/verify-otp/$verificationId';
 
   @override
   Future<AuthResult> verifyOtp({
@@ -513,7 +603,11 @@ class LiveAuthRepository extends LiveRepository
     if (role == UserRole.courier) {
       final handle = RiderVerificationHandle.parse(verificationId);
       if (handle == null) return notWired(verifyOtpPath(role, verificationId));
-      final body = await _signed(handle, handle.verifyUrl, body: {'otp': code.trim()});
+      final body = await _signed(
+        handle,
+        handle.verifyUrl,
+        body: {'otp': code.trim()},
+      );
       return _resultFrom(body, role: role);
     }
     if (role != UserRole.buyer) {
@@ -584,12 +678,31 @@ class LiveAuthRepository extends LiveRepository
     // WebZefanya revokes only the current token and answers 204.
     final path = '${_prefix(role)}/logout';
 
+    // Before the first `await`: a new generation makes every in-flight
+    // sign-in/refresh of this session stale, and the token is taken (read and
+    // cleared) in one queued credential step. Local state is therefore cleared
+    // whatever the server answers, and a later sign-in's token can never be
+    // the one cleared or revoked here.
+    final epoch = client.beginSession();
+    final token = await client.takeToken(epoch: epoch);
+    if (token == null || token.isEmpty) return;
+    await client.postJson(path, bearerToken: token);
+  }
+
+  Future<bool> verifySavedSession(UserRole role) async {
+    final epoch = client.sessionEpoch;
     try {
-      await client.postJson(path);
-    } finally {
-      // Local state is cleared whatever the server answered: someone who asked
-      // to be signed out while offline must not be left holding a usable token.
-      await client.forgetToken();
+      await client.getJson('${_prefix(role)}/profile');
+      return client.setRenewPath(_renewPathFor(role), epoch: epoch);
+    } on ApiException catch (error) {
+      if (error is! UnauthorizedException &&
+          error is! ForbiddenException &&
+          error is! PendingApprovalException) {
+        rethrow;
+      }
+      // Only this session's token; a newer sign-in's is kept.
+      await client.forgetToken(epoch: epoch);
+      return false;
     }
   }
 
@@ -602,18 +715,27 @@ class LiveAuthRepository extends LiveRepository
     // get a 403 rather than a 401, which would look like "account not approved"
     // rather than "this token is from a different role".
     final path = '${_prefix(role)}/profile';
+    // The session this refresh belongs to. A sign-in or sign-out that starts
+    // while it is in flight makes its answer stale.
+    final epoch = client.sessionEpoch;
     // A restored session: the token's expiry is unknown here, so a rider's
     // token is renewed before this first request goes out.
-    client.renewPath = _renewPath(role);
+    client.setRenewPath(_renewPathFor(role), epoch: epoch);
 
     try {
       final body = await client.getJson(path);
+      if (client.sessionEpoch != epoch) {
+        throw const SessionSupersededException();
+      }
       return _resultFrom(body, role: role);
     } on UnauthorizedException {
       // A token the server has rejected is worse than no token — it keeps
       // producing 401s — so the answer is to forget it, and `null` is the
-      // caller's word for "no session".
-      await client.forgetToken();
+      // caller's word for "no session". Only this session's token, though:
+      // a newer sign-in's token is never erased by an old refresh.
+      if (!await client.forgetToken(epoch: epoch)) {
+        throw const SessionSupersededException();
+      }
       return null;
     }
     // A gate (`403`) is deliberately not caught here. The token is *valid* and
@@ -642,15 +764,13 @@ class LiveAuthRepository extends LiveRepository
 /// Public because the Google repository reads the same answer shape. The role
 /// is still an argument: the email/password paths know it from the route, and
 /// the Google path parses it from the server before calling here.
-AuthResult authResultFrom(
-  Map<String, Object?> body, {
-  required UserRole role,
-}) {
+AuthResult authResultFrom(Map<String, Object?> body, {required UserRole role}) {
   final payload = unwrapMap(body);
   final remote = RemoteRegistrationStatus.parse(
     payload['registration_status'] ?? _webZefanyaStatus(payload['status']),
   );
-  final name = payload['name']?.toString() ??
+  final name =
+      payload['name']?.toString() ??
       [payload['first_name'], payload['last_name']]
           .whereType<Object>()
           .map((part) => part.toString().trim())
@@ -676,11 +796,11 @@ AuthResult authResultFrom(
 /// login gate, where `approved` (buyers) and `active` (riders) both mean
 /// usable. Anything else stays unrecognised and so fails safe to pending.
 String? _webZefanyaStatus(Object? status) => switch (status?.toString()) {
-      'approved' || 'active' => 'approved',
-      'pending' => 'pending_approval',
-      'rejected' => 'rejected',
-      _ => null,
-    };
+  'approved' || 'active' => 'approved',
+  'pending' => 'pending_approval',
+  'rejected' => 'rejected',
+  _ => null,
+};
 
 /// The two signed URLs WebZefanya returns after a rider registers, carried
 /// through the app as one opaque [AuthResult.verificationId].
@@ -699,7 +819,8 @@ class RiderVerificationHandle {
   /// When the links stop working: the signed URLs' own `expires` parameter
   /// (Unix seconds), read without altering the URL. Null if absent.
   DateTime? get expiresAt {
-    final raw = Uri.tryParse(resendUrl)?.queryParameters['expires'] ??
+    final raw =
+        Uri.tryParse(resendUrl)?.queryParameters['expires'] ??
         Uri.tryParse(verifyUrl)?.queryParameters['expires'];
     final seconds = raw == null ? null : int.tryParse(raw);
     return seconds == null
@@ -715,7 +836,9 @@ class RiderVerificationHandle {
 
   static RiderVerificationHandle? parse(String handle) {
     final parts = handle.split('\n');
-    if (parts.length != 2 || parts.any((p) => !p.startsWith('http'))) return null;
+    if (parts.length != 2 || parts.any((p) => !p.startsWith('http'))) {
+      return null;
+    }
     return RiderVerificationHandle(parts[0], parts[1]);
   }
 }
@@ -730,8 +853,10 @@ AuthResult riderRegistrationResultFrom(
 }) {
   final data = unwrapMap(body);
   final handle = switch ((data['verify_url'], data['resend_url'])) {
-    (final String verify, final String resend) =>
-      RiderVerificationHandle(verify, resend).encode(),
+    (final String verify, final String resend) => RiderVerificationHandle(
+      verify,
+      resend,
+    ).encode(),
     _ => null,
   };
   final remote = handle != null

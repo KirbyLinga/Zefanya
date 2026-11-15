@@ -5,8 +5,11 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'config/backend_profile.dart';
 import 'config/dev_flags.dart';
 import 'data/ph_address_catalog.dart';
+import 'data/api/backend_scope.dart';
 import 'data/repositories/repositories.dart';
 import 'data/api/api_exception.dart';
 import 'services/connection_watcher.dart';
@@ -27,10 +30,14 @@ import 'state/theme_state.dart';
 import 'state/wishlist_state.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/pending_approval_screen.dart';
+import 'screens/auth/registration_screen.dart';
 import 'screens/buyer/buyer_shell.dart';
 import 'screens/buyer/product_link_screen.dart';
 import 'screens/courier/courier_shell.dart';
+import 'screens/courier/linehaul_portal.dart';
+import 'screens/courier/webzefanya_courier_portal.dart';
 import 'screens/landing_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'utils/motion.dart';
 import 'utils/product_link.dart';
 import 'widgets/app_atmosphere.dart';
@@ -57,9 +64,19 @@ void main() async {
   ]);
 
   // The one place the mock/real decision is made.
+  //
+  // `zefanya.backend` selects which backend a live build talks to; the demo
+  // fork stays the default. The WebZefanya profile has its own base URL and
+  // keeps writes off unless the build opts in (see config/backend_profile.dart).
+  final profile = kBackendProfile;
   final repositories = Repositories.forMode(
     useLive: kUseLiveApi,
-    baseUrl: kApiBaseUrl,
+    baseUrl: apiBaseUrlFor(profile),
+    profile: profile,
+    allowWrites: kWebZefanyaAllowWrites,
+    otherBaseUrl: profile == BackendProfile.webzefanya
+        ? kApiBaseUrl
+        : kWebZefanyaBaseUrl,
   );
 
   if (repositories.client case final client?) {
@@ -89,13 +106,54 @@ void main() async {
   );
   final catalogState = CatalogState(repository: repositories.catalog);
   final chatState = ChatState(repository: repositories.chat);
-  final courierState = CourierState(repository: repositories.courier);
+  final courierState = CourierState(
+    repository: repositories.courier,
+    capabilities: repositories.capabilities,
+    deliveryCompletionStore: repositories.client == null
+        ? null
+        : scopedRiderCompletionStore(profile, apiBaseUrlFor(profile)),
+  );
   final notificationState = NotificationState(client: repositories.client);
+  Future<void> syncNotificationSession() {
+    final role = authState.role;
+    final supported =
+        authState.isLoggedIn &&
+        (role == UserRole.buyer || role == UserRole.courier);
+    return notificationState.setSession(
+      account: supported ? (role, authState.email) : null,
+      rider: supported && role == UserRole.courier,
+    );
+  }
+
+  void syncRiderSession() {
+    courierState.setRiderSession(
+      authState.isLoggedIn && authState.role == UserRole.courier
+          ? authState.email?.trim().toLowerCase()
+          : null,
+    );
+  }
+
+  if (repositories.client != null) {
+    unawaited(syncNotificationSession());
+    authState.addListener(() => unawaited(syncNotificationSession()));
+    authState.addListener(syncRiderSession);
+  }
   final returnState = ReturnState(repository: repositories.returns);
   final orderState = OrderState(
     repository: repositories.order,
     returns: returnState,
   );
+  void syncBuyerCheckoutSession() {
+    orderState.setBuyerCheckoutOwner(
+      authState.isLoggedIn && authState.role == UserRole.buyer
+          ? authState.email ?? authState.phone
+          : null,
+    );
+  }
+
+  if (repositories.client != null) {
+    authState.addListener(syncBuyerCheckoutSession);
+  }
   final recentlyViewedState = RecentlyViewedState(
     catalog: repositories.catalog,
   );
@@ -141,7 +199,14 @@ void main() async {
   );
 
   await Future.wait([
-    startupState.guard('your account', authState.load),
+    startupState.guard('your account', () async {
+      try {
+        await authState.load();
+      } finally {
+        syncRiderSession();
+        syncBuyerCheckoutSession();
+      }
+    }),
     startupState.guard('your appearance settings', themeState.load),
     // Non-fatal: if the bundled asset cannot be read, the address screens
     // show their own Retry card instead of blocking the whole shell.
@@ -154,8 +219,14 @@ void main() async {
     startupState.guard('the store catalogue', catalogState.load),
     startupState.guard('your cart', cartState.load),
     startupState.guard('your chats', chatState.load),
-    startupState.guard('your delivery jobs', courierState.load),
-    startupState.guard('your notifications', notificationState.load),
+    if (repositories.client == null)
+      startupState.guard('your delivery jobs', courierState.load),
+    startupState.guard(
+      'your notifications',
+      repositories.client == null
+          ? notificationState.load
+          : syncNotificationSession,
+    ),
     startupState.guard('your orders', orderState.load),
     startupState.guard('your recently viewed items', recentlyViewedState.load),
     startupState.guard('your reviews', reviewState.load),
@@ -168,42 +239,49 @@ void main() async {
 /// Widest the app's content column gets before it stops stretching.
 const double kMaxContentWidth = 560;
 
-/// In-app loading state shown while `main()`'s nine loads run.
-/// so the person sees something in Flutter's own rendering rather than
-/// just the native splash screen. The design deliberately matches the
-/// atmosphere and mark that are already in the app so the transition
-/// from this screen to the real shell is seamless rather than jarring.
-///
-/// Brightness: `ThemeState` hasn't loaded yet, so we initialize the
-/// palette to light mode here. This is the same default the palette
-/// has before any call to `AppColors.apply`, so there is no flicker —
-/// it simply stays at the mode it would have been in anyway.
+/// The Flutter splash is visible only while the startup state loads.
 class _BootSplash extends StatelessWidget {
   const _BootSplash();
 
   @override
   Widget build(BuildContext context) {
-    // Do NOT call AppColors.watch or AppColors.apply here — _BootSplash is
-    // shown before AppPaletteScope is in the tree (it replaces MarketplaceApp
-    // which wraps that scope). AppColors starts at its light default.
+    final palette = AppPalette.of(context.watch<ThemeState>().brightness);
+    final reduced = reduceMotion(context);
+
     return Directionality(
-      // Required by Stack and other widgets below MaterialApp.
       textDirection: TextDirection.ltr,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          const AppAtmosphere(),
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ZefanyaMark(size: 48, strokeWidth: 6),
-                const SizedBox(height: 28),
-                ZefanyaLoader(size: 28, strokeWidth: 4),
-              ],
+      child: ColoredBox(
+        color: palette.background,
+        child: SafeArea(
+          child: Center(
+            child: Semantics(
+              label: 'Loading Zefanya',
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: reduced ? 1.0 : .96, end: 1.0),
+                duration: reduced
+                    ? Duration.zero
+                    : const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                builder: (context, scale, child) =>
+                    Transform.scale(scale: reduced ? 1 : scale, child: child),
+                child: SizedBox(
+                  width: 104,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ZefanyaMark(size: 58, color: palette.textPrimary),
+                      const SizedBox(height: 20),
+                      ColoredBox(
+                        color: palette.divider,
+                        child: const SizedBox(width: 104, height: 1),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -221,6 +299,7 @@ class _MarketplaceAppState extends State<MarketplaceApp> {
   StreamSubscription<Uri>? _linkSubscription;
   AuthState? _auth;
   Uri? _pendingLink;
+  final _openProductLinks = <String>{};
 
   @override
   void initState() {
@@ -287,10 +366,24 @@ class _MarketplaceAppState extends State<MarketplaceApp> {
       return;
     }
     _pendingLink = null;
+    if (!_openProductLinks.add(productId)) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _navigatorKey.currentState?.push(
-        AppPageRoute(builder: (_) => ProductLinkScreen(productId: productId)),
+      final navigator = _navigatorKey.currentState;
+      if (navigator == null ||
+          _auth?.isLoggedIn != true ||
+          _auth?.role != UserRole.buyer) {
+        _openProductLinks.remove(productId);
+        return;
+      }
+      unawaited(
+        navigator
+            .push<void>(
+              AppPageRoute(
+                builder: (_) => ProductLinkScreen(productId: productId),
+              ),
+            )
+            .whenComplete(() => _openProductLinks.remove(productId)),
       );
     });
   }
@@ -358,8 +451,46 @@ class _MarketplaceAppState extends State<MarketplaceApp> {
                                       ConnectionWatcher.instance.check(),
                                 ),
                               ),
+                            )
+                          else
+                            SafeArea(
+                              bottom: false,
+                              child: Material(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.inverseSurface,
+                                child: Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 4,
+                                    ),
+                                    child: Text(
+                                      'DEMO MODE · Sample data',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelMedium
+                                          ?.copyWith(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onInverseSurface,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
-                          Expanded(child: child!),
+                          Expanded(
+                            child: kUseLiveApi
+                                ? child!
+                                : Builder(
+                                    builder: (context) =>
+                                        MediaQuery.removePadding(
+                                          context: context,
+                                          removeTop: true,
+                                          child: child!,
+                                        ),
+                                  ),
+                          ),
                         ],
                       ),
                     ),
@@ -404,6 +535,8 @@ class _AuthGateState extends State<AuthGate> {
   /// process while the app is backgrounded; landing decides again on
   /// that restart, same as it did on the original cold start.
   bool _introDone = false;
+  bool? _showOnboarding;
+  SharedPreferences? _onboardingPreferences;
 
   /// Whether we've made the one-time decision below. Runs before the
   /// first build (didChangeDependencies always fires before build on
@@ -430,6 +563,39 @@ class _AuthGateState extends State<AuthGate> {
     // should return them to Login, not back to this screen).
     if (context.read<AuthState>().status != AccountStatus.loggedOut) {
       _introDone = true;
+    } else {
+      unawaited(_checkOnboarding());
+    }
+  }
+
+  Future<void> _checkOnboarding() async {
+    var show = false;
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      _onboardingPreferences = preferences;
+      show =
+          preferences.getBool(OnboardingScreen.completionKey) != true &&
+          !AuthState.hasSavedSessionHistory(preferences);
+    } catch (_) {
+      // Optional welcome content must never prevent reaching sign-in.
+    }
+    if (mounted) setState(() => _showOnboarding = show);
+  }
+
+  void _finishOnboarding() {
+    if (_showOnboarding != true) return;
+    setState(() => _showOnboarding = false);
+    unawaited(_saveOnboarding());
+  }
+
+  Future<void> _saveOnboarding() async {
+    try {
+      await _onboardingPreferences?.setBool(
+        OnboardingScreen.completionKey,
+        true,
+      );
+    } catch (_) {
+      // The current launch still continues when local storage is unavailable.
     }
   }
 
@@ -437,10 +603,28 @@ class _AuthGateState extends State<AuthGate> {
   Widget build(BuildContext context) {
     AppColors.watch(context);
     if (!_introDone) {
+      if (_showOnboarding == null) {
+        return ColoredBox(color: AppColors.background);
+      }
+      if (_showOnboarding == true) {
+        return OnboardingScreen(onFinish: _finishOnboarding);
+      }
       return LandingScreen(
         reduceMotion: reduceMotion(context),
+        animateEditorial:
+            kUseLiveApi && context.read<Repositories?>()?.client != null,
         onDone: () {
           if (mounted) setState(() => _introDone = true);
+        },
+        onCreateAccount: () {
+          if (!mounted || _introDone) return;
+          setState(() => _introDone = true);
+          Navigator.of(context).push(
+            AppPageRoute(
+              builder: (_) =>
+                  const RegistrationScreen(initialRole: UserRole.buyer),
+            ),
+          );
         },
       );
     }
@@ -455,9 +639,15 @@ class _AuthGateState extends State<AuthGate> {
         // on the login screen, and nothing at all on the landing screen.
         return Column(
           children: [
-            const StartupNotice(),
+            if (auth.role != UserRole.linehaul) const StartupNotice(),
             Expanded(
-              child: auth.role == UserRole.courier
+              child: auth.role == UserRole.linehaul
+                  ? ((context.read<Repositories?>()?.capabilities.isWebZefanya ??
+                            false)
+                        // WebZefanya: the read-only Transfer Courier portal.
+                        ? const WebZefanyaCourierPortal()
+                        : const LinehaulPortal())
+                  : auth.role == UserRole.courier
                   ? const CourierShell()
                   : const BuyerShell(),
             ),
@@ -466,7 +656,7 @@ class _AuthGateState extends State<AuthGate> {
       case AccountStatus.pendingApproval:
         return const PendingApprovalScreen();
       case AccountStatus.loggedOut:
-        return const LoginScreen();
+        return const LoginScreen(showDemoRoles: !kUseLiveApi);
     }
   }
 }

@@ -7,7 +7,7 @@
 // host to point at, so `zefanya.webBaseUrl` is a dart-define with a clearly
 // non-production fallback; tests assert the path, not the host.
 
-import '../config/dev_flags.dart';
+import '../config/backend_profile.dart' show kActiveApiBaseUrl;
 import '../data/mock_data.dart' show Product;
 
 const String _fallbackWebBase = 'https://zefanya.test';
@@ -24,7 +24,7 @@ String get productWebBaseUrl {
   }
   // If a live API base was supplied, the web host is usually the same origin.
   // Strip the API suffix rather than hard-coding a second domain.
-  final api = kApiBaseUrl.trim();
+  final api = kActiveApiBaseUrl.trim();
   if (api.isNotEmpty) {
     return api
         .replaceFirst(RegExp(r'/api/?$'), '')
