@@ -250,8 +250,10 @@ class ProductPublishingTest extends TestCase
         $seller = Seller::factory()->create();
         $data = $this->payload();
         $inserts = 0;
-        DB::listen(function ($query) use (&$inserts): void {
-            if (str_contains($query->sql, 'insert into "product_images"') && ++$inserts === 2) {
+        $connection = DB::connection();
+        $imageInsert = 'insert into '.$connection->getQueryGrammar()->wrapTable('product_images');
+        $connection->listen(function ($query) use (&$inserts, $imageInsert): void {
+            if (str_contains($query->sql, $imageInsert) && ++$inserts === 2) {
                 throw new \RuntimeException('Simulated image persistence failure');
             }
         });

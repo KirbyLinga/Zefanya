@@ -51,7 +51,7 @@ class LegacyBarangayRemediationTest extends TestCase
     public function test_parcel_14_scenario_preserves_snapshot_and_pickup_while_verifying_and_reconciling_delivery(): void
     {
         extract($this->fixture());
-        $original = $order->shipping_address;
+        $original = $order->refresh()->shipping_address;
         $this->actingAs($provider, 'logistics')->get(route('logistics.parcel-sorting.address.preview', $parcel))
             ->assertOk()->assertSee('Original checkout street')->assertSee('043411006');
         $this->assertNull($parcel->fresh()->delivery_address_verification);

@@ -178,8 +178,10 @@ class CodRemittanceCreationTest extends TestCase
     public function test_obligation_write_failure_rolls_back_collection_proof_status_and_file(): void
     {
         $armed = true;
-        DB::connection()->beforeExecuting(function (string $sql) use (&$armed): void {
-            if ($armed && str_starts_with(strtolower($sql), 'insert into "cod_remittances"')) {
+        $connection = DB::connection();
+        $obligationInsert = 'insert into '.$connection->getQueryGrammar()->wrapTable('cod_remittances');
+        $connection->beforeExecuting(function (string $sql) use (&$armed, $obligationInsert): void {
+            if ($armed && str_starts_with(strtolower($sql), $obligationInsert)) {
                 $armed = false;
                 throw new \RuntimeException('Controlled COD obligation failure.');
             }

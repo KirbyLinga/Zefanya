@@ -725,8 +725,10 @@ class PhysicalReturnTest extends TestCase
         $return = $this->buyerReturn($f);
         $service = app(ParcelReturnService::class);
         $service->approveBySeller($return, $f['seller']);
-        DB::connection()->beforeExecuting(function (string $sql): void {
-            if (str_starts_with(strtolower($sql), 'insert into "parcel_return_events"')) {
+        $connection = DB::connection();
+        $auditInsert = 'insert into '.$connection->getQueryGrammar()->wrapTable('parcel_return_events');
+        $connection->beforeExecuting(function (string $sql) use ($auditInsert): void {
+            if (str_starts_with(strtolower($sql), $auditInsert)) {
                 throw new \RuntimeException('Injected return assignment audit failure.');
             }
         });

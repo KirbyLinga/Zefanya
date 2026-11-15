@@ -312,8 +312,10 @@ class CommissionShippingIntegrityTest extends TestCase
         $before = $order->fresh()->getRawOriginal();
         $settlementBefore = $settlement->fresh()->getRawOriginal();
         $armed = true;
-        DB::connection()->beforeExecuting(function (string $sql) use (&$armed): void {
-            if ($armed && str_starts_with(strtolower($sql), 'update "seller_settlements"')) {
+        $connection = DB::connection();
+        $settlementUpdate = 'update '.$connection->getQueryGrammar()->wrapTable('seller_settlements');
+        $connection->beforeExecuting(function (string $sql) use (&$armed, $settlementUpdate): void {
+            if ($armed && str_starts_with(strtolower($sql), $settlementUpdate)) {
                 $armed = false;
                 throw new \RuntimeException('Controlled commission settlement failure.');
             }
@@ -352,8 +354,10 @@ class CommissionShippingIntegrityTest extends TestCase
             }
         };
         $writes = 0;
-        DB::connection()->beforeExecuting(function (string $sql) use (&$writes): void {
-            if (str_starts_with(strtolower($sql), 'insert into "parcel_provider_allocations"') && ++$writes === 2) {
+        $connection = DB::connection();
+        $allocationInsert = 'insert into '.$connection->getQueryGrammar()->wrapTable('parcel_provider_allocations');
+        $connection->beforeExecuting(function (string $sql) use (&$writes, $allocationInsert): void {
+            if (str_starts_with(strtolower($sql), $allocationInsert) && ++$writes === 2) {
                 throw new \RuntimeException('Controlled provider allocation failure.');
             }
         });

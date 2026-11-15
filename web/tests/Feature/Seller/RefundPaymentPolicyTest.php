@@ -19,17 +19,17 @@ use App\Models\Shared\Payment;
 use App\Models\Shared\SellerOrder;
 use App\Services\Logistics\ParcelReturnService;
 use App\Support\RuntimeSchema;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\TestWith;
+use Tests\Support\MigratesPendingRefundPolicy;
 use Tests\TestCase;
 
 class RefundPaymentPolicyTest extends TestCase
 {
-    use LazilyRefreshDatabase;
+    use MigratesPendingRefundPolicy;
 
     private Admin $admin;
 
@@ -44,8 +44,6 @@ class RefundPaymentPolicyTest extends TestCase
         Storage::fake('local');
         Notification::fake();
         $this->admin = Admin::factory()->create(['role' => 'admin']);
-        // Activate only this isolated test schema; the live database is never migrated.
-        (require database_path('migrations/pending/2026_11_14_120000_activate_refund_payment_policy.php'))->up();
         $this->clearSchemaMemo();
         $provider = LogisticsProvider::factory()->create(['status' => 'approved']);
         $courier = Courier::factory()->create(['logistics_provider_id' => $provider->id]);

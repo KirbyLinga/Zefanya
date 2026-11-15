@@ -184,7 +184,14 @@ class ReturnRecoveryTest extends TestCase
         $event = $return->events()->where('event_key', 'collection_failed')->sole();
         $this->assertSame('rider', $event->actor_type);
         $this->assertSame($f['rider']->id, (int) $event->actor_id);
-        $this->assertSame(['attempt' => 1, 'courier_id' => $f['courier']->id, 'reason' => 'buyer_absent', 'notes' => null], $event->metadata);
+        $metadata = $event->metadata;
+        ksort($metadata);
+        $this->assertSame([
+            'attempt' => 1,
+            'courier_id' => $f['courier']->id,
+            'notes' => null,
+            'reason' => 'buyer_absent',
+        ], $metadata);
         $this->assertSame(1, $f['buyer']->notifications()->where('type', ReturnRecoveryUpdate::class)->count());
         $this->get(route('rider.return-pickups.index'))->assertOk()->assertSee('Collection failed')
             ->assertDontSee(route('rider.return-pickups.collect', $return), false);

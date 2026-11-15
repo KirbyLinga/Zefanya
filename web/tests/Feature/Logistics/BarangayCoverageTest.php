@@ -51,7 +51,7 @@ class BarangayCoverageTest extends TestCase
         return LogisticsHub::query()->create([
             'logistics_provider_id' => $provider->id, 'name' => 'Station', 'hub_type' => LogisticsHub::STATION,
             'parent_hub_id' => $province->id, 'municipality' => 'San Fernando',
-            'region_code' => '030000000', 'province_code' => '030540000', 'province_name' => 'Pampanga', 'barangay_code' => 'physical-address-code',
+            'region_code' => '030000000', 'province_code' => '030540000', 'province_name' => 'Pampanga', 'barangay_code' => '0305401099',
             'approval_status' => 'approved', 'is_active' => false,
         ]);
     }
@@ -95,7 +95,7 @@ class BarangayCoverageTest extends TestCase
             'barangay_codes' => ['0305401001', '0305401002'],
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(2, $one->areas()->count());
-        $this->assertSame('physical-address-code', $one->fresh()->barangay_code);
+        $this->assertSame('0305401099', $one->fresh()->barangay_code);
         $this->assertSame(0, $two->areas()->count());
     }
 

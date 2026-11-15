@@ -198,11 +198,14 @@ class MobileRiderRegistrationTest extends TestCase
     #[DataProvider('accountRoles')]
     public function test_email_owned_by_any_account_role_is_rejected_case_insensitively(string $model): void
     {
-        $model::factory()->create(['email' => 'TAKEN@example.com']);
+        $owner = $model::factory()->create(['email' => 'TAKEN@example.com']);
+        $original = $owner->fresh()->getRawOriginal();
+        $riderCount = Rider::query()->count();
         $payload = $this->payload(['email' => ' taken@EXAMPLE.com ']);
 
         $this->postJson('/api/rider/register', $payload)->assertUnprocessable()->assertJsonValidationErrors(['email']);
-        $this->assertDatabaseMissing('riders', ['email' => 'taken@example.com']);
+        $this->assertDatabaseCount('riders', $riderCount);
+        $this->assertSame($original, $owner->fresh()->getRawOriginal());
     }
 
     public function test_duplicate_registration_does_not_replace_the_original_application(): void

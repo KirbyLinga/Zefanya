@@ -78,7 +78,9 @@ class SellerProductManagementTest extends TestCase
         $this->assertSame('299.00', $product->price);
         $this->assertSame(30, $product->stock_quantity);
         $this->assertSame(600, $product->weight_grams);
-        $this->assertSame(['length' => 35, 'width' => 25, 'height' => 3], $product->dimensions);
+        $dimensions = $product->dimensions;
+        ksort($dimensions);
+        $this->assertSame(['height' => 3, 'length' => 35, 'width' => 25], $dimensions);
         $this->assertSame('No brand', $product->brand);
         $this->assertSame('New', $product->condition);
         $this->assertSame([$category->id], $product->storeCategories->modelKeys());

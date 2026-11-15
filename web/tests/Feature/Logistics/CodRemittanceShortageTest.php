@@ -342,8 +342,10 @@ class CodRemittanceShortageTest extends TestCase
         $before = $this->remittance->fresh()->getRawOriginal();
         $logs = OperationsAuditLog::query()->count();
         $armed = true;
-        DB::connection()->beforeExecuting(function (string $sql) use (&$armed): void {
-            if ($armed && str_starts_with(strtolower($sql), 'insert into "operations_audit_logs"')) {
+        $connection = DB::connection();
+        $auditInsert = 'insert into '.$connection->getQueryGrammar()->wrapTable('operations_audit_logs');
+        $connection->beforeExecuting(function (string $sql) use (&$armed, $auditInsert): void {
+            if ($armed && str_starts_with(strtolower($sql), $auditInsert)) {
                 $armed = false;
                 throw new \RuntimeException('Controlled COD audit failure.');
             }

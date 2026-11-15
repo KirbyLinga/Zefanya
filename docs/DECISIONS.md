@@ -2,6 +2,18 @@
 
 This file records deviations from the repository's baseline instructions or decisions required during execution.
 
+## Phase 11.7: Native MySQL compatibility
+
+- Compare return collection audit metadata by exact keys, types, and values after sorting the JSON object keys. MySQL normalizes the order of those keys. The test still checks the actor, collection retry and escalation, and notifications.
+- Use the active database grammar in checkout, COD, commission, provider allocation, return assignment, and product-image failure injection. Keep the exact rollback and file-cleanup assertions so both MySQL and SQLite exercise the same safeguards.
+- Compare the legacy checkout snapshot with its persisted baseline and compare product dimensions by strict sorted JSON keys. Use a synthetic PSGC-shaped station code that fits the native column while continuing to assert that station coverage edits preserve its physical address.
+
+## Phase 11.9: Seller shipment status rendering
+
+- Cover in-transit, arrived-at-hub and lost parcels in the shared Seller status pill. A Web login returned HTTP 500 on the Seller dashboard after a verified transfer reached the destination hub because the Blade match omitted those enum values. Both Seller order lists now exercise those labels in their regression test.
+- Apply the existing pending refund-policy migration before the affected test transactions. MySQL commits DDL implicitly, which invalidated their savepoints. Normal production migrations retain the existing explicit activation sequence.
+- Use the active SQL grammar for platform remittance rollback injection. Compare Rider counts and the original account snapshot in the duplicate registration test so the test stays strict under MySQL's case-insensitive email collation.
+
 ## Phase 11.6.3: Flutter Rider contract tests
 
 - Update the unsupported-route and injected read-only client tests to assert that the restored Rider COD GET reaches the transport. Preserve rejection of unsupported routes and writes in read-only mode.

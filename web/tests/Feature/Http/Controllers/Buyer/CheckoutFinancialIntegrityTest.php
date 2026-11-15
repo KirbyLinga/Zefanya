@@ -247,8 +247,10 @@ class CheckoutFinancialIntegrityTest extends TestCase
         $buyer = Buyer::factory()->create();
         $line = $this->line($buyer);
         $token = $this->prepareCheckout($buyer, [$line]);
-        DB::connection()->beforeExecuting(function (string $query): void {
-            if (str_contains(strtolower($query), 'insert into "inventory_transactions"')) {
+        $connection = DB::connection();
+        $ledgerInsert = 'insert into '.$connection->getQueryGrammar()->wrapTable('inventory_transactions');
+        $connection->beforeExecuting(function (string $query) use ($ledgerInsert): void {
+            if (str_contains(strtolower($query), $ledgerInsert)) {
                 throw new \RuntimeException('Injected checkout ledger failure.');
             }
         });

@@ -228,13 +228,20 @@ class DashboardStatisticsTest extends TestCase
         $seller = Seller::factory()->create(['status' => 'approved']);
         $this->sellerOrder($seller, OrderStatus::ReadyForPickup, 1000);
         $this->sellerOrder($seller, OrderStatus::Cancelled, 1000);
+        $transferStatuses = [OrderStatus::InTransit, OrderStatus::ArrivedAtHub, OrderStatus::Lost];
+        foreach ($transferStatuses as $status) {
+            $this->sellerOrder($seller, $status, 1000);
+        }
 
         $this->actingAs($seller, 'seller');
 
         foreach ([route('seller.dashboard'), route('seller.orders.index')] as $page) {
-            $this->get($page)->assertOk()
+            $response = $this->get($page)->assertOk()
                 ->assertSee('bg-sky-100 text-sky-900 ring-sky-300', false)
                 ->assertSee('bg-red-100 text-red-900 ring-red-300', false);
+            foreach ($transferStatuses as $status) {
+                $response->assertSee('>'.$status->label().'</span>', false);
+            }
         }
     }
 
