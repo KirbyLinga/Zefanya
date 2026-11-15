@@ -103,26 +103,23 @@ void main() {
       );
     });
 
-    test(
-      'capabilities: the demo has everything, WebZefanya gates the rest',
-      () {
-        const demo = BackendCapabilities.demo();
-        expect(demo.riderReturnCollect, isTrue);
-        expect(demo.courierLogin, isTrue);
+    test('capabilities reflect the supported workflows of each backend', () {
+      const demo = BackendCapabilities.demo();
+      expect(demo.riderReturnCollect, isTrue);
+      expect(demo.courierLogin, isFalse);
 
-        const wz = BackendCapabilities.webzefanya();
-        expect(wz.isWebZefanya, isTrue);
-        expect(wz.riderReturnCollect, isFalse);
-        expect(wz.riderCodLedger, isFalse);
-        expect(wz.riderPayouts, isFalse);
-        expect(wz.riderWaybill, isFalse);
-        expect(wz.riderProofPhotos, isFalse);
-        expect(wz.riderPickupFailure, isFalse);
-        expect(wz.courierLogin, isFalse);
-        expect(wz.buyerReviewSubmit, isFalse);
-        expect(wz.buyerDeliveryDispute, isFalse);
-      },
-    );
+      const wz = BackendCapabilities.webzefanya();
+      expect(wz.isWebZefanya, isTrue);
+      expect(wz.riderReturnCollect, isFalse);
+      expect(wz.riderCodLedger, isFalse);
+      expect(wz.riderPayouts, isFalse);
+      expect(wz.riderWaybill, isFalse);
+      expect(wz.riderProofPhotos, isFalse);
+      expect(wz.riderPickupFailure, isFalse);
+      expect(wz.courierLogin, kWebZefanyaCourierApp);
+      expect(wz.buyerReviewSubmit, isFalse);
+      expect(wz.buyerDeliveryDispute, isFalse);
+    });
   });
 
   group('demo mode backward compatibility', () {
@@ -150,12 +147,13 @@ void main() {
         expect(live.courier, isA<LiveCourierRepository>());
         expect(live.courier, isNot(isA<WebZefanyaCourierRepository>()));
         expect(live.client!.routePolicy, isNull);
-        expect(live.linehaul, isNotNull);
+        expect(live.linehaul, isNull);
+        expect(live.capabilities.courierLogin, isFalse);
       },
     );
 
     test(
-      'the WebZefanya profile installs the guard and drops Courier sign-in',
+      'the WebZefanya profile uses the guarded read-only Courier portal when enabled',
       () {
         final wz = Repositories.forMode(
           useLive: true,
@@ -166,7 +164,7 @@ void main() {
         expect(wz.capabilities.isWebZefanya, isTrue);
         expect(wz.courier, isA<WebZefanyaCourierRepository>());
         expect(wz.client!.routePolicy, isA<WebZefanyaContract>());
-        expect(wz.linehaul, isNull);
+        expect(wz.linehaul != null, kWebZefanyaCourierApp);
       },
     );
 
@@ -248,7 +246,6 @@ void main() {
     test('unsupported Rider calls fail locally and send nothing', () async {
       final t = _webzefanya((request, _) => _ok({}), allowWrites: true);
       final repo = t.repos.courier as RiderServerData;
-      final courier = t.repos.courier;
 
       Future<void> expectBlocked(Future<Object?> Function() call) async {
         await expectLater(call(), throwsA(isA<ApiNotImplementedException>()));
@@ -265,13 +262,6 @@ void main() {
         () => repo.reportPickupFailure('1', reason: 'x', expectedAttempt: 1),
       );
       await expectBlocked(() => repo.finishPickupStop('1'));
-      await expectBlocked(
-        () => courier.completeDelivery(
-          '1',
-          proofPhotoPath: 'x.jpg',
-          recipientCategory: 'buyer',
-        ),
-      );
       expect(t.wire.requests, isEmpty);
     });
 
@@ -381,33 +371,52 @@ void main() {
         expect(deliver, contains('name="proof_photo"'));
         expect(deliver, contains('1500.00'));
         // The demo fork's acknowledgement fields are not sent.
-        expect(deliver, isNot(contains('recipient_accepted')));
-        expect(deliver, isNot(contains('recipient_category')));
+        expect(deliver, contains('name="recipient_accepted"\r\n\r\n1'));
+        expect(deliver, contains('name="recipient_category"\r\n\r\nbuyer'));
       },
     );
 
-    test(
-      'delivery is not sent when the parcel scan is refused',
-      () async {
-        final t = _webzefanya((request, body) {
-          final path = request.url.path;
-          if (path.endsWith('/rider/jobs')) {
-            return _ok({
-              'online': true,
-              'pickups': <Object?>[],
-              'deliveries': [_parcel(11)],
-              'return_pickups': <Object?>[],
-            });
-          }
-          if (path.endsWith('/scan/verify')) {
-            return _json(409, {'message': 'Parcel changed.'});
-          }
-          return _ok({});
-        }, allowWrites: true);
-        final repo = t.repos.courier as WebZefanyaCourierRepository;
-        await repo.assignedJobs();
+    test('delivery is not sent when the parcel scan is refused', () async {
+      final t = _webzefanya((request, body) {
+        final path = request.url.path;
+        if (path.endsWith('/rider/jobs')) {
+          return _ok({
+            'online': true,
+            'pickups': <Object?>[],
+            'deliveries': [_parcel(11)],
+            'return_pickups': <Object?>[],
+          });
+        }
+        if (path.endsWith('/scan/verify')) {
+          return _json(409, {'message': 'Parcel changed.'});
+        }
+        return _ok({});
+      }, allowWrites: true);
+      final repo = t.repos.courier as WebZefanyaCourierRepository;
+      await repo.assignedJobs();
 
-        final photo = File('${Directory.systemTemp.path}/wz_pod_refused.jpg')
+      final photo = File('${Directory.systemTemp.path}/wz_pod_refused.jpg')
+        ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 0xD9]);
+      addTearDown(() {
+        if (photo.existsSync()) photo.deleteSync();
+      });
+      await expectLater(
+        repo.completeDelivery(
+          '11',
+          proofPhotoPath: photo.path,
+          recipientCategory: 'buyer',
+        ),
+        throwsA(isA<RequestRejectedException>()),
+      );
+      expect(t.wire.requests.where((r) => r.contains('/deliver')), isEmpty);
+    });
+
+    test(
+      'with writes off, no scan or delivery request leaves the device',
+      () async {
+        final t = _webzefanya((request, _) => _ok({}));
+        final repo = t.repos.courier as WebZefanyaCourierRepository;
+        final photo = File('${Directory.systemTemp.path}/wz_pod_blocked.jpg')
           ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 0xD9]);
         addTearDown(() {
           if (photo.existsSync()) photo.deleteSync();
@@ -418,45 +427,32 @@ void main() {
             proofPhotoPath: photo.path,
             recipientCategory: 'buyer',
           ),
-          throwsA(isA<RequestRejectedException>()),
+          throwsA(isA<ValidationException>()),
+        ); // no tracking number known yet
+        expect(t.wire.requests, isEmpty);
+
+        // With a known parcel, the scan POST itself is blocked by the guard.
+        final known = _webzefanya((request, _) {
+          return _ok({
+            'online': true,
+            'pickups': <Object?>[],
+            'deliveries': [_parcel(11)],
+            'return_pickups': <Object?>[],
+          });
+        });
+        final knownRepo = known.repos.courier as WebZefanyaCourierRepository;
+        await knownRepo.assignedJobs();
+        await expectLater(
+          knownRepo.completeDelivery(
+            '11',
+            proofPhotoPath: photo.path,
+            recipientCategory: 'buyer',
+          ),
+          throwsA(isA<ApiNotImplementedException>()),
         );
-        expect(t.wire.requests.where((r) => r.contains('/deliver')), isEmpty);
+        expect(known.wire.requests, ['GET /api/rider/jobs']);
       },
     );
-
-    test('with writes off, no scan or delivery request leaves the device', () async {
-      final t = _webzefanya((request, _) => _ok({}));
-      final repo = t.repos.courier as WebZefanyaCourierRepository;
-      final photo = File('${Directory.systemTemp.path}/wz_pod_blocked.jpg')
-        ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 0xD9]);
-      addTearDown(() {
-        if (photo.existsSync()) photo.deleteSync();
-      });
-      await expectLater(repo.completeDelivery(
-        '11',
-        proofPhotoPath: photo.path,
-        recipientCategory: 'buyer',
-      ), throwsA(isA<ValidationException>())); // no tracking number known yet
-      expect(t.wire.requests, isEmpty);
-
-      // With a known parcel, the scan POST itself is blocked by the guard.
-      final known = _webzefanya((request, _) {
-        return _ok({
-          'online': true,
-          'pickups': <Object?>[],
-          'deliveries': [_parcel(11)],
-          'return_pickups': <Object?>[],
-        });
-      });
-      final knownRepo = known.repos.courier as WebZefanyaCourierRepository;
-      await knownRepo.assignedJobs();
-        await expectLater(knownRepo.completeDelivery(
-          '11',
-          proofPhotoPath: photo.path,
-          recipientCategory: 'buyer',
-        ), throwsA(isA<ApiNotImplementedException>()));
-      expect(known.wire.requests, ['GET /api/rider/jobs']);
-    });
   });
 
   group('authentication expiry, network errors and retry', () {

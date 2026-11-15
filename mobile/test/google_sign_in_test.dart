@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zefanya/config/dev_flags.dart';
 import 'package:zefanya/screens/auth/login_screen.dart';
 import 'package:zefanya/state/auth_state.dart';
 import 'package:zefanya/theme/app_theme.dart';
@@ -28,10 +29,7 @@ Future<void> _pumpLogin(WidgetTester tester, AuthState auth) async {
   await tester.pumpWidget(
     ChangeNotifierProvider<AuthState>.value(
       value: auth,
-      child: MaterialApp(
-        theme: AppTheme.light,
-        home: const LoginScreen(),
-      ),
+      child: MaterialApp(theme: AppTheme.light, home: const LoginScreen()),
     ),
   );
   await tester.pump();
@@ -41,17 +39,20 @@ Future<void> _pumpLogin(WidgetTester tester, AuthState auth) async {
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets(
-    'Google button is shown in mock mode (kUseLiveApi=false)',
-    (tester) async {
-      final auth = AuthState();
-      await _pumpLogin(tester, auth);
+  testWidgets('Google button follows the build configuration', (tester) async {
+    final auth = AuthState();
+    await _pumpLogin(tester, auth);
 
-      // In mock mode _googleAvailable is true, so the Google button renders.
-      expect(find.byKey(const ValueKey('login-google-button')), findsOneWidget);
-      expect(find.text('Continue with Google'), findsOneWidget);
-    },
-  );
+    final visible = !kUseLiveApi || GoogleConfig.current.isConfigured;
+    expect(
+      find.byKey(const ValueKey('login-google-button')),
+      visible ? findsOneWidget : findsNothing,
+    );
+    expect(
+      find.text('Continue with Google'),
+      visible ? findsOneWidget : findsNothing,
+    );
+  });
 
   testWidgets(
     'tapping Google in mock mode routes to registration with identity',
@@ -59,7 +60,9 @@ void main() {
       final auth = AuthState();
       await _pumpLogin(tester, auth);
 
-      await tester.ensureVisible(find.byKey(const ValueKey('login-google-button')));
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('login-google-button')),
+      );
       await tester.tap(find.byKey(const ValueKey('login-google-button')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
@@ -68,7 +71,11 @@ void main() {
       // existing buyer email → sign in succeeds, no registration needed.
       // If the identity were new, the app would show the role sheet → registration.
       // Either way the tap must not crash and must not show an error snackbar.
-      expect(find.text('Google sign-in is not available right now'), findsNothing);
+      expect(
+        find.text('Google sign-in is not available right now'),
+        findsNothing,
+      );
     },
+    skip: kUseLiveApi,
   );
 }

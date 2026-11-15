@@ -15,7 +15,7 @@ import 'package:zefanya/data/api/webzefanya_contract.dart';
 // Every request uses a fake transport; the production server is never called.
 void main() {
   test(
-    'production defines select only guarded WebZefanya Courier APIs',
+    'production defines select guarded WebZefanya APIs and verified writes',
     () async {
       final defines =
           jsonDecode(File('env.webzefanya.production.json').readAsStringSync())
@@ -26,6 +26,7 @@ void main() {
         'zefanya.webzefanya.apiBaseUrl': 'https://zefanya.shop/api',
         'zefanya.webzefanya.courierApp': true,
         'zefanya.webzefanya.allowWrites': false,
+        'zefanya.webzefanya.allowVerifiedWrites': true,
         'zefanya.apiBaseUrl': '',
         'zefanya.devTools': false,
       });
@@ -39,6 +40,7 @@ void main() {
         expect(kApiBaseUrl, isEmpty);
         expect(kWebZefanyaCourierApp, isTrue);
         expect(kWebZefanyaAllowWrites, isFalse);
+        expect(kWebZefanyaAllowVerifiedWrites, isTrue);
         expect(kShowDevTools, isFalse);
       }
       var requests = 0;
@@ -46,6 +48,7 @@ void main() {
         baseUrl: defines['zefanya.webzefanya.apiBaseUrl'] as String,
         tokenStore: InMemoryTokenStore(),
         routePolicy: WebZefanyaContract(
+          allowVerifiedWrites: true,
           routes: productionBuild
               ? kWebZefanyaBuildRoutes
               : [...kWebZefanyaRoutes, ...kWebZefanyaCourierRoutes],
@@ -54,7 +57,10 @@ void main() {
           requests++;
           expect(request.url.scheme, 'https');
           expect(request.url.host, 'zefanya.shop');
-          expect(request.url.path, startsWith('/api/courier/'));
+          expect(
+            request.url.path,
+            anyOf(startsWith('/api/courier/'), '/api/buyer/checkout/quote'),
+          );
           expect(request.followRedirects, isFalse);
           return http.Response(jsonEncode({'success': true, 'data': {}}), 200);
         }),
@@ -75,6 +81,7 @@ void main() {
         await client.postJson(path, body: {});
       }
       expect(requests, 7);
+      await client.postJson('/buyer/checkout/quote', body: {});
       await expectLater(
         client.postJson('/buyer/cart', body: {}),
         throwsA(isA<ApiNotImplementedException>()),
@@ -83,7 +90,7 @@ void main() {
         client.postJson('/courier/transfers/1/receive', body: {}),
         throwsA(isA<ApiNotImplementedException>()),
       );
-      expect(requests, 7);
+      expect(requests, 8);
     },
   );
 

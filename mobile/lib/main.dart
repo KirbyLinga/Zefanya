@@ -30,11 +30,9 @@ import 'state/theme_state.dart';
 import 'state/wishlist_state.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/pending_approval_screen.dart';
-import 'screens/auth/registration_screen.dart';
 import 'screens/buyer/buyer_shell.dart';
 import 'screens/buyer/product_link_screen.dart';
 import 'screens/courier/courier_shell.dart';
-import 'screens/courier/linehaul_portal.dart';
 import 'screens/courier/webzefanya_courier_portal.dart';
 import 'screens/landing_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -74,6 +72,7 @@ void main() async {
     baseUrl: apiBaseUrlFor(profile),
     profile: profile,
     allowWrites: kWebZefanyaAllowWrites,
+    allowVerifiedWrites: kWebZefanyaAllowVerifiedWrites,
     otherBaseUrl: profile == BackendProfile.webzefanya
         ? kApiBaseUrl
         : kWebZefanyaBaseUrl,
@@ -611,20 +610,8 @@ class _AuthGateState extends State<AuthGate> {
       }
       return LandingScreen(
         reduceMotion: reduceMotion(context),
-        animateEditorial:
-            kUseLiveApi && context.read<Repositories?>()?.client != null,
         onDone: () {
           if (mounted) setState(() => _introDone = true);
-        },
-        onCreateAccount: () {
-          if (!mounted || _introDone) return;
-          setState(() => _introDone = true);
-          Navigator.of(context).push(
-            AppPageRoute(
-              builder: (_) =>
-                  const RegistrationScreen(initialRole: UserRole.buyer),
-            ),
-          );
         },
       );
     }
@@ -642,11 +629,9 @@ class _AuthGateState extends State<AuthGate> {
             if (auth.role != UserRole.linehaul) const StartupNotice(),
             Expanded(
               child: auth.role == UserRole.linehaul
-                  ? ((context.read<Repositories?>()?.capabilities.isWebZefanya ??
-                            false)
-                        // WebZefanya: the read-only Transfer Courier portal.
-                        ? const WebZefanyaCourierPortal()
-                        : const LinehaulPortal())
+                  ? WebZefanyaCourierPortal(
+                      repository: context.read<Repositories?>()?.linehaul,
+                    )
                   : auth.role == UserRole.courier
                   ? const CourierShell()
                   : const BuyerShell(),

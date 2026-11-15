@@ -167,15 +167,30 @@ class CourierHistoryPage {
 
 /// The Courier API, read-only.
 class CourierTransferRepository {
-  const CourierTransferRepository(this.client);
+  const CourierTransferRepository(ApiClient client) : _client = client;
+  const CourierTransferRepository.demo() : _client = null;
 
-  final ApiClient client;
+  final ApiClient? _client;
 
-  Future<CourierProfile> profile() async => CourierProfile.fromJson(
-    unwrapMap(await client.getJson('/courier/profile')),
-  );
+  Future<CourierProfile> profile() async {
+    final client = _client;
+    if (client == null) {
+      return const CourierProfile(
+        accountId: 0,
+        loginId: 'DEMO',
+        name: 'Demo Transport Courier',
+      );
+    }
+    return CourierProfile.fromJson(
+      unwrapMap(await client.getJson('/courier/profile')),
+    );
+  }
 
   Future<CourierAssignments> assignments() async {
+    final client = _client;
+    if (client == null) {
+      return const CourierAssignments(current: [], upcoming: []);
+    }
     final data = unwrapMap(await client.getJson('/courier/transfers'));
     List<CourierTransfer> list(Object? raw) => [
       if (raw is List)
@@ -188,6 +203,15 @@ class CourierTransferRepository {
   }
 
   Future<CourierHistoryPage> history({int page = 1}) async {
+    final client = _client;
+    if (client == null) {
+      return const CourierHistoryPage(
+        items: [],
+        currentPage: 1,
+        lastPage: 1,
+        total: 0,
+      );
+    }
     final data = unwrapMap(
       await client.getJson(
         '/courier/transfers/history',

@@ -6,16 +6,12 @@
 //
 // In mock mode the milestone is read directly from CourierState (the
 // courier's own tracker writes it there). In live mode the screen also
-// polls GET /api/orders/{id}/milestone every 30 s so the buyer's view
+// polls the buyer's authenticated shipment record every 30 s so the view
 // stays in sync across devices — a courier advancing a milestone on
 // their phone surfaces here without the buyer having to leave and
 // re-enter the screen.
 //
-// The poll is fire-and-forget: a transient network error is silently
-// discarded rather than surfaced (the milestone the screen already has
-// is still valid; the next tick will try again). Only
-// UnauthorizedException is forwarded — that means the session is dead
-// and there is no point continuing.
+// A failed refresh keeps the last confirmed status and marks it stale.
 
 import 'dart:async';
 import 'dart:io';
@@ -36,7 +32,6 @@ import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_shapes.dart';
 import '../../widgets/staggered_reveal.dart';
 import '../shared/chat_screen.dart';
-import 'widgets/delivery_pass_card.dart';
 
 class CourierTrackerScreen extends StatefulWidget {
   const CourierTrackerScreen({super.key, required this.order});
@@ -84,6 +79,11 @@ class _CourierTrackerScreenState extends State<CourierTrackerScreen> {
   static const _pollInterval = Duration(seconds: 30);
 
   Timer? _pollTimer;
+  DeliveryMilestone? _serverMilestone;
+  String? _serverStatus;
+  DateTime? _lastChecked;
+  bool _checking = false;
+  String? _trackingProblem;
 
   // The ApiClient is only present in live mode (Repositories.client is null
   // in mock mode). When it is null polling is skipped entirely — the
@@ -109,38 +109,40 @@ class _CourierTrackerScreenState extends State<CourierTrackerScreen> {
     super.dispose();
   }
 
-  /// Fetches the current milestone for this order from the server and
-  /// updates CourierState if it has changed.
-  ///
-  /// Errors are silently discarded — the screen keeps showing whatever
-  /// milestone it already has, and the next tick will retry. The one
-  /// exception is [UnauthorizedException]: a dead session means every
-  /// future tick will also fail, so there's no point continuing.
   Future<void> _poll() async {
     final client = _apiClient;
-    if (client == null || !mounted) return;
+    if (client == null || !mounted || _checking) return;
+    setState(() => _checking = true);
 
     try {
-      final body = await client.getJson(
-        '/orders/${widget.order.id}/milestone',
-        authenticated: true,
+      final body = unwrapMap(
+        await client.getJson('/buyer/shipments/${widget.order.id}'),
       );
       if (!mounted) return;
-
-      final milestone = courierMilestoneForWire(body['milestone']);
-      if (milestone == null) return;
-
-      final job = context.read<CourierState>().jobForOrder(widget.order.id);
-      if (job == null) return;
-
-      context.read<CourierState>().updateMilestoneFromServer(job.id, milestone);
+      final milestone = courierMilestoneForWire(body['status']);
+      final label = body['status_label'];
+      if (milestone == null && (label is! String || label.isEmpty)) {
+        throw const MalformedResponseException();
+      }
+      setState(() {
+        _serverMilestone = milestone;
+        _serverStatus = label is String && label.isNotEmpty ? label : null;
+        _lastChecked = DateTime.now();
+        _trackingProblem = null;
+      });
     } on UnauthorizedException {
-      // Session expired — cancel the timer so we don't spam failed requests.
       _pollTimer?.cancel();
+      if (mounted) {
+        setState(
+          () => _trackingProblem = 'Sign in again to refresh this shipment.',
+        );
+      }
     } on ApiException {
-      // Transient error — try again on the next tick.
-    } catch (_) {
-      // Unexpected — swallow so the screen stays usable.
+      if (mounted) {
+        setState(() => _trackingProblem = 'Could not refresh this shipment.');
+      }
+    } finally {
+      if (mounted) setState(() => _checking = false);
     }
   }
 
@@ -150,29 +152,40 @@ class _CourierTrackerScreenState extends State<CourierTrackerScreen> {
     final theme = Theme.of(context);
     final courier = context.watch<CourierState>();
     final job = courier.jobForOrder(widget.order.id);
-    final milestone = job == null
-        ? DeliveryMilestone.accepted
-        : courier.milestoneFor(job.id);
+    final milestone =
+        _serverMilestone ??
+        (job == null
+            ? switch (widget.order.status) {
+                OrderStatus.toShip => DeliveryMilestone.accepted,
+                OrderStatus.inTransit => DeliveryMilestone.atSortingCenter,
+                OrderStatus.outForDelivery => DeliveryMilestone.inTransit,
+                OrderStatus.toRate => DeliveryMilestone.delivered,
+              }
+            : courier.milestoneFor(job.id));
 
     final failed = milestone == DeliveryMilestone.failedDelivery;
     final returning = milestone == DeliveryMilestone.returnToSender;
-
-    // A pass is useful only while the parcel is travelling to this buyer:
-    // showing it before a rider exists would put the code on screen days
-    // early, and after delivery it is no longer a handover credential.
-    final deliveryPass =
-        job != null &&
-            job.deliveryOtp.trim().isNotEmpty &&
-            (milestone == DeliveryMilestone.assignedToRider ||
-                milestone == DeliveryMilestone.inTransit)
-        ? job
-        : null;
+    final hasTimeline = _serverStatus == null || _serverMilestone != null;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(),
+      appBar: AppBar(
+        actions: [
+          if (_apiClient != null)
+            IconButton(
+              tooltip: 'Refresh shipment',
+              onPressed: _checking ? null : _poll,
+              icon: const Icon(Icons.refresh),
+            ),
+        ],
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.s40),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.s20,
+          0,
+          AppSpacing.s20,
+          AppSpacing.s40,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -185,21 +198,39 @@ class _CourierTrackerScreenState extends State<CourierTrackerScreen> {
                 failed: failed,
                 returning: returning,
                 order: widget.order,
+                serverStatus: _serverStatus,
               ),
             ),
+            if (_apiClient != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_checking && _lastChecked == null)
+                      const Text('Checking shipment…'),
+                    if (_trackingProblem != null)
+                      Text(
+                        _trackingProblem!,
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    if (_lastChecked case final checked?)
+                      Text(
+                        'Last checked: ${MaterialLocalizations.of(context).formatMediumDate(checked)} · ${TimeOfDay.fromDateTime(checked).format(context)}',
+                      ),
+                  ],
+                ),
+              ),
             const SizedBox(height: AppSpacing.s20),
 
-            // ---- Handover pass ----------------------------------
-            // Only while the rider is on the way; the code is the proof the
-            // courier enters at the door, so it belongs with the delivery
-            // details rather than on the order confirmation.
-            if (deliveryPass != null) ...[
-              StaggeredReveal(
-                index: 1,
-                child: DeliveryPassCard(job: deliveryPass),
+            if (milestone == DeliveryMilestone.inTransit)
+              const Padding(
+                padding: EdgeInsets.only(bottom: AppSpacing.s12),
+                child: Text(
+                  'You or someone you authorize can accept the parcel. '
+                  'Check the parcel and any cash payment at handover.',
+                ),
               ),
-              const SizedBox(height: AppSpacing.s12),
-            ],
 
             // ---- Failure notice ---------------------------------
             if (failed || returning)
@@ -208,7 +239,7 @@ class _CourierTrackerScreenState extends State<CourierTrackerScreen> {
                 child: _FailureNotice(theme: theme, returning: returning),
               ),
 
-            if (!failed && !returning) ...[
+            if (hasTimeline && !failed && !returning) ...[
               // ---- Progress timeline ----------------------------
               StaggeredReveal(
                 index: 2,
@@ -259,6 +290,7 @@ class _StatusHero extends StatelessWidget {
     required this.failed,
     required this.returning,
     required this.order,
+    this.serverStatus,
   });
 
   final ThemeData theme;
@@ -266,8 +298,10 @@ class _StatusHero extends StatelessWidget {
   final bool failed;
   final bool returning;
   final Order order;
+  final String? serverStatus;
 
   String get _headline {
+    if (serverStatus case final label?) return label;
     if (failed) return 'Delivery Attempted';
     if (returning) return 'Returning to Seller';
     if (milestone == DeliveryMilestone.delivered) return 'Delivered!';
@@ -313,21 +347,26 @@ class _StatusHero extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.s16),
-            Text(
-              _headline,
-              style: AppType.sectionDisplay.copyWith(
-                fontSize: 26,
-                color: _accentColor,
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                _headline,
+                style: AppType.sectionDisplay.copyWith(
+                  fontSize: 26,
+                  color: _accentColor,
+                ),
               ),
             ),
-            const SizedBox(height: AppSpacing.s4),
-            Text(
-              order.eta,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+            if (serverStatus == null) ...[
+              const SizedBox(height: AppSpacing.s4),
+              Text(
+                order.eta,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -423,7 +462,10 @@ class _ProgressTimeline extends StatelessWidget {
           const SizedBox(width: AppSpacing.s12),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.s16, top: AppSpacing.s4),
+              padding: const EdgeInsets.only(
+                bottom: AppSpacing.s16,
+                top: AppSpacing.s4,
+              ),
               child: Text(
                 label,
                 style: theme.textTheme.bodySmall?.copyWith(

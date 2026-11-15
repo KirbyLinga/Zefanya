@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zefanya/config/dev_flags.dart' show kUseLiveApi;
 import 'package:zefanya/config/app_info.dart';
 import 'package:zefanya/screens/courier/dev_qr_generator_screen.dart';
 import 'package:zefanya/screens/shared/profile_screen.dart';
@@ -36,10 +37,7 @@ Widget _wrap({
       ChangeNotifierProvider(create: (_) => RecentlyViewedState()),
       ChangeNotifierProvider(create: (_) => WishlistState()),
     ],
-    child: MaterialApp(
-      theme: AppTheme.light,
-      home: child,
-    ),
+    child: MaterialApp(theme: AppTheme.light, home: child),
   );
 }
 
@@ -54,8 +52,9 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('buyer settings shows only the account rows that work',
-      (tester) async {
+  testWidgets('buyer settings shows only the account rows that work', (
+    tester,
+  ) async {
     _phoneSize(tester);
     final auth = AuthState();
     await tester.pumpWidget(
@@ -78,8 +77,9 @@ void main() {
     expect(find.byKey(const ValueKey('settings-logout')), findsOneWidget);
   });
 
-  testWidgets('rider settings replaces addresses with vehicle and documents',
-      (tester) async {
+  testWidgets('rider settings replaces addresses with vehicle and documents', (
+    tester,
+  ) async {
     _phoneSize(tester);
     final auth = AuthState()..role = UserRole.courier;
 
@@ -95,33 +95,32 @@ void main() {
     );
   });
 
-  testWidgets('appearance offers Light, Dark and System and applies the choice',
-      (tester) async {
-    _phoneSize(tester);
-    final theme = ThemeState();
-    await tester.pumpWidget(
-      _wrap(
-        child: const SettingsScreen(),
-        auth: AuthState(),
-        theme: theme,
-      ),
-    );
+  testWidgets(
+    'appearance offers Light, Dark and System and applies the choice',
+    (tester) async {
+      _phoneSize(tester);
+      final theme = ThemeState();
+      await tester.pumpWidget(
+        _wrap(child: const SettingsScreen(), auth: AuthState(), theme: theme),
+      );
 
-    expect(find.text('Light'), findsOneWidget);
-    expect(find.text('Dark'), findsOneWidget);
-    expect(find.text('System'), findsOneWidget);
+      expect(find.text('Light'), findsOneWidget);
+      expect(find.text('Dark'), findsOneWidget);
+      expect(find.text('System'), findsOneWidget);
 
-    await tester.tap(find.text('Dark'));
-    await tester.pumpAndSettle();
-    expect(theme.mode, ThemeMode.dark);
+      await tester.tap(find.text('Dark'));
+      await tester.pumpAndSettle();
+      expect(theme.mode, ThemeMode.dark);
 
-    await tester.tap(find.text('System'));
-    await tester.pumpAndSettle();
-    expect(theme.mode, ThemeMode.system);
-  });
+      await tester.tap(find.text('System'));
+      await tester.pumpAndSettle();
+      expect(theme.mode, ThemeMode.system);
+    },
+  );
 
-  testWidgets('About unlocks Developer options only on the seventh tap',
-      (tester) async {
+  testWidgets('About unlocks Developer options only on the seventh tap', (
+    tester,
+  ) async {
     _phoneSize(tester);
     final about = find.byKey(const ValueKey('settings-about'));
     await tester.pumpWidget(
@@ -149,8 +148,11 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('settings-developer')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Mock data'), findsOneWidget);
-    expect(find.byKey(const ValueKey('developer-qr-generator')), findsOneWidget);
+    expect(find.text(kUseLiveApi ? 'Live API' : 'Mock data'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('developer-qr-generator')),
+      findsOneWidget,
+    );
 
     await tester.ensureVisible(
       find.byKey(const ValueKey('developer-qr-generator')),
@@ -204,8 +206,9 @@ void main() {
     expect(auth.role, isNull);
   });
 
-  testWidgets('Profile gear opens Settings and Profile no longer signs out',
-      (tester) async {
+  testWidgets('Profile gear opens Settings and Profile no longer signs out', (
+    tester,
+  ) async {
     _phoneSize(tester);
     await tester.pumpWidget(
       _wrap(

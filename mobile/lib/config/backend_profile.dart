@@ -62,6 +62,10 @@ const bool kWebZefanyaAllowWrites = bool.fromEnvironment(
   defaultValue: false,
 );
 
+const bool kWebZefanyaAllowVerifiedWrites = bool.fromEnvironment(
+  'zefanya.webzefanya.allowVerifiedWrites',
+);
+
 /// Whether the configured WebZefanya has the Courier Mobile API (Phase 3:
 /// `/api/courier/*`, approved and built in an isolated WebZefanya copy). Off by
 /// default: the live WebZefanya does not serve these routes until the owner
@@ -127,7 +131,7 @@ class BackendCapabilities {
       riderPickupFailure = true,
       riderPickupStops = true,
       deliveryCompletionStatus = true,
-      courierLogin = true,
+      courierLogin = false,
       buyerReviewsList = true,
       buyerReviewSubmit = true,
       buyerCheckoutReconcile = true,
@@ -153,7 +157,7 @@ class BackendCapabilities {
       courierLogin = kWebZefanyaCourierApp,
       buyerReviewsList = false,
       buyerReviewSubmit = false,
-      buyerCheckoutReconcile = false,
+      buyerCheckoutReconcile = true,
       buyerDeliveryDispute = false,
       proofOfDeliveryPreview = true;
 

@@ -25,6 +25,7 @@
 // global build flag.
 
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -163,6 +164,72 @@ class MockChatRepository implements ChatRepository {
 
 class LiveChatRepository extends LiveRepository implements ChatRepository {
   LiveChatRepository(super.client);
+
+  static const _buyerMessages = '/buyer/messages';
+
+  Future<List<ChatConversation>> buyerConversations() async {
+    final body = await client.getJson(_buyerMessages, authenticated: true);
+    return [
+      for (final row in unwrapList(body))
+        ChatConversation(
+          id: row['id'] as int,
+          contactName: (row['seller'] as Map?)?['name']?.toString() ?? 'Seller',
+          contactRole: 'Seller',
+          messages: const [],
+          unreadCount: row['unread_count'] as int? ?? 0,
+        ),
+    ];
+  }
+
+  Future<int> openBuyerConversation(int sellerId, int productId) async {
+    final body = await client.postJson(
+      '$_buyerMessages/open',
+      body: {'seller_id': sellerId, 'product_id': productId},
+      authenticated: true,
+    );
+    return (body['data'] as Map)['conversation_id'] as int;
+  }
+
+  Future<List<ChatMessage>> buyerMessages(int id) async {
+    final body = await client.getJson(
+      '$_buyerMessages/$id',
+      authenticated: true,
+    );
+    final rows = (body['data'] as Map)['messages'] as List;
+    return [
+      for (final row in rows)
+        _buyerMessage(Map<String, Object?>.from(row as Map)),
+    ];
+  }
+
+  Future<ChatMessage> sendBuyerMessage(
+    int id,
+    String text, {
+    ({List<int> bytes, String filename})? image,
+  }) async {
+    final body = image == null
+        ? await client.postJson(
+            _buyerMessages,
+            body: {'conversation_id': id, 'body': text},
+            authenticated: true,
+          )
+        : await client.postMultipart(
+            _buyerMessages,
+            fields: {'conversation_id': '$id', 'body': text},
+            byteFiles: {'image': image},
+          );
+    return _buyerMessage(Map<String, Object?>.from(body['data'] as Map));
+  }
+
+  Future<Uint8List> buyerMessageImage(int conversationId, int messageId) =>
+      client.getBytes('$_buyerMessages/$conversationId/images/$messageId');
+
+  ChatMessage _buyerMessage(Map<String, Object?> row) => ChatMessage(
+    text: row['body']?.toString() ?? '',
+    isMe: row['sender_role'] == 'buyer',
+    time: chatTimeLabel(row['created_at']?.toString()),
+    imageId: row['image_url'] == null ? null : row['id'] as int?,
+  );
 
   @override
   bool get supportsAttachments => false;

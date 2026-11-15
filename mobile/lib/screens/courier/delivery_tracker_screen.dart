@@ -8,6 +8,7 @@
 // superseded by this one.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/dev_flags.dart' show FeatureFlags, kShowDevTools;
@@ -733,7 +734,9 @@ class _DeliveryTrackerScreenState extends State<DeliveryTrackerScreen> {
               ),
             const SizedBox(height: 12),
             _buildProofUpload(theme),
-            if (context.read<CourierState>().capabilities
+            if (context
+                    .read<CourierState>()
+                    .capabilities
                     .proofOfDeliveryPreview ||
                 kShowDevTools)
               _buildPodPreviewLink(job),

@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zefanya/config/dev_flags.dart' show kUseLiveApi;
 
 import 'package:zefanya/config/pricing.dart';
 import 'package:zefanya/data/mock_data.dart';
@@ -291,7 +292,10 @@ void main() {
         ChangeNotifierProvider<CartState>.value(value: cart),
       ]);
 
-      expect(find.text('Saved ₱50'), findsOneWidget);
+      expect(
+        find.text('Saved ₱50'),
+        kUseLiveApi ? findsNothing : findsOneWidget,
+      );
       expect(find.text('₱360'), findsWidgets);
     });
   });

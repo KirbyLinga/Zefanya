@@ -4,9 +4,7 @@
 //
 // The local state machine already decides what the rider sees; these tests
 // pin the second half of the contract — that the values the rider typed
-// (waybill, failure reason, delivery code, cash) reach the repository, and
-// that a live job with no on-device code does not lock the rider out of a
-// code the server never gave this phone.
+// (waybill and failure reason) reach the repository.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,7 +25,6 @@ typedef _Call = ({
   String milestone,
   String? trackingNumber,
   String? failureReason,
-  String? deliveryOtp,
   double? codAmount,
 });
 
@@ -38,13 +35,12 @@ class _RecordingCourierRepository implements CourierRepository {
   bool get isServerAuthoritative => false;
 
   @override
-  Future<void> requestDeliveryCode(String jobId) async {}
-
-  @override
   Future<void> completeDelivery(
     String jobId, {
     required String proofPhotoPath,
-    required String deliveryOtp,
+    required String recipientCategory,
+    String? receivedBy,
+    String? recipientRelationship,
     double? codAmount,
   }) async {}
 
@@ -57,7 +53,6 @@ class _RecordingCourierRepository implements CourierRepository {
     String milestoneValue, {
     String? trackingNumber,
     String? failureReason,
-    String? deliveryOtp,
     double? codAmount,
   }) async {
     calls.add((
@@ -65,7 +60,6 @@ class _RecordingCourierRepository implements CourierRepository {
       milestone: milestoneValue,
       trackingNumber: trackingNumber,
       failureReason: failureReason,
-      deliveryOtp: deliveryOtp,
       codAmount: codAmount,
     ));
   }
@@ -74,7 +68,6 @@ class _RecordingCourierRepository implements CourierRepository {
 Future<(CourierState, _RecordingCourierRepository, String)> _dispatched({
   double codAmount = 700,
   bool prepaid = false,
-  String? deliveryOtp,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final repository = _RecordingCourierRepository();
@@ -89,64 +82,12 @@ Future<(CourierState, _RecordingCourierRepository, String)> _dispatched({
     trackingNumber: 'ZEF-RID-777',
     codAmount: codAmount,
     prepaid: prepaid,
-    deliveryOtp: deliveryOtp,
   );
 
   return (courier, repository, courier.jobForOrder(_order.id)!.id);
 }
 
 void main() {
-  group('RID-DLV-004', () {
-    test('a live job accepts any 6-digit code and leaves the check to server',
-        () async {
-      final (courier, _, jobId) = await _dispatched(deliveryOtp: '');
-
-      expect(courier.validateDeliveryOtp(jobId, '482913'), isNull);
-      expect(courier.otpFailuresFor(jobId), 0);
-      expect(courier.isOtpLocked(jobId), isFalse);
-
-      // A five-digit entry is still a shape error, not a server question.
-      expect(courier.validateDeliveryOtp(jobId, '48291'), isNotNull);
-      expect(courier.otpFailuresFor(jobId), 0);
-    });
-  });
-
-  group('RID-DLV-005', () {
-    test('the exact cash and code are sent with DELIVERED', () async {
-      final (courier, repository, jobId) = await _dispatched();
-
-      courier.advanceMilestone(
-        jobId,
-        DeliveryMilestone.delivered,
-        deliveryOtp: '482913',
-        codAmount: 700,
-      );
-
-      final call = repository.calls.single;
-      expect(call.jobId, jobId);
-      expect(call.milestone, 'DELIVERED');
-      expect(call.deliveryOtp, '482913');
-      expect(call.codAmount, 700);
-    });
-  });
-
-  group('RID-DLV-006', () {
-    test('a prepaid delivery sends no cash amount', () async {
-      final (courier, repository, jobId) = await _dispatched(
-        codAmount: 0,
-        prepaid: true,
-      );
-
-      courier.advanceMilestone(
-        jobId,
-        DeliveryMilestone.delivered,
-        deliveryOtp: '482913',
-      );
-
-      expect(repository.calls.single.codAmount, isNull);
-    });
-  });
-
   group('RID-PICK-003', () {
     test('the typed waybill is sent with PICKED_UP', () async {
       final (courier, repository, jobId) = await _dispatched();
@@ -196,21 +137,23 @@ void main() {
   });
 
   group('RID-FAIL-005', () {
-    test('the third failure is sent as RETURNED, not a fourth attempt',
-        () async {
-      final (courier, repository, jobId) = await _dispatched();
+    test(
+      'the third failure is sent as RETURNED, not a fourth attempt',
+      () async {
+        final (courier, repository, jobId) = await _dispatched();
 
-      for (var attempt = 1; attempt <= 3; attempt++) {
-        courier.advanceMilestone(
-          jobId,
-          DeliveryMilestone.failedDelivery,
-          failureReason: 'Buyer not available',
-        );
-      }
+        for (var attempt = 1; attempt <= 3; attempt++) {
+          courier.advanceMilestone(
+            jobId,
+            DeliveryMilestone.failedDelivery,
+            failureReason: 'Buyer not available',
+          );
+        }
 
-      expect(repository.calls.last.milestone, 'RETURNED');
-      expect(repository.calls.last.failureReason, 'Buyer not available');
-      expect(courier.milestoneFor(jobId), DeliveryMilestone.returnToSender);
-    });
+        expect(repository.calls.last.milestone, 'RETURNED');
+        expect(repository.calls.last.failureReason, 'Buyer not available');
+        expect(courier.milestoneFor(jobId), DeliveryMilestone.returnToSender);
+      },
+    );
   });
 }

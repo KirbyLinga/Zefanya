@@ -51,11 +51,11 @@ class OrderDetailScreen extends StatelessWidget {
   // and primaryDark have a different value in each mode, and a const map
   // would freeze whichever mode happened to be active at first touch.
   static Map<OrderStatus, Color> get _statusColors => {
-        OrderStatus.toShip: AppColors.neutral,
-        OrderStatus.inTransit: AppColors.warning,
-        OrderStatus.outForDelivery: AppColors.primaryDark,
-        OrderStatus.toRate: AppColors.tertiary,
-      };
+    OrderStatus.toShip: AppColors.neutral,
+    OrderStatus.inTransit: AppColors.warning,
+    OrderStatus.outForDelivery: AppColors.primaryDark,
+    OrderStatus.toRate: AppColors.tertiary,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -69,15 +69,15 @@ class OrderDetailScreen extends StatelessWidget {
     final statusColor = order.cancelled
         ? AppColors.danger
         : returnRequest != null
-            ? _returnStatusColor(returnRequest.status)
-            : _statusColors[order.status]!;
+        ? _returnStatusColor(returnRequest.status)
+        : _statusColors[order.status]!;
     final statusLabel = order.cancelled
         ? 'Cancelled'
         : order.buyerConfirmed
-            ? 'Completed'
-            : returnRequest != null
-                ? returnRequest.orderLabel
-                : _statusLabels[order.status]!;
+        ? 'Completed'
+        : returnRequest != null
+        ? returnRequest.orderLabel
+        : _statusLabels[order.status]!;
     final textColor = Color.lerp(statusColor, Colors.black, 0.40)!;
     // Pull live courier milestone if available
     final milestone = courier.milestoneForOrder(order.id);
@@ -106,8 +106,11 @@ class OrderDetailScreen extends StatelessWidget {
                           CircleAvatar(
                             radius: 18,
                             backgroundColor: AppColors.surface,
-                            child: Icon(Icons.storefront_outlined,
-                                size: 18, color: AppColors.primaryDark),
+                            child: Icon(
+                              Icons.storefront_outlined,
+                              size: 18,
+                              color: AppColors.primaryDark,
+                            ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
@@ -116,14 +119,18 @@ class OrderDetailScreen extends StatelessWidget {
                               children: [
                                 Text('FROM THE SELLER', style: AppType.eyebrow),
                                 const SizedBox(height: 2),
-                                Text(order.shopName,
-                                    style: theme.textTheme.titleSmall),
+                                Text(
+                                  order.shopName,
+                                  style: theme.textTheme.titleSmall,
+                                ),
                               ],
                             ),
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: statusColor.withValues(alpha: 0.15),
                               borderRadius: radiusOf(ShapeTier.pill),
@@ -131,7 +138,9 @@ class OrderDetailScreen extends StatelessWidget {
                             child: Text(
                               statusLabel,
                               style: theme.textTheme.labelSmall?.copyWith(
-                                  color: textColor, fontWeight: FontWeight.w700),
+                                color: textColor,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ],
@@ -148,38 +157,59 @@ class OrderDetailScreen extends StatelessWidget {
                           // Reference number
                           InkWell(
                             onTap: () => copyId(context, order.id),
-                            child: Semantics(button: true, label: 'Copy order ID', excludeSemantics: true, child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(order.id, style: AppType.eyebrow),
-                                const SizedBox(width: 6),
-                                Icon(Icons.copy_outlined, size: 13, color: AppColors.textSecondary),
-                              ],
+                            child: Semantics(
+                              button: true,
+                              label: 'Copy order ID',
+                              excludeSemantics: true,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(order.id, style: AppType.eyebrow),
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    Icons.copy_outlined,
+                                    size: 13,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
                           ),
                           const SizedBox(height: 10),
                           // Item summary
                           _receiptLine(theme, 'Items', order.itemSummary),
                           const SizedBox(height: 6),
                           // ETA
-                          _receiptLine(theme, 'Estimated Arrival', order.eta,
-                              valueColor: AppColors.accent,
-                              valueBold: true),
+                          _receiptLine(
+                            theme,
+                            'Estimated Arrival',
+                            order.eta,
+                            valueColor: AppColors.accent,
+                            valueBold: true,
+                          ),
                           if (milestone != null) ...[
                             const SizedBox(height: 6),
-                            _receiptLine(theme, 'Courier Status',
-                                _milestoneLabel(milestone)),
+                            _receiptLine(
+                              theme,
+                              'Courier Status',
+                              _milestoneLabel(milestone),
+                            ),
                           ],
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 14),
                             child: Divider(height: 1),
                           ),
-                          _receiptLine(theme, 'Payment Method',
-                              'Cash on Delivery'),
+                          _receiptLine(
+                            theme,
+                            'Payment Method',
+                            'Cash on Delivery',
+                          ),
                           const SizedBox(height: 6),
-                          _receiptLine(theme, 'Order Date',
-                              'See app notification'), // placeholder until API
+                          _receiptLine(
+                            theme,
+                            'Order Date',
+                            'See app notification',
+                          ), // placeholder until API
                         ],
                       ),
                     ),
@@ -189,8 +219,7 @@ class OrderDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             // ---- Return / refund status --------------------------
-            if (returnRequest != null)
-              ReturnStatusCard(request: returnRequest),
+            if (returnRequest != null) ReturnStatusCard(request: returnRequest),
             // ---- Actions ----------------------------------------
             _ActionCard(
               order: order,
@@ -199,24 +228,31 @@ class OrderDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             // ---- Timeline (milestone progress) ------------------
-            if (milestone != null)
-              _MilestoneTimeline(milestone: milestone),
+            if (milestone != null) _MilestoneTimeline(milestone: milestone),
           ],
         ),
       ),
     );
   }
 
-  Widget _receiptLine(ThemeData theme, String label, String value,
-      {Color? valueColor, bool valueBold = false}) {
+  Widget _receiptLine(
+    ThemeData theme,
+    String label,
+    String value, {
+    Color? valueColor,
+    bool valueBold = false,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           width: 120,
-          child: Text(label,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: AppColors.textSecondary)),
+          child: Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
         ),
         Expanded(
           child: Text(
@@ -232,24 +268,25 @@ class OrderDetailScreen extends StatelessWidget {
   }
 
   String _milestoneLabel(DeliveryMilestone m) => switch (m) {
-        DeliveryMilestone.accepted        => 'Assigned to courier',
-        DeliveryMilestone.arrivedAtSeller => 'Courier at seller',
-        DeliveryMilestone.pickedUp        => 'Package picked up',
-        DeliveryMilestone.atSortingCenter => 'At sorting center',
-        DeliveryMilestone.sorted          => 'Sorted',
-        DeliveryMilestone.assignedToRider => 'Assigned to delivery rider',
-        DeliveryMilestone.inTransit       => 'In transit',
-        DeliveryMilestone.delivered       => 'Delivered',
-        DeliveryMilestone.failedDelivery  => 'Delivery failed — retry pending',
-        DeliveryMilestone.returnToSender  => 'Returning to seller',
-      };
+    DeliveryMilestone.accepted => 'Assigned to courier',
+    DeliveryMilestone.arrivedAtSeller => 'Courier at seller',
+    DeliveryMilestone.pickedUp => 'Package picked up',
+    DeliveryMilestone.atSortingCenter => 'At sorting center',
+    DeliveryMilestone.sorted => 'Sorted',
+    DeliveryMilestone.assignedToRider => 'Assigned to delivery rider',
+    DeliveryMilestone.inTransit => 'In transit',
+    DeliveryMilestone.delivered => 'Delivered',
+    DeliveryMilestone.failedDelivery => 'Delivery failed — retry pending',
+    DeliveryMilestone.returnToSender => 'Returning to seller',
+  };
 
   static Color _returnStatusColor(ReturnStatus status) => switch (status) {
-        ReturnStatus.submitted => AppColors.warning,
-        ReturnStatus.rejected => AppColors.danger,
-        ReturnStatus.escalated => AppColors.primaryDark,
-        ReturnStatus.refunded => AppColors.tertiary,
-      };
+    ReturnStatus.submitted => AppColors.warning,
+    ReturnStatus.rejected => AppColors.danger,
+    ReturnStatus.escalated => AppColors.primaryDark,
+    ReturnStatus.refunded => AppColors.tertiary,
+    ReturnStatus.returned => AppColors.tertiary,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -297,9 +334,9 @@ class _ActionCard extends StatelessWidget {
         content: Text('$added item${added == 1 ? '' : 's'} added to cart'),
         action: SnackBarAction(
           label: 'View Cart',
-          onPressed: () => Navigator.of(context).push(
-            AppPageRoute(builder: (_) => const CartScreen()),
-          ),
+          onPressed: () => Navigator.of(
+            context,
+          ).push(AppPageRoute(builder: (_) => const CartScreen())),
         ),
       ),
     );
@@ -307,8 +344,9 @@ class _ActionCard extends StatelessWidget {
 
   Future<void> _confirmReceived(BuildContext context) async {
     try {
-      final error =
-          await context.read<OrderState>().confirmOrderReceived(order);
+      final error = await context.read<OrderState>().confirmOrderReceived(
+        order,
+      );
       if (!context.mounted) return;
       showTimedSnackBar(
         context,
@@ -328,10 +366,7 @@ class _ActionCard extends StatelessWidget {
   Future<void> _startReturn(BuildContext context) async {
     await Navigator.of(context).push(
       AppPageRoute(
-        builder: (_) => ReturnScreen(
-          order: order,
-          deliveredAt: deliveredAt,
-        ),
+        builder: (_) => ReturnScreen(order: order, deliveredAt: deliveredAt),
       ),
     );
   }
@@ -374,10 +409,7 @@ class _ActionCard extends StatelessWidget {
                       ),
                     ),
                     for (final option in OrderState.cancellationReasons)
-                      RadioListTile<String>(
-                        value: option,
-                        title: Text(option),
-                      ),
+                      RadioListTile<String>(value: option, title: Text(option)),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                       child: ElevatedButton(
@@ -416,7 +448,8 @@ class _ActionCard extends StatelessWidget {
     AppColors.watch(context);
     final returns = context.watch<OrderState>().returns;
     final returnOpen = returnRequest?.isOpen ?? false;
-    final canReturn = returnRequest == null &&
+    final canReturn =
+        returnRequest == null &&
         returns.returnRefusal(order, deliveredAt: deliveredAt) == null;
     return Container(
       padding: const EdgeInsets.all(16),
@@ -471,10 +504,14 @@ class _ActionCard extends StatelessWidget {
           ],
           if (FeatureFlags.chatLive) ...[
             OutlinedButton.icon(
-              onPressed: () => Navigator.of(context).push(AppPageRoute(
-                builder: (_) => ChatScreen(
-                    contactName: order.shopName, contactRole: 'Seller'),
-              )),
+              onPressed: () => Navigator.of(context).push(
+                AppPageRoute(
+                  builder: (_) => ChatScreen(
+                    contactName: order.shopName,
+                    contactRole: 'Seller',
+                  ),
+                ),
+              ),
               icon: const Icon(Icons.chat_bubble_outline, size: 16),
               label: const Text('Contact Seller'),
             ),
@@ -485,10 +522,14 @@ class _ActionCard extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: () {
                 copyId(context, order.id);
-                Navigator.of(context).push(AppPageRoute(
-                  builder: (_) => ChatScreen(
-                      contactName: order.shopName, contactRole: 'Seller'),
-                ));
+                Navigator.of(context).push(
+                  AppPageRoute(
+                    builder: (_) => ChatScreen(
+                      contactName: order.shopName,
+                      contactRole: 'Seller',
+                    ),
+                  ),
+                );
               },
               icon: const Icon(Icons.copy_outlined, size: 16),
               label: const Text('Copy ID & Chat with Seller'),
@@ -540,14 +581,14 @@ class _MilestoneTimeline extends StatelessWidget {
   final DeliveryMilestone milestone;
 
   static const _steps = [
-    (DeliveryMilestone.accepted,        'Order Received'),
+    (DeliveryMilestone.accepted, 'Order Received'),
     (DeliveryMilestone.arrivedAtSeller, 'Courier at Seller'),
-    (DeliveryMilestone.pickedUp,        'Package Picked Up'),
+    (DeliveryMilestone.pickedUp, 'Package Picked Up'),
     (DeliveryMilestone.atSortingCenter, 'At Sorting Center'),
-    (DeliveryMilestone.sorted,          'Sorted'),
+    (DeliveryMilestone.sorted, 'Sorted'),
     (DeliveryMilestone.assignedToRider, 'Assigned to Rider'),
-    (DeliveryMilestone.inTransit,       'In Transit'),
-    (DeliveryMilestone.delivered,       'Delivered'),
+    (DeliveryMilestone.inTransit, 'In Transit'),
+    (DeliveryMilestone.delivered, 'Delivered'),
   ];
 
   @override
@@ -581,11 +622,13 @@ class _MilestoneTimeline extends StatelessWidget {
     );
   }
 
-  Widget _timelineStep(ThemeData theme,
-      {required String label,
-      required bool done,
-      required bool active,
-      required bool isLast}) {
+  Widget _timelineStep(
+    ThemeData theme, {
+    required String label,
+    required bool done,
+    required bool active,
+    required bool isLast,
+  }) {
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -607,8 +650,7 @@ class _MilestoneTimeline extends StatelessWidget {
                     ),
                   ),
                   child: done && !active
-                      ? Icon(Icons.check,
-                          size: 8, color: AppColors.textOnDark)
+                      ? Icon(Icons.check, size: 8, color: AppColors.textOnDark)
                       : null,
                 ),
                 if (!isLast)
@@ -631,10 +673,9 @@ class _MilestoneTimeline extends StatelessWidget {
                   color: active
                       ? AppColors.primaryDark
                       : done
-                          ? AppColors.textPrimary
-                          : AppColors.textSecondary,
-                  fontWeight:
-                      active ? FontWeight.w700 : FontWeight.w400,
+                      ? AppColors.textPrimary
+                      : AppColors.textSecondary,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w400,
                 ),
               ),
             ),

@@ -108,20 +108,22 @@ void main() {
     );
 
     test(
-      'a default build has no Courier routes and offers no Courier sign-in',
+      'the build flag controls Courier routes and Courier sign-in together',
       () {
-        expect(kWebZefanyaCourierApp, isFalse);
-        expect(const BackendCapabilities.webzefanya().courierLogin, isFalse);
+        expect(
+          const BackendCapabilities.webzefanya().courierLogin,
+          kWebZefanyaCourierApp,
+        );
         expect(
           kWebZefanyaBuildRoutes.any((r) => r.path.startsWith('/courier')),
-          isFalse,
+          kWebZefanyaCourierApp,
         );
         expect(
           const WebZefanyaContract.fromEnvironment().supports(
             'POST',
             '/courier/login',
           ),
-          isFalse,
+          kWebZefanyaCourierApp,
         );
       },
     );

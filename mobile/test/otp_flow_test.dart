@@ -581,7 +581,10 @@ void _widgetTests() {
       // described as being behind them.
       expect(find.text('Confirm Code'), findsNothing);
       expect(find.text('Enter Code'), findsNothing);
-      expect(find.text('Under Review'), findsOneWidget);
+      expect(
+        find.text(kShowDevTools ? 'Under Review' : "You're on the List"),
+        findsOneWidget,
+      );
       expect(repository.codeSeen, '123456');
     });
   });
@@ -732,12 +735,14 @@ void _widgetTests() {
       expect(find.textContaining('Send another in'), findsNothing);
     });
 
-    testWidgets("a server cooldown (429) waits as long as the server said",
-        (tester) async {
+    testWidgets("a server cooldown (429) waits as long as the server said", (
+      tester,
+    ) async {
       final repository = _ScriptedOtpRepository(
         resendThrows: const RequestRejectedException(
           statusCode: 429,
-          message: 'Too many verification codes requested. Please try again later.',
+          message:
+              'Too many verification codes requested. Please try again later.',
           retryAfter: Duration(seconds: 42),
         ),
       );

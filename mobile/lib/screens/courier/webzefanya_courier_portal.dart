@@ -25,10 +25,15 @@ import '../../state/auth_state.dart';
 import '../../utils/timed_snackbar.dart';
 
 class WebZefanyaCourierPortal extends StatefulWidget {
-  const WebZefanyaCourierPortal({super.key, this.repository});
+  const WebZefanyaCourierPortal({
+    super.key,
+    this.repository,
+    this.initialTab = 0,
+  });
 
   /// Injected in tests; otherwise built from the app's WebZefanya client.
   final CourierTransferRepository? repository;
+  final int initialTab;
 
   @override
   State<WebZefanyaCourierPortal> createState() =>
@@ -36,7 +41,7 @@ class WebZefanyaCourierPortal extends StatefulWidget {
 }
 
 class _WebZefanyaCourierPortalState extends State<WebZefanyaCourierPortal> {
-  late final CourierTransferRepository _repo;
+  CourierTransferRepository? _repo;
   int _generation = 0;
   int _tab = 0;
 
@@ -51,9 +56,14 @@ class _WebZefanyaCourierPortalState extends State<WebZefanyaCourierPortal> {
   @override
   void initState() {
     super.initState();
-    final client = context.read<Repositories?>()?.client;
-    _repo = widget.repository ?? CourierTransferRepository(client!);
-    _load();
+    _tab = widget.initialTab;
+    _repo = widget.repository ?? context.read<Repositories?>()?.linehaul;
+    if (_repo != null) {
+      _load();
+    } else {
+      _loading = false;
+      _blocked = 'Transport Courier access requires the WebZefanya profile.';
+    }
   }
 
   @override
@@ -65,6 +75,8 @@ class _WebZefanyaCourierPortalState extends State<WebZefanyaCourierPortal> {
   bool _current(int generation) => mounted && generation == _generation;
 
   Future<void> _load() async {
+    final repository = _repo;
+    if (repository == null) return;
     final generation = ++_generation;
     setState(() {
       _loading = true;
@@ -72,9 +84,9 @@ class _WebZefanyaCourierPortalState extends State<WebZefanyaCourierPortal> {
     });
     try {
       final results = await Future.wait([
-        _repo.profile(),
-        _repo.assignments(),
-        _repo.history(),
+        repository.profile(),
+        repository.assignments(),
+        repository.history(),
       ]);
       if (!_current(generation)) return;
       final page = results[2] as CourierHistoryPage;
@@ -94,12 +106,14 @@ class _WebZefanyaCourierPortalState extends State<WebZefanyaCourierPortal> {
   }
 
   Future<void> _loadMore() async {
+    final repository = _repo;
+    if (repository == null) return;
     final page = _lastHistoryPage;
     if (page == null || !page.hasMore || _loadingMore) return;
     final generation = _generation;
     setState(() => _loadingMore = true);
     try {
-      final next = await _repo.history(page: page.currentPage + 1);
+      final next = await repository.history(page: page.currentPage + 1);
       if (!_current(generation)) return;
       setState(() {
         final seen = _history.map((t) => t.key).toSet();

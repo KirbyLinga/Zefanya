@@ -10,6 +10,8 @@ import '../../config/dev_flags.dart' show kUseLiveApi;
 import '../../config/pricing.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/mock_data.dart' show Order, Voucher, VoucherScope;
+import '../../data/repositories/order_repository.dart'
+    show CheckoutOutcomeUnknown;
 import '../../state/auth_state.dart';
 import '../../state/cart_state.dart';
 import '../../state/courier_state.dart';
@@ -19,6 +21,7 @@ import '../../utils/money_format.dart';
 import '../../utils/timed_snackbar.dart';
 import 'address_book_screen.dart';
 import 'courier_tracker_screen.dart';
+import 'orders_status_screen.dart';
 import 'widgets/order_confirmation_dialog.dart';
 import '../../widgets/app_page_route.dart';
 import '../../widgets/editorial_header.dart';
@@ -58,11 +61,79 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _termsError;
   bool _agreedToTerms = false;
   bool _isPlacingOrder = false;
+  bool _checkingCheckout = false;
+  bool _checkoutUnconfirmed = false;
 
   /// Collapses the per-line breakdown to one total row, expanded on
   /// tap. Starts collapsed: the total is what a checkout screen is
   /// for; the lines are one tap away, not gone.
   bool _summaryExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final orders = context.read<OrderState>();
+    if (orders.usesServerCheckoutAddress) {
+      _checkingCheckout = true;
+      _restorePendingCheckout(orders);
+    }
+  }
+
+  Future<void> _restorePendingCheckout(OrderState orders) async {
+    var pending = true;
+    try {
+      pending = await orders.hasPendingCheckout();
+    } catch (_) {
+      // If pending storage is unreadable, the app cannot safely submit again.
+    }
+    if (!mounted) return;
+    setState(() {
+      _checkingCheckout = false;
+      _checkoutUnconfirmed = pending;
+    });
+  }
+
+  Future<void> _reconcileCheckout(List<CartItem> items) async {
+    if (_checkingCheckout) return;
+    final orders = context.read<OrderState>();
+    final cart = context.read<CartState>();
+    setState(() => _checkingCheckout = true);
+    var result = (status: 'unknown', identity: null as String?);
+    try {
+      result = await orders.reconcileCheckout();
+    } catch (_) {
+      // Keep the checkout locked if the recovery response was not established.
+    }
+    if (!mounted) return;
+    setState(() {
+      _checkingCheckout = false;
+      _checkoutUnconfirmed = result.status == 'unknown';
+    });
+
+    if (result.status == 'placed') {
+      if (widget.checkoutItems == null &&
+          orders.checkoutIdentity(items) == result.identity &&
+          orders.checkoutIdentity(cart.selectedItems) == result.identity) {
+        cart.clearSelected();
+      }
+      orders.refresh().ignore();
+      Navigator.of(context)
+        ..popUntil((route) => route.isFirst)
+        ..push(AppPageRoute(builder: (_) => const OrdersStatusScreen()));
+      return;
+    }
+
+    showTimedSnackBar(
+      context,
+      SnackBar(
+        content: Text(
+          result.status == 'rejected'
+              ? 'The previous checkout closed without placing an order. You can try again.'
+              : 'The previous checkout is still unconfirmed. Check again before placing another order.',
+        ),
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -71,6 +142,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _placeOrder(List<CartItem> selectedItems, double total) async {
+    if (_isPlacingOrder || _checkingCheckout || _checkoutUnconfirmed) return;
     final auth = context.read<AuthState>();
     final deliveryAddress = auth.defaultAddress?.summary ?? auth.addressSummary;
     final hasNoAddress = deliveryAddress.isEmpty;
@@ -188,10 +260,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // Live mode: WebZefanya prices the order (items, shipping per shop,
     // vouchers). Show the buyer the server's total and place only that.
     final orderState = context.read<OrderState>();
-    final voucherCodes = kUseLiveApi ? cart.appliedVoucherCodes : const <String>[];
+    final voucherCodes = kUseLiveApi
+        ? cart.appliedVoucherCodes
+        : const <String>[];
     double? serverTotal;
     try {
-      serverTotal = await orderState.quoteTotal(selectedItems, voucherCodes: voucherCodes);
+      serverTotal = await orderState.quoteTotal(
+        selectedItems,
+        voucherCodes: voucherCodes,
+      );
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() => _isPlacingOrder = false);
@@ -243,6 +320,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         voucherCodes: voucherCodes,
         expectedTotal: serverTotal,
       );
+    } on CheckoutOutcomeUnknown {
+      if (!mounted) return;
+      setState(() {
+        _isPlacingOrder = false;
+        _checkoutUnconfirmed = true;
+      });
+      return;
     } on ApiException catch (error) {
       // The cart is deliberately NOT cleared on failure — a checkout that
       // emptied the cart and then failed to place the order would be the worst
@@ -368,7 +452,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           .transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
       appBar: AppBar(),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.s20, 0, AppSpacing.s20, 120),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.s20,
+          0,
+          AppSpacing.s20,
+          120,
+        ),
         children: [
           const EditorialHeader(
             eyebrow: 'ALMOST THERE',
@@ -973,7 +1062,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
           if (hasError) ...[
             Padding(
-              padding: const EdgeInsets.only(left: AppSpacing.s12, bottom: AppSpacing.s4, top: AppSpacing.s4),
+              padding: const EdgeInsets.only(
+                left: AppSpacing.s12,
+                bottom: AppSpacing.s4,
+                top: AppSpacing.s4,
+              ),
               child: Row(
                 children: [
                   Icon(Icons.error_outline, size: 14, color: AppColors.danger),
@@ -1002,7 +1095,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     double total,
   ) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s12, AppSpacing.s20, AppSpacing.s16),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s20,
+        AppSpacing.s12,
+        AppSpacing.s20,
+        AppSpacing.s16,
+      ),
       decoration: BoxDecoration(
         color: AppColors.surface,
         boxShadow: [
@@ -1028,16 +1126,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
             ElevatedButton(
-              onPressed: _isPlacingOrder
+              onPressed: _isPlacingOrder || _checkingCheckout
                   ? null
+                  : _checkoutUnconfirmed
+                  ? () => _reconcileCheckout(selectedItems)
                   : () => _placeOrder(selectedItems, total),
-              child: _isPlacingOrder
+              child: _isPlacingOrder || _checkingCheckout
                   ? ZefanyaLoader(
                       size: 18,
                       color: AppColors.textOnDark,
                       strokeWidth: 4,
                     )
-                  : const Text('Place Order'),
+                  : Text(
+                      _checkoutUnconfirmed
+                          ? 'Check checkout status'
+                          : 'Place Order',
+                    ),
             ),
           ],
         ),

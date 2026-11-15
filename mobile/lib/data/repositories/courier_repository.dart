@@ -609,7 +609,7 @@ String failureReasonWire(String? label) => switch (label?.trim()) {
 ///     from `/rider/return-pickups`, which WebZefanya does not have. The rows
 ///     carry no id, so they are read-only: the tracking number identifies them
 ///     and nothing can be collected from the app.
-///   * The demo fork's recipient-acknowledgement fields are not sent.
+///   * Delivery requires a verified scan, proof photo and recipient acknowledgement.
 ///   * Calls WebZefanya has no route for throw [ApiNotImplementedException]
 ///     locally (also enforced by the client's endpoint guard).
 class WebZefanyaCourierRepository extends LiveCourierRepository {
@@ -694,6 +694,12 @@ class WebZefanyaCourierRepository extends LiveCourierRepository {
       '/rider/deliveries/$jobId/deliver',
       fields: {
         'verification_token': token,
+        'physical_handover': '1',
+        'recipient_accepted': '1',
+        'recipient_category': recipientCategory,
+        if (recipientCategory == 'representative' &&
+            recipientRelationship != null)
+          'recipient_relationship': recipientRelationship.trim(),
         if (receivedBy != null && receivedBy.trim().isNotEmpty)
           'received_by': receivedBy.trim(),
         if (codAmount != null) 'cod_amount': codAmount.toStringAsFixed(2),

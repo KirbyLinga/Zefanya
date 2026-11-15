@@ -30,6 +30,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zefanya/config/dev_flags.dart' show kUseLiveApi;
 
 import 'package:zefanya/config/pricing.dart';
 import 'package:zefanya/data/mock_data.dart';
@@ -523,7 +524,9 @@ void main() {
   });
 
   group('BUY-CHK-001 checkout with the worked example', () {
-    testWidgets('summary shows ₱1,098 + ₱185 − ₱200 = ₱1,083', (tester) async {
+    testWidgets('summary includes mock voucher discounts only in mock mode', (
+      tester,
+    ) async {
       final cart = await _cart();
       cart.addItem(_mock('p2'));
       cart.addItem(_mock('p6'));
@@ -540,12 +543,13 @@ void main() {
       expect(find.text('₱1,098'), findsOneWidget);
       expect(find.text('Shipping fee'), findsOneWidget);
       expect(find.text('₱185'), findsOneWidget);
-      expect(find.text('Store voucher (MCH50)'), findsOneWidget);
-      expect(find.text('Platform voucher (PLAT100)'), findsOneWidget);
-      expect(find.text('Shipping voucher (FREESHIP)'), findsOneWidget);
-      expect(find.text('- ₱50'), findsNWidgets(2));
-      expect(find.text('- ₱100'), findsOneWidget);
-      expect(find.text('₱1,083'), findsWidgets);
+      final voucherRows = kUseLiveApi ? findsNothing : findsOneWidget;
+      expect(find.text('Store voucher (MCH50)'), voucherRows);
+      expect(find.text('Platform voucher (PLAT100)'), voucherRows);
+      expect(find.text('Shipping voucher (FREESHIP)'), voucherRows);
+      expect(find.text('- ₱50'), kUseLiveApi ? findsNothing : findsNWidgets(2));
+      expect(find.text('- ₱100'), voucherRows);
+      expect(find.text(kUseLiveApi ? '₱1,283' : '₱1,083'), findsWidgets);
     });
 
     test('the cart becomes one order per seller and empties', () async {

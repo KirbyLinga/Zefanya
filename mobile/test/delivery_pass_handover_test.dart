@@ -2,9 +2,7 @@
 //
 // The courier half of the receiving flow. The handover sheet is reached
 // through the real tracker screen (including its proof-photo gate), then
-// the QR scanner's manual fallback supplies a pass. This pins the wiring
-// the pure codec tests cannot: that a scan fills the delivery-code field,
-// and that a malformed or wrong-order pass never completes a delivery.
+// it requires recorded handover and recipient acceptance without a Buyer OTP.
 
 import 'dart:io';
 
@@ -115,23 +113,24 @@ Future<void> _attachProofAndOpenHandover(WidgetTester tester) async {
   await tester.tap(find.text('Confirm Order Delivered'));
   await tester.pumpAndSettle();
   expect(find.text('CONFIRM HANDOVER'), findsOneWidget);
-  expect(find.byKey(const ValueKey('delivery-pass-scan')), findsOneWidget);
+  expect(find.byKey(const ValueKey('delivery-pass-scan')), findsNothing);
+  expect(find.byKey(const ValueKey('delivery-otp-field')), findsNothing);
 }
 
-Future<void> _scanManually(WidgetTester tester, String value) async {
-  await tester.tap(find.byKey(const ValueKey('delivery-pass-scan')));
-  // The scanner's camera placeholder keeps an indeterminate spinner
-  // running, so pumpAndSettle would never finish here.
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 500));
-
-  final field = find.byKey(const ValueKey('qr-manual-entry'));
-  expect(field, findsOneWidget);
-  await tester.enterText(field, value);
-  await tester.tap(find.byKey(const ValueKey('qr-manual-confirm')));
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 500));
+Future<void> _tap(WidgetTester tester, String key) async {
+  final target = find.byKey(ValueKey(key));
+  await tester.ensureVisible(target);
+  await tester.tap(target);
+  await tester.pumpAndSettle();
 }
+
+bool _canSubmit(WidgetTester tester) =>
+    tester
+        .widget<ElevatedButton>(
+          find.byKey(const ValueKey('confirm-delivery-submit')),
+        )
+        .onPressed !=
+    null;
 
 void main() {
   late Directory tempDir;
@@ -156,60 +155,59 @@ void main() {
     }
   });
 
-  testWidgets('a scanned pass fills the delivery code and completes the '
-      'handover', (tester) async {
-    final (courier, jobId) = await _atTheDoor();
-    await _pump(tester, courier, jobId);
-    await _attachProofAndOpenHandover(tester);
-
-    await _scanManually(tester, 'ZEFANYA:DELIVERY:$jobId:482913');
-
-    final otpField = tester.widget<TextField>(
-      find.byKey(const ValueKey('delivery-otp-field')),
-    );
-    expect(otpField.controller!.text, '482913');
-    expect(find.byKey(const ValueKey('handover-error')), findsNothing);
-
-    await tester.tap(find.byKey(const ValueKey('confirm-delivery-submit')));
-    await tester.pumpAndSettle();
-
-    expect(courier.isCompleted(jobId), isTrue);
-    expect(find.text('Delivered'), findsOneWidget);
-    expect(find.textContaining('added to your earnings'), findsOneWidget);
-  });
-
-  testWidgets('a pass for another order is refused and does not fill the '
-      'code', (tester) async {
-    final (courier, jobId) = await _atTheDoor();
-    await _pump(tester, courier, jobId);
-    await _attachProofAndOpenHandover(tester);
-
-    await _scanManually(tester, 'ZEFANYA:DELIVERY:REQ-9999:482913');
-
-    expect(
-      find.text('That delivery pass belongs to a different order.'),
-      findsOneWidget,
-    );
-    final otpField = tester.widget<TextField>(
-      find.byKey(const ValueKey('delivery-otp-field')),
-    );
-    expect(otpField.controller!.text, isEmpty);
-    expect(courier.isCompleted(jobId), isFalse);
-  });
-
-  testWidgets('an unrelated QR code is refused with a clear message', (
+  testWidgets('a proof photo and Buyer acknowledgement complete handover', (
     tester,
   ) async {
     final (courier, jobId) = await _atTheDoor();
     await _pump(tester, courier, jobId);
     await _attachProofAndOpenHandover(tester);
 
-    await _scanManually(tester, 'ZEF-5521-01');
+    await _tap(tester, 'physical-handover');
+    await _tap(tester, 'recipient-accepted');
+    expect(_canSubmit(tester), isTrue);
+    await _tap(tester, 'confirm-delivery-submit');
 
-    expect(
-      find.text('That QR is not a Zefanya delivery pass.'),
-      findsOneWidget,
-    );
+    expect(courier.isCompleted(jobId), isTrue);
+    expect(find.text('Delivered'), findsOneWidget);
+    expect(find.textContaining('added to your earnings'), findsOneWidget);
+  });
+
+  testWidgets('recipient acknowledgement alone cannot complete handover', (
+    tester,
+  ) async {
+    final (courier, jobId) = await _atTheDoor();
+    await _pump(tester, courier, jobId);
+    await _attachProofAndOpenHandover(tester);
+
+    await _tap(tester, 'recipient-accepted');
+    expect(_canSubmit(tester), isFalse);
     expect(courier.isCompleted(jobId), isFalse);
+  });
+
+  testWidgets('a representative requires both recorded identity fields', (
+    tester,
+  ) async {
+    final (courier, jobId) = await _atTheDoor();
+    await _pump(tester, courier, jobId);
+    await _attachProofAndOpenHandover(tester);
+
+    await _tap(tester, 'physical-handover');
+    await _tap(tester, 'recipient-category');
+    await tester.tap(find.text('Authorized representative').last);
+    await tester.pumpAndSettle();
+    await _tap(tester, 'recipient-accepted');
+    await tester.enterText(
+      find.byKey(const ValueKey('recipient-name')),
+      'Anna',
+    );
+    await tester.pumpAndSettle();
+    expect(_canSubmit(tester), isFalse);
+    expect(courier.isCompleted(jobId), isFalse);
+    await tester.enterText(
+      find.byKey(const ValueKey('recipient-relationship')),
+      'Household member',
+    );
+    await tester.pumpAndSettle();
+    expect(_canSubmit(tester), isTrue);
   });
 }

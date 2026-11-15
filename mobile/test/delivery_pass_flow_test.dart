@@ -1,10 +1,3 @@
-// test/delivery_pass_flow_test.dart
-//
-// The buyer's delivery pass, rendered where it is actually used. The card
-// only appears while a rider is carrying the parcel; before assignment
-// there is no one to show it to, and after delivery it is no longer a
-// handover credential.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -20,14 +13,11 @@ const _order = Order(
   id: 'ORD-PASS-1',
   shopName: 'Zefanya Studio',
   status: OrderStatus.inTransit,
-  eta: 'Today, 4–6 PM',
+  eta: 'Today, 4â€“6 PM',
   itemSummary: 'Linen Blend Wrap Dress',
 );
 
-Future<CourierState> _courierAt(
-  DeliveryMilestone milestone, {
-  String? deliveryOtp,
-}) async {
+Future<CourierState> _courierAt(DeliveryMilestone milestone) async {
   final courier = CourierState();
   await courier.load();
   courier.dispatchForOrder(
@@ -35,7 +25,6 @@ Future<CourierState> _courierAt(
     buyerName: 'Marielle Santos',
     deliveryArea: 'Sta. Cruz, Laguna',
     fee: 120,
-    deliveryOtp: deliveryOtp,
   );
   final jobId = courier.jobForOrder(_order.id)!.id;
   courier.advanceMilestone(jobId, milestone);
@@ -88,25 +77,24 @@ void main() {
     GoogleFonts.config.allowRuntimeFetching = false;
   });
 
-  group('buyer delivery pass', () {
-    testWidgets('appears while the rider is carrying the parcel', (
-      tester,
-    ) async {
+  group('buyer handover guidance', () {
+    testWidgets('does not expose a pass after assignment', (tester) async {
       final courier = await _courierAt(DeliveryMilestone.assignedToRider);
       await _pump(tester, courier: courier);
 
-      expect(find.byKey(const ValueKey('delivery-pass-card')), findsOneWidget);
-      expect(find.byKey(const ValueKey('delivery-pass-qr')), findsOneWidget);
-      expect(find.text('DELIVERY PASS'), findsOneWidget);
-      expect(find.text('482 913'), findsOneWidget);
+      expect(find.byKey(const ValueKey('delivery-pass-card')), findsNothing);
+      expect(find.byKey(const ValueKey('delivery-pass-qr')), findsNothing);
+      expect(find.text('DELIVERY PASS'), findsNothing);
+      expect(find.text('482 913'), findsNothing);
     });
 
-    testWidgets('stays visible in transit', (tester) async {
+    testWidgets('explains authorized handover in transit', (tester) async {
       final courier = await _courierAt(DeliveryMilestone.inTransit);
       await _pump(tester, courier: courier);
 
-      expect(find.byKey(const ValueKey('delivery-pass-card')), findsOneWidget);
-      expect(find.byKey(const ValueKey('delivery-pass-qr')), findsOneWidget);
+      expect(find.byKey(const ValueKey('delivery-pass-card')), findsNothing);
+      expect(find.byKey(const ValueKey('delivery-pass-qr')), findsNothing);
+      expect(find.textContaining('someone you authorize'), findsOneWidget);
     });
 
     testWidgets('is absent before a rider is assigned', (tester) async {
@@ -123,26 +111,21 @@ void main() {
       expect(find.byKey(const ValueKey('delivery-pass-card')), findsNothing);
     });
 
-    testWidgets('is absent when a live job has no on-device code', (
+    testWidgets('does not show handover instructions at pickup', (
       tester,
     ) async {
-      final courier = await _courierAt(
-        DeliveryMilestone.assignedToRider,
-        deliveryOtp: '',
-      );
+      final courier = await _courierAt(DeliveryMilestone.pickedUp);
       await _pump(tester, courier: courier);
 
       expect(find.byKey(const ValueKey('delivery-pass-card')), findsNothing);
     });
 
-    testWidgets('renders in dark mode without losing the QR ground', (
-      tester,
-    ) async {
+    testWidgets('renders handover guidance in dark mode', (tester) async {
       final courier = await _courierAt(DeliveryMilestone.assignedToRider);
       await _pump(tester, courier: courier, brightness: Brightness.dark);
 
-      expect(find.byKey(const ValueKey('delivery-pass-card')), findsOneWidget);
-      expect(find.byKey(const ValueKey('delivery-pass-qr')), findsOneWidget);
+      expect(find.byKey(const ValueKey('delivery-pass-card')), findsNothing);
+      expect(find.byKey(const ValueKey('delivery-pass-qr')), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -155,7 +138,7 @@ void main() {
         textScale: 1.3,
       );
 
-      expect(find.byKey(const ValueKey('delivery-pass-card')), findsOneWidget);
+      expect(find.byKey(const ValueKey('delivery-pass-card')), findsNothing);
       expect(tester.takeException(), isNull);
     });
   });

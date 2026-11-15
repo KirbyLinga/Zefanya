@@ -39,6 +39,12 @@ const int returnDescriptionMinLength = 10;
 
 /// The buyer's window, counted from the delivery timestamp.
 const int returnWindowDays = 7;
+const defectReturnReasons = [
+  'Item arrived damaged',
+  'Wrong item received',
+  'Item is defective',
+  'Missing items or parts',
+];
 
 enum ReturnStatus {
   /// The request has been submitted and is waiting for the seller.
@@ -50,6 +56,9 @@ enum ReturnStatus {
   /// The buyer escalated the rejection for another review.
   escalated,
 
+  /// The seller received the parcel.
+  returned,
+
   /// The money has been returned.
   refunded,
 }
@@ -58,11 +67,12 @@ extension ReturnStatusCopy on ReturnStatus {
   /// What the order badge says. "Return/Refund" is the status the workbook
   /// expects while the request is open, not a fifth `OrderStatus`.
   String get orderLabel => switch (this) {
-        ReturnStatus.submitted => 'Return/Refund',
-        ReturnStatus.rejected => 'Rejected',
-        ReturnStatus.escalated => 'Escalated',
-        ReturnStatus.refunded => 'Refunded',
-      };
+    ReturnStatus.submitted => 'Return/Refund',
+    ReturnStatus.rejected => 'Rejected',
+    ReturnStatus.escalated => 'Escalated',
+    ReturnStatus.returned => 'Returned to seller',
+    ReturnStatus.refunded => 'Refunded',
+  };
 
   /// Still awaiting a decision, so the order must not be completed.
   bool get isOpen =>
@@ -115,28 +125,27 @@ class ReturnRequest {
     List<String>? photoPaths,
     String? sellerReason,
     DateTime? escalatedAt,
-  }) =>
-      ReturnRequest(
-        id: id,
-        orderId: orderId,
-        description: description,
-        photoPaths: photoPaths ?? this.photoPaths,
-        submittedAt: submittedAt,
-        status: status ?? this.status,
-        sellerReason: sellerReason ?? this.sellerReason,
-        escalatedAt: escalatedAt ?? this.escalatedAt,
-      );
+  }) => ReturnRequest(
+    id: id,
+    orderId: orderId,
+    description: description,
+    photoPaths: photoPaths ?? this.photoPaths,
+    submittedAt: submittedAt,
+    status: status ?? this.status,
+    sellerReason: sellerReason ?? this.sellerReason,
+    escalatedAt: escalatedAt ?? this.escalatedAt,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'orderId': orderId,
-        'description': description,
-        'photoPaths': photoPaths,
-        'submittedAt': submittedAt.toIso8601String(),
-        'status': status.name,
-        'sellerReason': sellerReason,
-        'escalatedAt': escalatedAt?.toIso8601String(),
-      };
+    'id': id,
+    'orderId': orderId,
+    'description': description,
+    'photoPaths': photoPaths,
+    'submittedAt': submittedAt.toIso8601String(),
+    'status': status.name,
+    'sellerReason': sellerReason,
+    'escalatedAt': escalatedAt?.toIso8601String(),
+  };
 
   /// Returns null for an unreadable entry instead of throwing: one corrupt
   /// request must not take the whole return history with it.
@@ -187,7 +196,7 @@ class ReturnState extends ChangeNotifier {
   /// [repository] defaults to the mock implementation so existing call sites
   /// and tests keep working; `main.dart` passes the resolved bundle's.
   ReturnState({ReturnRepository? repository})
-      : _repository = repository ?? MockReturnRepository();
+    : _repository = repository ?? MockReturnRepository();
 
   final ReturnRepository _repository;
 
@@ -222,16 +231,45 @@ class ReturnState extends ChangeNotifier {
   /// than an empty history. In live mode the returns endpoint does not exist
   /// yet, so this is how the screen can explain the absence.
   ApiException? get loadFailure => _loadFailure;
+  int _page = 1;
+  int _pageGeneration = 0;
+  bool hasOlder = false;
+
+  Future<void> loadOlder() async {
+    final repository = _repository;
+    if (repository is! LiveReturnRepository || !hasOlder) return;
+    final generation = _pageGeneration;
+    final page = await repository.returnPage(_page + 1);
+    if (generation != _pageGeneration) return;
+    final seen = _requests.map((request) => request.id).toSet();
+    _requests = [
+      ..._requests,
+      ...page.items.where((request) => seen.add(request.id)),
+    ];
+    _page++;
+    hasOlder = page.hasMore;
+    notifyListeners();
+  }
 
   Future<void> load() async {
+    final generation = ++_pageGeneration;
     await _repository.load();
     try {
-      _requests = await _repository.all();
+      final repository = _repository;
+      final page = repository is LiveReturnRepository
+          ? await repository.returnPage(1)
+          : (items: await repository.all(), hasMore: false);
+      if (generation != _pageGeneration) return;
+      _requests = page.items;
+      _page = 1;
+      hasOlder = page.hasMore;
       _loadFailure = null;
     } on ApiNotConfiguredException {
       rethrow;
     } on ApiException catch (error) {
+      if (generation != _pageGeneration) return;
       _requests = const [];
+      hasOlder = false;
       _loadFailure = error;
     }
   }
@@ -242,25 +280,31 @@ class ReturnState extends ChangeNotifier {
   /// timestamp may live in `CourierState`, not on the order row yet. [now] is
   /// injectable so the day-7 boundary is testable without changing the device
   /// clock.
-  String? returnRefusal(
-    Order order, {
-    DateTime? deliveredAt,
-    DateTime? now,
-  }) {
+  String? returnRefusal(Order order, {DateTime? deliveredAt, DateTime? now}) {
     if (order.cancelled) return 'This order was cancelled.';
     if (order.status != OrderStatus.toRate) {
       return 'Returns are available only after delivery.';
     }
-    if (order.buyerConfirmed) return 'This order has already been completed.';
+    if (order.buyerConfirmed && _repository is! LiveReturnRepository) {
+      return 'This order has already been completed.';
+    }
     if (latestForOrder(order.id) != null) {
       return 'A return request already exists for this order.';
     }
 
-    final delivered = deliveredAt ?? order.deliveredAt;
+    final delivered = _repository is LiveReturnRepository
+        ? order.deliveredAt
+        : deliveredAt ?? order.deliveredAt;
     if (delivered != null) {
       final deadline = delivered.add(const Duration(days: returnWindowDays));
-      if ((now ?? DateTime.now()).isAfter(deadline)) {
-        return 'The 7-day return window has closed.';
+      final checkedAt = now ?? DateTime.now();
+      final expired = _repository is LiveReturnRepository
+          ? !checkedAt.isBefore(deadline)
+          : checkedAt.isAfter(deadline);
+      if (expired) {
+        return _repository is LiveReturnRepository
+            ? 'The seven-day online reporting window has closed. Contact support for available remedies.'
+            : 'The 7-day return window has closed.';
       }
     }
     return null;
@@ -276,6 +320,7 @@ class ReturnState extends ChangeNotifier {
     required Order order,
     required String description,
     required List<String> photoPaths,
+    String? defectReason,
     DateTime? deliveredAt,
     DateTime? now,
   }) async {
@@ -285,6 +330,9 @@ class ReturnState extends ChangeNotifier {
 
     final refusal = returnRefusal(order, deliveredAt: deliveredAt, now: now);
     if (refusal != null) return refusal;
+    if (order.buyerConfirmed && !defectReturnReasons.contains(defectReason)) {
+      return 'Choose a wrong, defective, damaged or incomplete item.';
+    }
 
     final text = description.trim();
     if (text.length < returnDescriptionMinLength) {
@@ -304,12 +352,23 @@ class ReturnState extends ChangeNotifier {
 
     _submitting.add(order.id);
     try {
-      await _repository.submit(
-        orderId: order.id,
-        description: text,
-        photoPaths: List.unmodifiable(photos),
-        submittedAt: now ?? DateTime.now(),
-      );
+      final repository = _repository;
+      if (repository is LiveReturnRepository && defectReason != null) {
+        await repository.submit(
+          orderId: order.id,
+          description: text,
+          photoPaths: List.unmodifiable(photos),
+          submittedAt: now ?? DateTime.now(),
+          reason: defectReason,
+        );
+      } else {
+        await repository.submit(
+          orderId: order.id,
+          description: text,
+          photoPaths: List.unmodifiable(photos),
+          submittedAt: now ?? DateTime.now(),
+        );
+      }
       _requests = await _repository.all();
       _loadFailure = null;
       notifyListeners();

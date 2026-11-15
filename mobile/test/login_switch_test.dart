@@ -17,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zefanya/config/dev_flags.dart' show kUseLiveApi;
 
 import 'package:zefanya/data/dto/registration_payload.dart';
 import 'package:zefanya/data/google_identity.dart';
@@ -54,8 +55,11 @@ class _FakeAuthRepository implements AuthRepository {
     required String email,
     required String password,
     required RegistrationProfile profile,
-  }) async =>
-      AuthResult(role: role, status: AccountStatus.pendingApproval, email: email);
+  }) async => AuthResult(
+    role: role,
+    status: AccountStatus.pendingApproval,
+    email: email,
+  );
 
   @override
   Future<void> logout({UserRole role = UserRole.buyer}) async {}
@@ -65,8 +69,7 @@ class _FakeAuthRepository implements AuthRepository {
     required UserRole role,
     required String verificationId,
     required String code,
-  }) async =>
-      AuthResult(role: role, status: AccountStatus.active);
+  }) async => AuthResult(role: role, status: AccountStatus.active);
 
   @override
   Future<void> resendOtp({
@@ -78,10 +81,7 @@ class _FakeAuthRepository implements AuthRepository {
   Future<AuthResult?> refresh({UserRole role = UserRole.buyer}) async => null;
 }
 
-Future<void> _pumpLogin(
-  WidgetTester tester, {
-  required AuthState auth,
-}) async {
+Future<void> _pumpLogin(WidgetTester tester, {required AuthState auth}) async {
   AppColors.apply(Brightness.light);
   GoogleFonts.config.allowRuntimeFetching = false;
 
@@ -136,7 +136,7 @@ void main() {
       expect(find.text('RIDER PORTAL'), findsOneWidget);
       expect(find.text('Zefanya Rider'), findsOneWidget);
       expect(
-        find.text('Sign in to accept jobs and deliver parcels'),
+        find.text('Sign in to view assigned jobs and deliver parcels'),
         findsOneWidget,
       );
       expect(find.text('Back to shopper sign in'), findsOneWidget);
@@ -222,5 +222,6 @@ void main() {
       expect(registration.initialRole, UserRole.courier);
       expect(auth.isLoggedIn, isFalse);
     },
+    skip: kUseLiveApi,
   );
 }

@@ -31,8 +31,7 @@ import '../courier/dev_qr_generator_screen.dart';
 import '../courier/rider_vehicle_screen.dart';
 import 'account_security_screen.dart';
 import '../../data/repositories/repositories.dart';
-import '../../data/repositories/linehaul_repository.dart';
-import '../courier/linehaul_profile_screen.dart';
+import '../courier/webzefanya_courier_portal.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -119,12 +118,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: 'Company, vehicle & documents',
               subtitle: 'Your Logistics company and reviewed Courier records.',
               onTap: () {
-                final client = context.read<Repositories>().client;
-                if (client != null) {
+                final repository = context.read<Repositories>().linehaul;
+                if (repository != null) {
                   Navigator.of(context).push(
                     AppPageRoute(
-                      builder: (_) => LinehaulProfileScreen(
-                        repository: LinehaulRepository(client),
+                      builder: (_) => WebZefanyaCourierPortal(
+                        repository: repository,
+                        initialTab: 2,
                       ),
                     ),
                   );

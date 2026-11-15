@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zefanya/data/mock_data.dart';
 import 'package:zefanya/data/address_entry.dart';
+import 'package:zefanya/data/api/api_client.dart';
+import 'package:zefanya/data/api/token_store.dart';
+import 'package:zefanya/data/repositories/order_repository.dart';
 import 'package:zefanya/screens/buyer/checkout_screen.dart';
 import 'package:zefanya/state/auth_state.dart';
 import 'package:zefanya/state/cart_state.dart';
@@ -16,10 +21,10 @@ Future<void> _pumpCheckout(
   WidgetTester tester, {
   required AuthState auth,
   required CartState cart,
+  OrderState? orders,
 }) async {
   AppColors.apply(Brightness.light);
   GoogleFonts.config.allowRuntimeFetching = false;
-  SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
@@ -30,7 +35,7 @@ Future<void> _pumpCheckout(
         ChangeNotifierProvider.value(value: auth),
         ChangeNotifierProvider.value(value: cart),
         ChangeNotifierProvider(create: (_) => CourierState()),
-        ChangeNotifierProvider(create: (_) => OrderState()),
+        ChangeNotifierProvider(create: (_) => orders ?? OrderState()),
       ],
       child: MaterialApp(theme: AppTheme.light, home: const CheckoutScreen()),
     ),
@@ -39,6 +44,52 @@ Future<void> _pumpCheckout(
 }
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  testWidgets(
+    'an unresolved checkout blocks placement until the server rejects it',
+    (tester) async {
+      const baseUrl = 'https://checkout.test/api';
+      final requests = <String>[];
+      final repository = LiveOrderRepository(
+        ApiClient(
+          baseUrl: baseUrl,
+          tokenStore: InMemoryTokenStore(),
+          httpClient: MockClient((request) async {
+            requests.add('${request.method} ${request.url.path}');
+            expect(request.body, contains('existing-checkout-token'));
+            return http.Response(
+              '{"data":{"status":"rejected"}}',
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }),
+        ),
+      );
+      SharedPreferences.setMockInitialValues({
+        'live_checkout:$baseUrl:buyer-7':
+            '{"token":"existing-checkout-token","identity":"original"}',
+      });
+      final orders = OrderState(repository: repository)
+        ..setBuyerCheckoutOwner('buyer-7');
+      await _pumpCheckout(
+        tester,
+        auth: AuthState(),
+        cart: CartState(),
+        orders: orders,
+      );
+      await tester.pump();
+      expect(find.text('Place Order'), findsNothing);
+      expect(find.text('Check checkout status'), findsOneWidget);
+
+      await tester.tap(find.text('Check checkout status'));
+      await tester.pumpAndSettle();
+      expect(requests, ['POST /api/buyer/checkout/reconcile']);
+      expect(find.text('Place Order'), findsOneWidget);
+      expect(await orders.hasPendingCheckout(), isFalse);
+      await tester.pump(const Duration(seconds: 4));
+    },
+  );
   testWidgets(
     'shows Add delivery address button and inline validation errors on empty submission',
     (tester) async {

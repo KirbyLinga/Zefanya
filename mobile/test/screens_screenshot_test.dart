@@ -157,6 +157,10 @@ Future<void> _renderAndCapture(
   if (name == 'courier_home') {
     await tester.pump(const Duration(milliseconds: 900));
   }
+  if (const {'login', 'cart', 'product_detail', 'buyer_home'}.contains(name)) {
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+  }
 
   if (preCaptureAction != null) {
     preCaptureAction();

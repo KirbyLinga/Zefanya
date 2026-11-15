@@ -49,6 +49,7 @@ const List<ApiRoute> kWebZefanyaRoutes = [
   ApiRoute('GET', '/buyer/categories'),
   ApiRoute('POST', '/buyer/checkout'),
   ApiRoute('POST', '/buyer/checkout/quote'),
+  ApiRoute('POST', '/buyer/checkout/reconcile'),
   ApiRoute('POST', '/buyer/login'),
   ApiRoute('POST', '/buyer/logout'),
   ApiRoute('GET', '/buyer/messages'),
@@ -74,8 +75,10 @@ const List<ApiRoute> kWebZefanyaRoutes = [
   ApiRoute('GET', '/buyer/products'),
   ApiRoute('GET', '/buyer/products/{product}'),
   ApiRoute('GET', '/buyer/profile'),
+  ApiRoute('GET', '/buyer/reviews/mine'),
   ApiRoute('GET', '/buyer/shipments'),
   ApiRoute('GET', '/buyer/shipments/{shipment}'),
+  ApiRoute('PATCH', '/buyer/shipments/{shipment}/products/{product}/review'),
   ApiRoute('GET', '/buyer/vouchers'),
   ApiRoute('GET', '/buyer/wishlist'),
   ApiRoute('DELETE', '/buyer/wishlist/{product}'),
@@ -85,6 +88,7 @@ const List<ApiRoute> kWebZefanyaRoutes = [
   ApiRoute('GET', '/logistics/rider-applications/{rider}/documents/{document}'),
   ApiRoute('POST', '/logistics/rider-applications/{rider}/reject'),
   ApiRoute('POST', '/rider/availability'),
+  ApiRoute('GET', '/rider/cod'),
   ApiRoute('POST', '/rider/deliveries/{sellerOrder}/deliver'),
   ApiRoute('POST', '/rider/deliveries/{sellerOrder}/failed'),
   ApiRoute('POST', '/rider/deliveries/{sellerOrder}/start'),
@@ -98,15 +102,23 @@ const List<ApiRoute> kWebZefanyaRoutes = [
   ApiRoute('POST', '/rider/notifications/read-all'),
   ApiRoute('POST', '/rider/notifications/{notification}/read'),
   ApiRoute('POST', '/rider/parcels/{sellerOrder}/incidents'),
+  ApiRoute('GET', '/rider/payouts'),
+  ApiRoute('POST', '/rider/pickups/stops/{pickupSession}/finish'),
   ApiRoute('POST', '/rider/pickups/{sellerOrder}/confirm'),
+  ApiRoute('POST', '/rider/pickups/{sellerOrder}/failed'),
   ApiRoute('GET', '/rider/profile'),
+  ApiRoute('GET', '/rider/proofs/{deliveryProof}'),
   ApiRoute('GET', '/rider/providers'),
   ApiRoute('POST', '/rider/register'),
   ApiRoute('POST', '/rider/registration/resume'),
   ApiRoute('POST', '/rider/registration/{rider}/resend-otp'),
   ApiRoute('POST', '/rider/registration/{rider}/verify-otp'),
+  ApiRoute('GET', '/rider/return-pickups'),
+  ApiRoute('POST', '/rider/return-pickups/{parcelReturn}/collect'),
   ApiRoute('POST', '/rider/scan/verify'),
   ApiRoute('POST', '/rider/token/refresh'),
+  ApiRoute('GET', '/rider/waybills/{sellerOrder}'),
+  ApiRoute('POST', '/v1/buyer/checkout/quote'),
 ];
 
 /// The Courier Mobile API (Phase 3), from the isolated WebZefanya build.
@@ -146,11 +158,23 @@ const List<String> _alwaysAllowedWrites = [
   '/courier/token/refresh',
 ];
 
+/// Opt-in operations exercised over HTTP against the repaired Laravel/MySQL
+/// backend. Broader write access is reserved for isolated test builds.
+const List<ApiRoute> _verifiedWrites = [
+  ApiRoute('POST', '/buyer/cart/items'),
+  ApiRoute('POST', '/buyer/checkout/quote'),
+  ApiRoute('POST', '/buyer/checkout/reconcile'),
+  ApiRoute('POST', '/buyer/checkout'),
+  ApiRoute('POST', '/rider/scan/verify'),
+  ApiRoute('POST', '/rider/deliveries/{sellerOrder}/deliver'),
+];
+
 /// Answers "may the app send this request to WebZefanya?".
 class WebZefanyaContract implements ApiRoutePolicy {
   const WebZefanyaContract({
     this.routes = kWebZefanyaRoutes,
     this.allowWrites = false,
+    this.allowVerifiedWrites = false,
   });
 
   /// The routes considered supported. Overridable for tests.
@@ -162,11 +186,13 @@ class WebZefanyaContract implements ApiRoutePolicy {
   /// build must opt in with `--dart-define=zefanya.webzefanya.allowWrites=true`
   /// before it can change anything on a WebZefanya server.
   final bool allowWrites;
+  final bool allowVerifiedWrites;
 
   /// A contract configured from the build flags.
   const WebZefanyaContract.fromEnvironment()
     : routes = kWebZefanyaBuildRoutes,
-      allowWrites = kWebZefanyaAllowWrites;
+      allowWrites = kWebZefanyaAllowWrites,
+      allowVerifiedWrites = kWebZefanyaAllowVerifiedWrites;
 
   /// True when [method] [path] matches a WebZefanya route. [path] is relative
   /// to `/api`; a query string is ignored.
@@ -197,13 +223,18 @@ class WebZefanyaContract implements ApiRoutePolicy {
     }
     if (!allowWrites &&
         verb != 'GET' &&
-        !_alwaysAllowedWrites.contains(clean)) {
+        !_alwaysAllowedWrites.contains(clean) &&
+        !(allowVerifiedWrites &&
+            _verifiedWrites.any(
+              (route) => route.method == verb && _matches(route.path, clean),
+            ))) {
       throw ApiNotImplementedException(
         '$verb /api$clean',
         contractSection:
             'WebZefanya profile: writes are disabled (zefanya.webzefanya.allowWrites)',
-        message:
-            'Changes are turned off in this build (read-only WebZefanya mode).',
+        message: allowVerifiedWrites
+            ? 'This change is unavailable in the current WebZefanya release.'
+            : 'Changes are turned off in this build (read-only WebZefanya mode).',
       );
     }
   }
@@ -241,6 +272,7 @@ ApiClient guardedWebZefanyaClient({
   required TokenStore tokenStore,
   http.Client? httpClient,
   bool allowWrites = false,
+  bool allowVerifiedWrites = false,
   Duration timeout = const Duration(seconds: 20),
 }) => ApiClient(
   baseUrl: baseUrl,
@@ -250,5 +282,6 @@ ApiClient guardedWebZefanyaClient({
   routePolicy: WebZefanyaContract(
     routes: kWebZefanyaBuildRoutes,
     allowWrites: allowWrites,
+    allowVerifiedWrites: allowVerifiedWrites,
   ),
 );

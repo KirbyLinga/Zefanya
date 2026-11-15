@@ -32,8 +32,10 @@ class _FakeServer {
   final List<String> bodies = [];
   final List<Map<String, String>> headers = [];
 
-  late final http.Client client =
-      MockClient.streaming((request, bodyStream) async {
+  late final http.Client client = MockClient.streaming((
+    request,
+    bodyStream,
+  ) async {
     methods.add(request.method);
     paths.add(request.url.path);
     queries.add(request.url.queryParameters);
@@ -51,13 +53,16 @@ class _FakeServer {
 }
 
 http.Response _ok(Object? data, [int status = 200]) => http.Response.bytes(
-      utf8.encode(jsonEncode({'success': true, 'data': data})),
-      status,
-      headers: {'content-type': 'application/json; charset=utf-8'},
-    );
+  utf8.encode(jsonEncode({'success': true, 'data': data})),
+  status,
+  headers: {'content-type': 'application/json; charset=utf-8'},
+);
 
-http.Response _error(int status, String message, [Map<String, Object?>? errors]) =>
-    http.Response(jsonEncode({'message': message, 'errors': errors}), status);
+http.Response _error(
+  int status,
+  String message, [
+  Map<String, Object?>? errors,
+]) => http.Response(jsonEncode({'message': message, 'errors': errors}), status);
 
 Map<String, Object?> _parcel({
   int id = 12,
@@ -65,67 +70,66 @@ Map<String, Object?> _parcel({
   String status = 'OUT_FOR_DELIVERY',
   bool cod = false,
   int codMinor = 0,
-}) =>
-    {
-      'id': id,
-      'order_id': 7,
-      'leg': leg,
-      'tracking_number': 'TRK-$id',
-      'status': status,
-      'seller_name': 'Willow & Bloom Atelier',
-      'pickup_area': 'Cebu City',
-      'buyer_name': 'Marites Santos',
-      'buyer_phone': '09171234567',
-      'delivery_address': '12 Mabini Street, Quezon City',
-      'delivery_area': 'Quezon City',
-      'item_count': 2,
-      'weight': '0.5 kg',
-      'payment_method': cod ? 'cod' : 'online',
-      'requires_cod_collection': cod,
-      'cod_amount_minor': codMinor,
-    };
+}) => {
+  'id': id,
+  'order_id': 7,
+  'leg': leg,
+  'tracking_number': 'TRK-$id',
+  'status': status,
+  'seller_name': 'Willow & Bloom Atelier',
+  'pickup_area': 'Cebu City',
+  'buyer_name': 'Marites Santos',
+  'buyer_phone': '09171234567',
+  'delivery_address': '12 Mabini Street, Quezon City',
+  'delivery_area': 'Quezon City',
+  'item_count': 2,
+  'weight': '0.5 kg',
+  'payment_method': cod ? 'cod' : 'online',
+  'requires_cod_collection': cod,
+  'cod_amount_minor': codMinor,
+};
 
 Map<String, Object?> _jobs({
   List<Map<String, Object?>> pickups = const [],
   List<Map<String, Object?>> deliveries = const [],
-}) =>
-    {'online': true, 'pickups': pickups, 'deliveries': deliveries};
+}) => {'online': true, 'pickups': pickups, 'deliveries': deliveries};
 
 http.Response _verified(int id, List<String> actions) => _ok({
-      'context': 'delivery',
-      'parcel': {'id': id},
-      'actions': [
-        for (final key in actions) {'key': key, 'verification_token': 'tok-$key'},
-      ],
-    });
-
+  'context': 'delivery',
+  'parcel': {'id': id},
+  'actions': [
+    for (final key in actions) {'key': key, 'verification_token': 'tok-$key'},
+  ],
+});
 
 http.Response _cash({int holdingMinor = 0}) => _ok({
-      'summary': {
-        'collected_minor': holdingMinor,
-        'holding_minor': holdingMinor,
-        'holding_count': holdingMinor > 0 ? 1 : 0,
-        'overdue_count': 0,
-        'overdue_after_days': 2,
-        'remitted_minor': 0,
-        'remitted_month_minor': 0,
-      },
-      'holding': const [],
-      'remitted': const [],
-    });
+  'summary': {
+    'collected_minor': holdingMinor,
+    'holding_minor': holdingMinor,
+    'holding_count': holdingMinor > 0 ? 1 : 0,
+    'overdue_count': 0,
+    'overdue_after_days': 2,
+    'remitted_minor': 0,
+    'remitted_month_minor': 0,
+  },
+  'holding': const [],
+  'remitted': const [],
+});
 
 http.Response _payoutsResp() => _ok({
-      'summary': {'earned_month_minor': 0, 'paid_minor': 0, 'pending_minor': 0},
-      'payouts': const [],
-    });
+  'summary': {'earned_month_minor': 0, 'paid_minor': 0, 'pending_minor': 0},
+  'payouts': const [],
+});
 
 http.Response _returns([List<Map<String, Object?>> rows = const []]) =>
     _ok({'returns': rows});
 
 class _Live {
-  _Live(List<http.Response> script, {String baseUrl = 'https://api.zefanya.test'})
-      : server = _FakeServer(script),
-        tokens = InMemoryTokenStore() {
+  _Live(
+    List<http.Response> script, {
+    String baseUrl = 'https://api.zefanya.test',
+  }) : server = _FakeServer(script),
+       tokens = InMemoryTokenStore() {
     client = ApiClient(
       baseUrl: baseUrl,
       tokenStore: tokens,
@@ -141,7 +145,10 @@ class _Live {
 }
 
 /// Loads one delivery so the repository knows its tracking number.
-Future<_Live> _withJob(List<http.Response> then, {String status = 'OUT_FOR_DELIVERY'}) async {
+Future<_Live> _withJob(
+  List<http.Response> then, {
+  String status = 'OUT_FOR_DELIVERY',
+}) async {
   final live = _Live([
     _ok(_jobs(deliveries: [_parcel(status: status)])),
     ...then,
@@ -169,10 +176,12 @@ void main() {
 
   test('maps pickups and deliveries into DeliveryJob objects', () async {
     final live = _Live([
-      _ok(_jobs(
-        pickups: [_parcel(id: 3, leg: 'pickup', status: 'READY_FOR_PICKUP')],
-        deliveries: [_parcel(id: 12, cod: true, codMinor: 129900)],
-      )),
+      _ok(
+        _jobs(
+          pickups: [_parcel(id: 3, leg: 'pickup', status: 'READY_FOR_PICKUP')],
+          deliveries: [_parcel(id: 12, cod: true, codMinor: 129900)],
+        ),
+      ),
     ]);
 
     final jobs = await live.repo.assignedJobs();
@@ -196,7 +205,10 @@ void main() {
 
   test('a 401 throws UnauthorizedException', () async {
     final live = _Live([_error(401, 'Unauthenticated.')]);
-    await expectLater(live.repo.assignedJobs(), throwsA(isA<UnauthorizedException>()));
+    await expectLater(
+      live.repo.assignedJobs(),
+      throwsA(isA<UnauthorizedException>()),
+    );
   });
 
   test('throws ApiNotConfiguredException when no base URL', () async {
@@ -207,31 +219,62 @@ void main() {
     );
   });
 
-  test('start delivery verifies the scan first, then sends its token', () async {
-    final live = await _withJob(
-      [_verified(12, ['start_delivery']), _ok(_parcel())],
-      status: 'ASSIGNED_TO_RIDER',
-    );
+  test(
+    'start delivery verifies the scan first, then sends its token',
+    () async {
+      final live = await _withJob([
+        _verified(12, ['start_delivery']),
+        _ok(_parcel()),
+      ], status: 'ASSIGNED_TO_RIDER');
 
-    await live.repo.advanceMilestone('12', 'OUT_FOR_DELIVERY');
+      await live.repo.advanceMilestone('12', 'OUT_FOR_DELIVERY');
 
-    expect(live.server.paths.skip(1), ['/rider/scan/verify', '/rider/deliveries/12/start']);
-    expect(jsonDecode(live.server.bodies[1]), {'tracking_number': 'TRK-12', 'method': 'manual'});
-    expect(jsonDecode(live.server.bodies[2]), {'verification_token': 'tok-start_delivery'});
-  });
+      expect(live.server.paths.skip(1), [
+        '/rider/scan/verify',
+        '/rider/deliveries/12/start',
+      ]);
+      expect(jsonDecode(live.server.bodies[1]), {
+        'tracking_number': 'TRK-12',
+        'method': 'manual',
+      });
+      expect(jsonDecode(live.server.bodies[2]), {
+        'verification_token': 'tok-start_delivery',
+      });
+    },
+  );
 
-  test('pickup uses the typed tracking number and the pickup endpoint', () async {
-    final live = _Live([_verified(3, ['confirm_pickup']), _ok(_parcel(id: 3))]);
+  test(
+    'pickup uses the typed tracking number and the pickup endpoint',
+    () async {
+      final live = _Live([
+        _verified(3, ['confirm_pickup']),
+        _ok(_parcel(id: 3)),
+      ]);
 
-    await live.repo.advanceMilestone('3', 'PICKED_UP', trackingNumber: 'TRK-3');
+      await live.repo.advanceMilestone(
+        '3',
+        'PICKED_UP',
+        trackingNumber: 'TRK-3',
+      );
 
-    expect(live.server.paths, ['/rider/scan/verify', '/rider/pickups/3/confirm']);
-  });
+      expect(live.server.paths, [
+        '/rider/scan/verify',
+        '/rider/pickups/3/confirm',
+      ]);
+    },
+  );
 
   test('a failed delivery sends WebZefanya reason values', () async {
-    final live = await _withJob([_verified(12, ['mark_failed']), _ok(_parcel())]);
+    final live = await _withJob([
+      _verified(12, ['mark_failed']),
+      _ok(_parcel()),
+    ]);
 
-    await live.repo.advanceMilestone('12', 'DELIVERY_FAILED', failureReason: 'Buyer not available');
+    await live.repo.advanceMilestone(
+      '12',
+      'DELIVERY_FAILED',
+      failureReason: 'Buyer not available',
+    );
 
     expect(live.server.paths.last, '/rider/deliveries/12/failed');
     expect(jsonDecode(live.server.bodies.last), {
@@ -241,9 +284,16 @@ void main() {
   });
 
   test('an unmapped reason is sent as other with notes', () async {
-    final live = await _withJob([_verified(12, ['mark_failed']), _ok(_parcel())]);
+    final live = await _withJob([
+      _verified(12, ['mark_failed']),
+      _ok(_parcel()),
+    ]);
 
-    await live.repo.advanceMilestone('12', 'DELIVERY_FAILED', failureReason: 'Payment not ready');
+    await live.repo.advanceMilestone(
+      '12',
+      'DELIVERY_FAILED',
+      failureReason: 'Payment not ready',
+    );
 
     expect(jsonDecode(live.server.bodies.last), {
       'verification_token': 'tok-mark_failed',
@@ -255,7 +305,14 @@ void main() {
   test('steps a rider cannot set are not sent', () async {
     final live = await _withJob([]);
 
-    for (final step in ['PLACED', 'CONFIRMED', 'AT_SORTING_CENTER', 'SORTED', 'ASSIGNED_TO_RIDER', 'DELIVERED']) {
+    for (final step in [
+      'PLACED',
+      'CONFIRMED',
+      'AT_SORTING_CENTER',
+      'SORTED',
+      'ASSIGNED_TO_RIDER',
+      'DELIVERED',
+    ]) {
       await live.repo.advanceMilestone('12', step);
     }
 
@@ -263,11 +320,19 @@ void main() {
   });
 
   test('a parcel that no longer offers the action is a 409 conflict', () async {
-    final live = await _withJob([_verified(12, ['digital_waybill'])]);
+    final live = await _withJob([
+      _verified(12, ['digital_waybill']),
+    ]);
 
     await expectLater(
       live.repo.advanceMilestone('12', 'OUT_FOR_DELIVERY'),
-      throwsA(isA<RequestRejectedException>().having((e) => e.isConflict, 'conflict', isTrue)),
+      throwsA(
+        isA<RequestRejectedException>().having(
+          (e) => e.isConflict,
+          'conflict',
+          isTrue,
+        ),
+      ),
     );
     // Nothing was attempted past the scan.
     expect(live.server.paths.last, '/rider/scan/verify');
@@ -280,42 +345,71 @@ void main() {
     ]);
 
     await expectLater(
-      live.repo.advanceMilestone('12', 'DELIVERY_FAILED', failureReason: 'Wrong address'),
-      throwsA(isA<RequestRejectedException>().having((e) => e.isConflict, 'conflict', isTrue)),
+      live.repo.advanceMilestone(
+        '12',
+        'DELIVERY_FAILED',
+        failureReason: 'Wrong address',
+      ),
+      throwsA(
+        isA<RequestRejectedException>().having(
+          (e) => e.isConflict,
+          'conflict',
+          isTrue,
+        ),
+      ),
     );
   });
 
-  test('delivery code request never reads a code back', () async {
+  test('delivery cannot submit without a valid scan action', () async {
     final live = await _withJob([
-      _verified(12, ['proof_of_delivery']),
-      _ok(null),
+      _verified(12, ['digital_waybill']),
     ]);
 
-    await live.repo.requestDeliveryCode('12');
-
-    expect(live.server.paths.last, '/rider/deliveries/12/otp');
-    expect(jsonDecode(live.server.bodies.last), {'verification_token': 'tok-proof_of_delivery'});
+    await expectLater(
+      live.repo.completeDelivery(
+        '12',
+        proofPhotoPath: 'unused.jpg',
+        recipientCategory: 'buyer',
+      ),
+      throwsA(isA<RequestRejectedException>()),
+    );
+    expect(live.server.paths.last, '/rider/scan/verify');
   });
 
-  test('proof of delivery is multipart with photo, code and exact cash', () async {
-    final dir = Directory.systemTemp.createTempSync('zef_pod');
-    addTearDown(() => dir.deleteSync(recursive: true));
-    final photo = '${dir.path}${Platform.pathSeparator}proof.jpg';
-    File(photo).writeAsBytesSync([0xFF, 0xD8, 0xFF, 0xD9]);
+  test(
+    'proof of delivery is multipart with photo, acknowledgement and exact cash',
+    () async {
+      final dir = Directory.systemTemp.createTempSync('zef_pod');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final photo = '${dir.path}${Platform.pathSeparator}proof.jpg';
+      File(photo).writeAsBytesSync([0xFF, 0xD8, 0xFF, 0xD9]);
 
-    final live = await _withJob([_verified(12, ['proof_of_delivery']), _ok(_parcel(status: 'DELIVERED'))]);
+      final live = await _withJob([
+        _verified(12, ['proof_of_delivery']),
+        _ok(_parcel(status: 'DELIVERED')),
+      ]);
 
-    await live.repo.completeDelivery('12', proofPhotoPath: photo, deliveryOtp: ' 123456 ', codAmount: 1299);
+      await live.repo.completeDelivery(
+        '12',
+        proofPhotoPath: photo,
+        recipientCategory: 'buyer',
+        codAmount: 1299,
+      );
 
-    expect(live.server.paths.last, '/rider/deliveries/12/deliver');
-    final body = live.server.bodies.last;
-    expect(body, contains('name="proof_photo"'));
-    expect(body, contains('name="delivery_otp"\r\n\r\n123456'));
-    expect(body, contains('name="cod_amount"\r\n\r\n1299.00'));
-    expect(body, contains('name="verification_token"\r\n\r\ntok-proof_of_delivery'));
-  });
+      expect(live.server.paths.last, '/rider/deliveries/12/deliver');
+      final body = live.server.bodies.last;
+      expect(body, contains('name="proof_photo"'));
+      expect(body, isNot(contains('name="delivery_otp"')));
+      expect(body, contains('name="recipient_category"\r\n\r\nbuyer'));
+      expect(body, contains('name="cod_amount"\r\n\r\n1299.00'));
+      expect(
+        body,
+        contains('name="verification_token"\r\n\r\ntok-proof_of_delivery'),
+      );
+    },
+  );
 
-  test('a wrong code comes back as a field error', () async {
+  test('a rejected acknowledgement comes back as a field error', () async {
     final dir = Directory.systemTemp.createTempSync('zef_pod');
     addTearDown(() => dir.deleteSync(recursive: true));
     final photo = '${dir.path}${Platform.pathSeparator}proof.jpg';
@@ -323,13 +417,17 @@ void main() {
 
     final live = await _withJob([
       _verified(12, ['proof_of_delivery']),
-      _error(422, 'The delivery code is incorrect.', {
-        'delivery_otp': ['The delivery code is incorrect. Ask the buyer for the latest code.'],
+      _error(422, 'Acknowledgement is incomplete.', {
+        'recipient_relationship': ['Enter the representative relationship.'],
       }),
     ]);
 
     await expectLater(
-      live.repo.completeDelivery('12', proofPhotoPath: photo, deliveryOtp: '000000'),
+      live.repo.completeDelivery(
+        '12',
+        proofPhotoPath: photo,
+        recipientCategory: 'representative',
+      ),
       throwsA(isA<ValidationException>()),
     );
   });
@@ -346,58 +444,82 @@ void main() {
 
   // ── Server-only rider data (RiderServerData) ─────────────────────────────
 
-  test('earnings read the server totals and ledger, never a local rate', () async {
-    final live = _Live([
-      _ok({
-        'summary': {'monthMinor': 8500},
-        'totals': {'today_minor': 6000, 'week_minor': 6000, 'all_time_minor': 8500, 'jobs': 2},
-        'cod': {'holding_minor': 150000},
-        'recent': [
-          {
-            'id': 5,
-            'job': 'delivery',
-            'amount_minor': 6000,
-            'seller_order_id': 12,
-            'tracking_number': 'TRK-12',
-            'seller_name': 'Willow & Bloom Atelier',
-            'earned_at': '2026-11-06T02:00:00+00:00',
-            'paid': false,
+  test(
+    'earnings read the server totals and ledger, never a local rate',
+    () async {
+      final live = _Live([
+        _ok({
+          'summary': {'monthMinor': 8500},
+          'totals': {
+            'today_minor': 6000,
+            'week_minor': 6000,
+            'all_time_minor': 8500,
+            'jobs': 2,
           },
-          {'id': 4, 'job': 'pickup', 'amount_minor': 2500, 'earned_at': 'not a date'},
-        ],
-      }),
-    ]);
-    await live.tokens.write('1|rider');
+          'cod': {'holding_minor': 150000},
+          'recent': [
+            {
+              'id': 5,
+              'job': 'delivery',
+              'amount_minor': 6000,
+              'seller_order_id': 12,
+              'tracking_number': 'TRK-12',
+              'seller_name': 'Willow & Bloom Atelier',
+              'earned_at': '2026-11-06T02:00:00+00:00',
+              'paid': false,
+            },
+            {
+              'id': 4,
+              'job': 'pickup',
+              'amount_minor': 2500,
+              'earned_at': 'not a date',
+            },
+          ],
+        }),
+      ]);
+      await live.tokens.write('1|rider');
 
-    final snapshot = await live.repo.earnings(limit: 20);
+      final snapshot = await live.repo.earnings(limit: 20);
 
-    expect(live.server.paths.single, '/rider/earnings');
-    expect(snapshot.today, 60);
-    expect(snapshot.week, 60);
-    expect(snapshot.allTime, 85);
-    expect(snapshot.codHolding, 1500);
-    // A row without a readable time is dropped rather than dated "now".
-    expect(snapshot.recent, hasLength(1));
-    expect(snapshot.recent.single.amount, 60);
-    expect(snapshot.recent.single.sellerOrderId, '12');
-  });
+      expect(live.server.paths.single, '/rider/earnings');
+      expect(snapshot.today, 60);
+      expect(snapshot.week, 60);
+      expect(snapshot.allTime, 85);
+      expect(snapshot.codHolding, 1500);
+      // A row without a readable time is dropped rather than dated "now".
+      expect(snapshot.recent, hasLength(1));
+      expect(snapshot.recent.single.amount, 60);
+      expect(snapshot.recent.single.sellerOrderId, '12');
+    },
+  );
 
-  test('an incident is multipart with the type, reason and damage photo', () async {
-    final dir = Directory.systemTemp.createTempSync('zef_incident');
-    addTearDown(() => dir.deleteSync(recursive: true));
-    final photo = '${dir.path}${Platform.pathSeparator}damage.jpg';
-    File(photo).writeAsBytesSync([0xFF, 0xD8, 0xFF, 0xD9]);
-    final live = _Live([_ok({'incident_id': 1, 'type': 'damaged'}, 201)]);
-    await live.tokens.write('1|rider');
+  test(
+    'an incident is multipart with the type, reason and damage photo',
+    () async {
+      final dir = Directory.systemTemp.createTempSync('zef_incident');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final photo = '${dir.path}${Platform.pathSeparator}damage.jpg';
+      File(photo).writeAsBytesSync([0xFF, 0xD8, 0xFF, 0xD9]);
+      final live = _Live([
+        _ok({'incident_id': 1, 'type': 'damaged'}, 201),
+      ]);
+      await live.tokens.write('1|rider');
 
-    await live.repo.reportIncident('12', type: 'damaged', reason: ' Crushed box ', description: 'Box crushed in transit.', photoPath: photo);
+      await live.repo.reportIncident(
+        '12',
+        type: 'damaged',
+        reason: ' Crushed box ',
+        description: 'Box crushed in transit.',
+        photoPath: photo,
+      );
 
-    expect(live.server.paths.single, '/rider/jobs/12/incidents');
-    final body = live.server.bodies.single;
-    expect(body, contains('name="type"\r\n\r\ndamaged'));
-    expect(body, contains('name="reason"\r\n\r\nCrushed box'));
-    expect(body, contains('name="photo"'));
-  });
+      expect(live.server.paths.single, '/rider/jobs/12/incidents');
+      final body = live.server.bodies.single;
+      expect(body, contains('name="type"\r\n\r\ndamaged'));
+      expect(body, contains('name="reason"\r\n\r\nCrushed box'));
+      expect(body, contains('name="photo"'));
+    },
+  );
 
   test('the registration provider list is read without a token', () async {
     final live = _Live([
@@ -417,172 +539,270 @@ void main() {
     expect(providers.map((p) => (p.id, p.name)), [(3, 'Bilis Hatid Express')]);
   });
 
-  test("the provider list asks for the rider's barangay when one is chosen", () async {
-    final live = _Live([_ok({'barangay': '1374040001', 'providers': const []})]);
+  test(
+    "the provider list asks for the rider's barangay when one is chosen",
+    () async {
+      final live = _Live([
+        _ok({'barangay': '1374040001', 'providers': const []}),
+      ]);
 
-    await live.repo.registrationProviders(barangayCode: '1374040001');
-    await live.repo.registrationProviders(barangayCode: ' ');
+      await live.repo.registrationProviders(barangayCode: '1374040001');
+      await live.repo.registrationProviders(barangayCode: ' ');
 
-    expect(live.server.paths, ['/rider/providers', '/rider/providers']);
-    expect(live.server.queries.first, {'barangay': '1374040001'});
-    // Blank means "no address yet": the full list, no filter.
-    expect(live.server.queries.last, isEmpty);
-  });
+      expect(live.server.paths, ['/rider/providers', '/rider/providers']);
+      expect(live.server.queries.first, {'barangay': '1374040001'});
+      // Blank means "no address yet": the full list, no filter.
+      expect(live.server.queries.last, isEmpty);
+    },
+  );
 
   // ── Availability, failed pickups and pickup stops ────────────────────────
 
   Map<String, Object?> stopsJobs({int attempts = 0, bool online = false}) => {
-        'online': online,
-        'pickups': [
-          {
-            ..._parcel(id: 21, leg: 'pickup', status: 'READY_FOR_PICKUP'),
-            'pickup_session_id': 5,
-            'pickup_attempts': attempts,
-          },
-          {
-            ..._parcel(id: 22, leg: 'pickup', status: 'PICKED_UP'),
-            'pickup_session_id': 5,
-            'pickup_attempts': 0,
-          },
-        ],
-        'deliveries': const [],
-        'stops': [
-          {
+    'online': online,
+    'pickups': [
+      {
+        ..._parcel(id: 21, leg: 'pickup', status: 'READY_FOR_PICKUP'),
+        'pickup_session_id': 5,
+        'pickup_attempts': attempts,
+      },
+      {
+        ..._parcel(id: 22, leg: 'pickup', status: 'PICKED_UP'),
+        'pickup_session_id': 5,
+        'pickup_attempts': 0,
+      },
+    ],
+    'deliveries': const [],
+    'stops': [
+      {
+        'id': 5,
+        'status': 'IN_PROGRESS',
+        'seller_name': 'Willow & Bloom Atelier',
+        'pickup_address': '12 Mabini Street',
+        'collected': 1,
+        'total': 2,
+        'remaining': 1,
+        'earned_minor': 3000,
+        'potential_minor': 3500,
+        'can_finish': true,
+      },
+    ],
+    'pickup_failure': {
+      'max_attempts': 2,
+      'reasons': [
+        {'value': 'recipient_unavailable', 'label': 'Recipient unavailable'},
+        {'value': 'other', 'label': 'Other'},
+      ],
+    },
+  };
+
+  test(
+    'jobs read the stops, attempts, reasons and server availability',
+    () async {
+      final live = _Live([_ok(stopsJobs(attempts: 1, online: true))]);
+      await live.tokens.write('1|rider');
+
+      final jobs = await live.repo.assignedJobs();
+      final meta = live.repo.lastJobsMeta!;
+
+      expect(jobs.map((j) => (j.id, j.pickupSessionId, j.pickupAttempts)), [
+        ('21', '5', 1),
+        ('22', '5', 0),
+      ]);
+      expect(meta.online, isTrue);
+      expect(meta.maxPickupAttempts, 2);
+      expect(meta.failureReasons.map((r) => r.value), [
+        'recipient_unavailable',
+        'other',
+      ]);
+      final stop = meta.stops.single;
+      expect(
+        (stop.id, stop.collected, stop.total, stop.remaining, stop.canFinish),
+        ('5', 1, 2, 1, true),
+      );
+      expect(stop.earned, 30);
+    },
+  );
+
+  test(
+    'availability posts {online} and adopts what the server recorded',
+    () async {
+      final live = _Live([
+        _ok({
+          'online': false,
+          'changed': true,
+          'jobs_flagged_for_reassignment': 0,
+        }),
+      ]);
+      await live.tokens.write('1|rider');
+
+      final recorded = await live.repo.setAvailability(online: true);
+
+      expect(live.server.paths.single, '/rider/availability');
+      expect(jsonDecode(live.server.bodies.single), {'online': true});
+      // The server's answer wins over what was asked.
+      expect(recorded, isFalse);
+    },
+  );
+
+  test(
+    'a failed pickup sends the reason, notes and the expected attempt',
+    () async {
+      final live = _Live([
+        _ok({
+          'attempt': 2,
+          'attempts_remaining': 0,
+          'cancelled': true,
+          'parcel': _parcel(id: 21, leg: 'pickup', status: 'CANCELLED'),
+        }),
+      ]);
+      await live.tokens.write('1|rider');
+
+      final result = await live.repo.reportPickupFailure(
+        '21',
+        reason: 'other',
+        expectedAttempt: 2,
+        notes: ' Shop closed ',
+      );
+
+      expect(live.server.paths.single, '/rider/pickups/21/failed');
+      expect(jsonDecode(live.server.bodies.single), {
+        'failure_reason': 'other',
+        'expected_attempt': 2,
+        'failure_notes': 'Shop closed',
+      });
+      // Cancellation is the server's answer, read as-is.
+      expect(
+        (result.attempt, result.attemptsRemaining, result.cancelled),
+        (2, 0, true),
+      );
+    },
+  );
+
+  test(
+    'a duplicate failed pickup is the server 409, surfaced as a conflict',
+    () async {
+      final live = _Live([
+        _error(
+          409,
+          'Pickup attempt #1 is already recorded. Refresh your pickups.',
+        ),
+      ]);
+      await live.tokens.write('1|rider');
+
+      await expectLater(
+        live.repo.reportPickupFailure(
+          '21',
+          reason: 'other',
+          expectedAttempt: 1,
+        ),
+        throwsA(
+          isA<RequestRejectedException>().having(
+            (e) => e.isConflict,
+            'isConflict',
+            isTrue,
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'finishing a stop posts to the stop and reads the finished stop',
+    () async {
+      final live = _Live([
+        _ok({
+          'stop': {
             'id': 5,
-            'status': 'IN_PROGRESS',
-            'seller_name': 'Willow & Bloom Atelier',
-            'pickup_address': '12 Mabini Street',
+            'status': 'COMPLETED',
+            'seller_name': 'Willow',
             'collected': 1,
-            'total': 2,
-            'remaining': 1,
-            'earned_minor': 3000,
-            'potential_minor': 3500,
-            'can_finish': true,
+            'total': 1,
+            'can_finish': false,
           },
-        ],
-        'pickup_failure': {
-          'max_attempts': 2,
-          'reasons': [
-            {'value': 'recipient_unavailable', 'label': 'Recipient unavailable'},
-            {'value': 'other', 'label': 'Other'},
-          ],
-        },
-      };
+        }),
+      ]);
+      await live.tokens.write('1|rider');
 
-  test('jobs read the stops, attempts, reasons and server availability', () async {
-    final live = _Live([_ok(stopsJobs(attempts: 1, online: true))]);
-    await live.tokens.write('1|rider');
+      final stop = await live.repo.finishPickupStop('5');
 
-    final jobs = await live.repo.assignedJobs();
-    final meta = live.repo.lastJobsMeta!;
-
-    expect(jobs.map((j) => (j.id, j.pickupSessionId, j.pickupAttempts)),
-        [('21', '5', 1), ('22', '5', 0)]);
-    expect(meta.online, isTrue);
-    expect(meta.maxPickupAttempts, 2);
-    expect(meta.failureReasons.map((r) => r.value), ['recipient_unavailable', 'other']);
-    final stop = meta.stops.single;
-    expect((stop.id, stop.collected, stop.total, stop.remaining, stop.canFinish), ('5', 1, 2, 1, true));
-    expect(stop.earned, 30);
-  });
-
-  test('availability posts {online} and adopts what the server recorded', () async {
-    final live = _Live([_ok({'online': false, 'changed': true, 'jobs_flagged_for_reassignment': 0})]);
-    await live.tokens.write('1|rider');
-
-    final recorded = await live.repo.setAvailability(online: true);
-
-    expect(live.server.paths.single, '/rider/availability');
-    expect(jsonDecode(live.server.bodies.single), {'online': true});
-    // The server's answer wins over what was asked.
-    expect(recorded, isFalse);
-  });
-
-  test('a failed pickup sends the reason, notes and the expected attempt', () async {
-    final live = _Live([
-      _ok({'attempt': 2, 'attempts_remaining': 0, 'cancelled': true, 'parcel': _parcel(id: 21, leg: 'pickup', status: 'CANCELLED')}),
-    ]);
-    await live.tokens.write('1|rider');
-
-    final result = await live.repo.reportPickupFailure('21', reason: 'other', expectedAttempt: 2, notes: ' Shop closed ');
-
-    expect(live.server.paths.single, '/rider/pickups/21/failed');
-    expect(jsonDecode(live.server.bodies.single), {
-      'failure_reason': 'other',
-      'expected_attempt': 2,
-      'failure_notes': 'Shop closed',
-    });
-    // Cancellation is the server's answer, read as-is.
-    expect((result.attempt, result.attemptsRemaining, result.cancelled), (2, 0, true));
-  });
-
-  test('a duplicate failed pickup is the server 409, surfaced as a conflict', () async {
-    final live = _Live([_error(409, 'Pickup attempt #1 is already recorded. Refresh your pickups.')]);
-    await live.tokens.write('1|rider');
-
-    await expectLater(
-      live.repo.reportPickupFailure('21', reason: 'other', expectedAttempt: 1),
-      throwsA(isA<RequestRejectedException>().having((e) => e.isConflict, 'isConflict', isTrue)),
-    );
-  });
-
-  test('finishing a stop posts to the stop and reads the finished stop', () async {
-    final live = _Live([
-      _ok({'stop': {'id': 5, 'status': 'COMPLETED', 'seller_name': 'Willow', 'collected': 1, 'total': 1, 'can_finish': false}}),
-    ]);
-    await live.tokens.write('1|rider');
-
-    final stop = await live.repo.finishPickupStop('5');
-
-    expect(live.server.methods.single, 'POST');
-    expect(live.server.paths.single, '/rider/pickups/stops/5/finish');
-    expect(stop!.status, 'COMPLETED');
-    expect(stop.canFinish, isFalse);
-  });
+      expect(live.server.methods.single, 'POST');
+      expect(live.server.paths.single, '/rider/pickups/stops/5/finish');
+      expect(stop!.status, 'COMPLETED');
+      expect(stop.canFinish, isFalse);
+    },
+  );
 
   group('CourierState (live)', () {
     setUp(() => SharedPreferences.setMockInitialValues({}));
 
-    test('adopts server availability and stops, and reports attempt + 1', () async {
-      final live = _Live([
-        _ok(stopsJobs(attempts: 1, online: true)), // refreshJobs
-        _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}), // earnings
-        _cash(), // cod
-        _payoutsResp(), // payouts
-        _returns(), // return pickups
-        _ok({'attempt': 2, 'attempts_remaining': 0, 'cancelled': true}), // report
-        _ok(stopsJobs(attempts: 2)), // refresh after report
-        _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}),
-        _cash(), // cod
-        _payoutsResp(), // payouts
-        _returns(), // return pickups
-      ]);
-      await live.tokens.write('1|rider');
-      final courier = CourierState(repository: live.repo);
+    test(
+      'adopts server availability and stops, and reports attempt + 1',
+      () async {
+        final live = _Live([
+          _ok(stopsJobs(attempts: 1, online: true)), // refreshJobs
+          _ok({
+            'summary': const {},
+            'totals': const {},
+            'cod': const {},
+            'recent': const [],
+          }), // earnings
+          _cash(), // cod
+          _payoutsResp(), // payouts
+          _returns(), // return pickups
+          _ok({
+            'attempt': 2,
+            'attempts_remaining': 0,
+            'cancelled': true,
+          }), // report
+          _ok(stopsJobs(attempts: 2)), // refresh after report
+          _ok({
+            'summary': const {},
+            'totals': const {},
+            'cod': const {},
+            'recent': const [],
+          }),
+          _cash(), // cod
+          _payoutsResp(), // payouts
+          _returns(), // return pickups
+        ]);
+        await live.tokens.write('1|rider');
+        final courier = CourierState(repository: live.repo);
 
-      await courier.refreshJobs();
-      expect(courier.isOnline, isTrue);
-      expect(courier.pickupStops.single.id, '5');
-      expect(courier.stopFor(courier.jobById('21')!)!.remaining, 1);
-      expect(courier.pickupFailureReasons, hasLength(2));
+        await courier.refreshJobs();
+        expect(courier.isOnline, isTrue);
+        expect(courier.pickupStops.single.id, '5');
+        expect(courier.stopFor(courier.jobById('21')!)!.remaining, 1);
+        expect(courier.pickupFailureReasons, hasLength(2));
 
-      final result = await courier.reportPickupFailure('21', reason: 'other');
+        final result = await courier.reportPickupFailure('21', reason: 'other');
 
-      expect(result!.cancelled, isTrue);
-      final report = live.server.paths.indexOf('/rider/pickups/21/failed');
-      expect(jsonDecode(live.server.bodies[report])['expected_attempt'], 2);
-    });
+        expect(result!.cancelled, isTrue);
+        final report = live.server.paths.indexOf('/rider/pickups/21/failed');
+        expect(jsonDecode(live.server.bodies[report])['expected_attempt'], 2);
+      },
+    );
 
     test('a second tap while a report is in flight sends nothing', () async {
       final live = _Live([
         _ok(stopsJobs()),
-        _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}),
+        _ok({
+          'summary': const {},
+          'totals': const {},
+          'cod': const {},
+          'recent': const [],
+        }),
         _cash(), // cod
         _payoutsResp(), // payouts
         _returns(), // return pickups
         _ok({'attempt': 1, 'attempts_remaining': 1, 'cancelled': false}),
         _ok(stopsJobs(attempts: 1)),
-        _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}),
+        _ok({
+          'summary': const {},
+          'totals': const {},
+          'cod': const {},
+          'recent': const [],
+        }),
         _cash(), // cod
         _payoutsResp(), // payouts
         _returns(), // return pickups
@@ -596,13 +816,21 @@ void main() {
       await first;
 
       expect(second, isNull);
-      expect(live.server.paths.where((p) => p == '/rider/pickups/21/failed'), hasLength(1));
+      expect(
+        live.server.paths.where((p) => p == '/rider/pickups/21/failed'),
+        hasLength(1),
+      );
     });
 
     test('a failed availability change leaves the switch unchanged', () async {
       final live = _Live([
         _ok(stopsJobs(online: false)),
-        _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}),
+        _ok({
+          'summary': const {},
+          'totals': const {},
+          'cod': const {},
+          'recent': const [],
+        }),
         _cash(), // cod
         _payoutsResp(), // payouts
         _returns(), // return pickups
@@ -637,11 +865,30 @@ void main() {
           'remitted_month_minor': 49000,
         },
         'holding': [
-          {'id': 1, 'tracking_number': 'TRK-1', 'status': 'PENDING_REMITTANCE', 'amount_minor': 150000, 'overdue': false},
-          {'id': 2, 'tracking_number': 'TRK-2', 'status': 'PENDING_REMITTANCE', 'amount_minor': 20000, 'overdue': true},
+          {
+            'id': 1,
+            'tracking_number': 'TRK-1',
+            'status': 'PENDING_REMITTANCE',
+            'amount_minor': 150000,
+            'overdue': false,
+          },
+          {
+            'id': 2,
+            'tracking_number': 'TRK-2',
+            'status': 'PENDING_REMITTANCE',
+            'amount_minor': 20000,
+            'overdue': true,
+          },
         ],
         'remitted': [
-          {'id': 3, 'tracking_number': 'TRK-3', 'status': 'REMITTED_TO_LOGISTICS', 'amount_minor': 50000, 'received_amount_minor': 49000, 'confirmed_at': '2026-11-06T02:00:00+00:00'},
+          {
+            'id': 3,
+            'tracking_number': 'TRK-3',
+            'status': 'REMITTED_TO_LOGISTICS',
+            'amount_minor': 50000,
+            'received_amount_minor': 49000,
+            'confirmed_at': '2026-11-06T02:00:00+00:00',
+          },
         ],
       }),
     ]);
@@ -650,30 +897,53 @@ void main() {
     final cash = await live.repo.cash();
 
     expect(live.server.paths.single, '/rider/cod');
-    expect((cash.collected, cash.holding, cash.remitted, cash.overdueCount), (2200.0, 1700.0, 490.0, 1));
-    expect(cash.held.map((r) => (r.trackingNumber, r.overdue, r.isHeld)), [('TRK-1', false, true), ('TRK-2', true, true)]);
+    expect(
+      (cash.collected, cash.holding, cash.remitted, cash.overdueCount),
+      (2200.0, 1700.0, 490.0, 1),
+    );
+    expect(cash.held.map((r) => (r.trackingNumber, r.overdue, r.isHeld)), [
+      ('TRK-1', false, true),
+      ('TRK-2', true, true),
+    ]);
     expect(cash.remittedRecords.single.receivedAmount, 490);
     expect(cash.remittedRecords.single.isHeld, isFalse);
   });
 
-  test('return pickups are listed and collected with the tracking number', () async {
-    final live = _Live([
-      _returns([
-        {'id': 9, 'tracking_number': 'TRK-RET', 'buyer_name': 'Ana', 'pickup_address': '1 Rizal St', 'reason': 'Damaged', 'item_count': 2},
-        {'id': 10, 'tracking_number': ''},
-      ]),
-      _ok({'id': 9, 'collected_at': '2026-11-07T02:00:00+00:00'}),
-    ]);
-    await live.tokens.write('1|rider');
+  test(
+    'return pickups are listed and collected with the tracking number',
+    () async {
+      final live = _Live([
+        _returns([
+          {
+            'id': 9,
+            'tracking_number': 'TRK-RET',
+            'buyer_name': 'Ana',
+            'pickup_address': '1 Rizal St',
+            'reason': 'Damaged',
+            'item_count': 2,
+          },
+          {'id': 10, 'tracking_number': ''},
+        ]),
+        _ok({'id': 9, 'collected_at': '2026-11-07T02:00:00+00:00'}),
+      ]);
+      await live.tokens.write('1|rider');
 
-    final returns = await live.repo.returnPickups();
-    await live.repo.collectReturn('9', trackingNumber: ' TRK-RET ');
+      final returns = await live.repo.returnPickups();
+      await live.repo.collectReturn('9', trackingNumber: ' TRK-RET ');
 
-    // A row without a tracking number cannot be verified, so it is dropped.
-    expect(returns.map((r) => (r.id, r.trackingNumber, r.itemCount)), [('9', 'TRK-RET', 2)]);
-    expect(live.server.paths, ['/rider/return-pickups', '/rider/return-pickups/9/collect']);
-    expect(jsonDecode(live.server.bodies.last), {'tracking_number': 'TRK-RET'});
-  });
+      // A row without a tracking number cannot be verified, so it is dropped.
+      expect(returns.map((r) => (r.id, r.trackingNumber, r.itemCount)), [
+        ('9', 'TRK-RET', 2),
+      ]);
+      expect(live.server.paths, [
+        '/rider/return-pickups',
+        '/rider/return-pickups/9/collect',
+      ]);
+      expect(jsonDecode(live.server.bodies.last), {
+        'tracking_number': 'TRK-RET',
+      });
+    },
+  );
 
   group('CourierState (Phase B)', () {
     setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -690,10 +960,17 @@ void main() {
     test('a refresh reads COD and returns from the server', () async {
       final live = _Live([
         _ok(stopsJobs()),
-        _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}),
+        _ok({
+          'summary': const {},
+          'totals': const {},
+          'cod': const {},
+          'recent': const [],
+        }),
         _cash(holdingMinor: 150000),
         _payoutsResp(), // payouts
-        _returns([{'id': 9, 'tracking_number': 'TRK-RET'}]),
+        _returns([
+          {'id': 9, 'tracking_number': 'TRK-RET'},
+        ]),
       ]);
       await live.tokens.write('1|rider');
       final courier = CourierState(repository: live.repo);
@@ -702,12 +979,20 @@ void main() {
 
       expect(courier.serverCash!.holding, 1500);
       expect(courier.returnPickups.single.id, '9');
-      expect(live.server.paths, ['/rider/jobs', '/rider/earnings', '/rider/cod', '/rider/payouts', '/rider/return-pickups']);
+      expect(live.server.paths, [
+        '/rider/jobs',
+        '/rider/earnings',
+        '/rider/cod',
+        '/rider/payouts',
+        '/rider/return-pickups',
+      ]);
     });
 
     test('a second collect tap while one is in flight sends nothing', () async {
       final live = _Live([
-        _returns([{'id': 9, 'tracking_number': 'TRK-RET'}]),
+        _returns([
+          {'id': 9, 'tracking_number': 'TRK-RET'},
+        ]),
         _ok({'id': 9}),
         _returns(),
       ]);
@@ -716,67 +1001,132 @@ void main() {
       await courier.refreshReturns();
 
       final first = courier.collectReturn('9', trackingNumber: 'TRK-RET');
-      final second = await courier.collectReturn('9', trackingNumber: 'TRK-RET');
+      final second = await courier.collectReturn(
+        '9',
+        trackingNumber: 'TRK-RET',
+      );
 
       expect(await first, isTrue);
       expect(second, isFalse);
-      expect(live.server.paths.where((p) => p == '/rider/return-pickups/9/collect'), hasLength(1));
+      expect(
+        live.server.paths.where((p) => p == '/rider/return-pickups/9/collect'),
+        hasLength(1),
+      );
       expect(courier.returnPickups, isEmpty);
     });
 
-    test('wind-down adopts the server notice, closes going online and skips returns', () async {
-      final live = _Live([
-        _ok({
-          ..._jobs(),
-          'online': true,
-          'winding_down': true,
-          'winding_down_message': 'Your logistics company is suspended.',
-        }),
-        _ok({'summary': const {}, 'totals': const {}, 'cod': const {}, 'recent': const []}),
-        _cash(),
-        _payoutsResp(), // payouts
-      ]);
-      await live.tokens.write('1|rider');
-      final courier = CourierState(repository: live.repo);
+    test(
+      'wind-down adopts the server notice, closes going online and skips returns',
+      () async {
+        final live = _Live([
+          _ok({
+            ..._jobs(),
+            'online': true,
+            'winding_down': true,
+            'winding_down_message': 'Your logistics company is suspended.',
+          }),
+          _ok({
+            'summary': const {},
+            'totals': const {},
+            'cod': const {},
+            'recent': const [],
+          }),
+          _cash(),
+          _payoutsResp(), // payouts
+        ]);
+        await live.tokens.write('1|rider');
+        final courier = CourierState(repository: live.repo);
 
-      await courier.refreshJobs();
+        await courier.refreshJobs();
 
-      expect(courier.isWindingDown, isTrue);
-      expect(courier.windingDownMessage, 'Your logistics company is suspended.');
-      expect(courier.isOnline, isFalse);
-      expect(await courier.setOnline(true), 'Your logistics company is suspended.');
-      // No availability request and no return-pickups read during a wind-down.
-      expect(live.server.paths, ['/rider/jobs', '/rider/earnings', '/rider/cod', '/rider/payouts']);
-    });
+        expect(courier.isWindingDown, isTrue);
+        expect(
+          courier.windingDownMessage,
+          'Your logistics company is suspended.',
+        );
+        expect(courier.isOnline, isFalse);
+        expect(
+          await courier.setOnline(true),
+          'Your logistics company is suspended.',
+        );
+        // No availability request and no return-pickups read during a wind-down.
+        expect(live.server.paths, [
+          '/rider/jobs',
+          '/rider/earnings',
+          '/rider/cod',
+          '/rider/payouts',
+        ]);
+      },
+    );
   });
 
   // ── History, payouts, waybill, proof, coverage ───────────────────────────
 
-  test('history reads finished deliveries with their pay and proof link', () async {
-    final live = _Live([
-      _ok({
-        'history': [
-          {'id': 12, 'tracking_number': 'TRK-12', 'status': 'DELIVERED', 'status_label': 'Delivered', 'earning_minor': 6000, 'proof_id': 4, 'returned': false, 'delivered_at': '2026-11-06T02:00:00+00:00'},
-          {'id': 13, 'tracking_number': 'TRK-13', 'status': 'RETURNED', 'status_label': 'Returned', 'earning_minor': null, 'proof_id': null, 'returned': true},
-        ],
-      }),
-    ]);
-    await live.tokens.write('1|rider');
+  test(
+    'history reads finished deliveries with their pay and proof link',
+    () async {
+      final live = _Live([
+        _ok({
+          'history': [
+            {
+              'id': 12,
+              'tracking_number': 'TRK-12',
+              'status': 'DELIVERED',
+              'status_label': 'Delivered',
+              'earning_minor': 6000,
+              'proof_id': 4,
+              'returned': false,
+              'delivered_at': '2026-11-06T02:00:00+00:00',
+            },
+            {
+              'id': 13,
+              'tracking_number': 'TRK-13',
+              'status': 'RETURNED',
+              'status_label': 'Returned',
+              'earning_minor': null,
+              'proof_id': null,
+              'returned': true,
+            },
+          ],
+        }),
+      ]);
+      await live.tokens.write('1|rider');
 
-    final history = await live.repo.history();
+      final history = await live.repo.history();
 
-    expect(live.server.paths.single, '/rider/history');
-    expect(history.map((h) => (h.sellerOrderId, h.earning, h.proofId, h.returned)),
-        [('12', 60.0, '4', false), ('13', null, null, true)]);
-  });
+      expect(live.server.paths.single, '/rider/history');
+      expect(
+        history.map((h) => (h.sellerOrderId, h.earning, h.proofId, h.returned)),
+        [('12', 60.0, '4', false), ('13', null, null, true)],
+      );
+    },
+  );
 
   test('payouts read what Logistics paid, with reversals flagged', () async {
     final live = _Live([
       _ok({
-        'summary': {'earned_month_minor': 8500, 'paid_minor': 6000, 'pending_minor': 5500},
+        'summary': {
+          'earned_month_minor': 8500,
+          'paid_minor': 6000,
+          'pending_minor': 5500,
+        },
         'payouts': [
-          {'id': 1, 'reference': 'GCASH-001', 'paid_on': '2026-11-06', 'earning_count': 1, 'amount_minor': 6000, 'reversed': false},
-          {'id': 2, 'reference': 'GCASH-002', 'paid_on': '2026-11-06', 'earning_count': 1, 'amount_minor': 3000, 'reversed': true},
+          {
+            'id': 1,
+            'reference': 'GCASH-001',
+            'paid_on': '2026-11-06',
+            'earning_count': 1,
+            'amount_minor': 6000,
+            'reversed': false,
+          },
+          {
+            'id': 2,
+            'reference': 'GCASH-002',
+            'paid_on': '2026-11-06',
+            'earning_count': 1,
+            'amount_minor': 3000,
+            'reversed': true,
+          },
         ],
       }),
     ]);
@@ -786,7 +1136,10 @@ void main() {
 
     expect(live.server.paths.single, '/rider/payouts');
     expect((pay.paid, pay.pending, pay.earnedThisMonth), (60.0, 55.0, 85.0));
-    expect(pay.payouts.map((p) => (p.reference, p.reversed)), [('GCASH-001', false), ('GCASH-002', true)]);
+    expect(pay.payouts.map((p) => (p.reference, p.reversed)), [
+      ('GCASH-001', false),
+      ('GCASH-002', true),
+    ]);
   });
 
   test('the waybill shows only the party the server sent', () async {
@@ -813,7 +1166,9 @@ void main() {
   });
 
   test('the proof photo is fetched as bytes with the rider token', () async {
-    final live = _Live([http.Response.bytes([0xFF, 0xD8, 0xFF, 0xD9], 200)]);
+    final live = _Live([
+      http.Response.bytes([0xFF, 0xD8, 0xFF, 0xD9], 200),
+    ]);
     await live.tokens.write('1|rider');
 
     final bytes = await live.repo.proofPhoto('4');
@@ -824,18 +1179,32 @@ void main() {
   });
 
   test("another rider's proof is the server 403, typed", () async {
-    final live = _Live([_error(403, 'This proof of delivery does not belong to you.')]);
+    final live = _Live([
+      _error(403, 'This proof of delivery does not belong to you.'),
+    ]);
     await live.tokens.write('1|rider');
 
-    await expectLater(live.repo.proofPhoto('4'), throwsA(isA<ForbiddenException>()));
+    await expectLater(
+      live.repo.proofPhoto('4'),
+      throwsA(isA<ForbiddenException>()),
+    );
   });
 
   test('coverage reads the station and area from the profile', () async {
     final live = _Live([
       _ok({
         'id': 1,
-        'station': {'id': 3, 'name': 'San Fernando Hub', 'municipality': 'San Fernando'},
-        'coverage_area': {'id': 7, 'name': 'Zone A', 'municipality': 'San Fernando', 'barangay': 'Dolores'},
+        'station': {
+          'id': 3,
+          'name': 'San Fernando Hub',
+          'municipality': 'San Fernando',
+        },
+        'coverage_area': {
+          'id': 7,
+          'name': 'Zone A',
+          'municipality': 'San Fernando',
+          'barangay': 'Dolores',
+        },
       }),
     ]);
     await live.tokens.write('1|rider');

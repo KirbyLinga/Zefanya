@@ -65,10 +65,7 @@ DeliveryJob? deliveryJobFromJson(Map<String, Object?> json) {
     prepaid:
         json['payment_method']?.toString() != 'cod' ||
         json['payment_status']?.toString() == 'paid',
-    // The server is the authority on the code; it only appears here when a
-    // build explicitly includes it (the mock fixtures/test server). An absent
-    // code is empty, not the mock value — guessing a live OTP would be worse
-    // than the handover failing closed.
+    deliveryOtp: '',
   );
 }
 
@@ -109,6 +106,7 @@ DeliveryJob? deliveryJobFromRiderParcel(Map<String, Object?> json) {
     parcelCount: (json['item_count'] as num?)?.toInt() ?? 1,
     codAmount: requiresCod && codMinor is num ? codMinor / 100 : 0,
     prepaid: !requiresCod,
+    deliveryOtp: '',
     serverStatus: json['status']?.toString(),
     pickupSessionId: json['pickup_session_id']?.toString(),
     pickupAttempts: (json['pickup_attempts'] as num?)?.toInt() ?? 0,

@@ -13,6 +13,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zefanya/main.dart';
+import 'package:zefanya/screens/landing_screen.dart';
+import 'package:zefanya/screens/onboarding_screen.dart';
 import 'package:zefanya/state/auth_state.dart';
 import 'package:zefanya/state/cart_state.dart';
 import 'package:zefanya/state/chat_state.dart';
@@ -48,12 +50,18 @@ void main() {
     GoogleFonts.config.allowRuntimeFetching = false;
   });
 
-  testWidgets('a signed-out cold start boots to the landing screen',
-      (tester) async {
+  testWidgets('a signed-out cold start boots to the landing screen', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      OnboardingScreen.completionKey: true,
+    });
     await tester.pumpWidget(_bootApp());
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
 
-    expect(find.text('BUY. SELL. DELIVER.'), findsOneWidget);
+    expect(find.byType(LandingScreen), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 3200));
     expect(find.text('BEGIN'), findsOneWidget);
 

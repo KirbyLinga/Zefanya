@@ -67,6 +67,7 @@ class Product {
     required this.category,
     required this.price,
     required this.sellerName,
+    this.sellerId,
     this.sellerMakerNote,
     this.compareAtPrice,
     this.rating = 4.5,
@@ -92,6 +93,7 @@ class Product {
   final double price;
   final double? compareAtPrice;
   final String sellerName;
+  final int? sellerId;
 
   /// The seller's own words for the "FROM THE MAKER" section, as received from
   /// the server. Null when the seller hasn't written one (live mode) or when

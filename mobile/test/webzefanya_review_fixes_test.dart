@@ -495,7 +495,7 @@ void main() {
 
         // Renewal: an unsupported renew route is blocked locally; the request
         // that triggered it still goes out unchanged.
-        client.renewPath = '/courier/token/refresh';
+        client.renewPath = '/courier/trips/renew';
         await client.getJson('/rider/jobs');
         expect(wire.requests, ['GET /api/rider/jobs']);
       },
@@ -685,22 +685,42 @@ void main() {
     });
 
     test(
-      'Courier (linehaul) sign-in is refused locally on WebZefanya',
+      'Courier auth is supported only in the Courier-enabled route contract',
       () async {
-        final wire = _Wire((r, _) => _ok({}));
+        final wire = _Wire((request, _) {
+          if (request.url.path.endsWith('/login')) {
+            return _ok({
+              'token': 'courier-test-token',
+              'expires_at': '2099-01-01T00:00:00Z',
+            });
+          }
+          return _ok({
+            'account_id': 7,
+            'name': 'Test Courier',
+            'login_id': 'ZC-ABCD2345',
+            'status': 'active',
+          });
+        });
         final repos = Repositories.webzefanya(
           _guarded(wire, allowWrites: true),
         );
-        await expectLater(
-          repos.auth.login(
-            role: UserRole.linehaul,
-            email: 'courier@example.test',
-            password: 'secret-pass',
-          ),
-          throwsA(isA<ApiNotImplementedException>()),
+        final signIn = repos.auth.login(
+          role: UserRole.linehaul,
+          email: 'ZC-ABCD2345',
+          password: 'secret-pass',
         );
-        expect(wire.requests, isEmpty);
-        expect(repos.linehaul, isNull);
+        if (kWebZefanyaCourierApp) {
+          expect((await signIn).role, UserRole.linehaul);
+          expect(wire.requests, [
+            'POST /api/courier/login',
+            'GET /api/courier/profile',
+          ]);
+          expect(repos.linehaul, isNotNull);
+        } else {
+          await expectLater(signIn, throwsA(isA<ApiNotImplementedException>()));
+          expect(wire.requests, isEmpty);
+          expect(repos.linehaul, isNull);
+        }
       },
     );
 

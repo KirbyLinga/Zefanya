@@ -21,21 +21,9 @@ import 'package:zefanya/data/api/webzefanya_contract.dart';
 /// forces an explicit decision.
 const Set<String> knownUnsupportedInWebZefanya = {
   // Rider
-  '/rider/cod',
-  '/rider/payouts',
-  '/rider/waybills/x',
-  '/rider/proofs/x',
   '/rider/deliveries/x/completion-status',
-  '/rider/pickups/x/failed',
-  '/rider/pickups/stops/x/finish',
-  '/rider/return-pickups',
-  '/rider/return-pickups/x/collect',
   // Buyer
-  '/buyer/checkout/reconcile',
-  '/buyer/reviews/mine',
-  '/buyer/shipments/x/products/x/review',
   '/buyer/shipments/x/delivery-dispute',
-  '/v1/buyer/checkout/quote', // WebZefanya profile uses /buyer/checkout/quote
   // Courier (linehaul): no Courier authentication exists on WebZefanya (C-AUTH).
   '/courier/duty',
   '/courier/duty/x',
@@ -90,6 +78,11 @@ void main() {
       expect(contract.supports('get', '/rider/jobs/'), isTrue);
       expect(contract.supports('GET', '/rider/history?limit=5'), isTrue);
       expect(contract.supports('POST', '/rider/pickups/42/confirm'), isTrue);
+      expect(contract.supports('GET', '/rider/cod'), isTrue);
+      expect(
+        contract.supports('POST', '/rider/return-pickups/3/collect'),
+        isTrue,
+      );
       expect(
         contract.supports('POST', '/buyer/orders/7/shipments/9/return'),
         isTrue,
@@ -98,13 +91,13 @@ void main() {
 
     test('rejects the methods and paths WebZefanya does not have', () {
       expect(contract.supports('DELETE', '/rider/jobs'), isFalse);
-      expect(contract.supports('GET', '/rider/cod'), isFalse);
+      expect(contract.supports('POST', '/rider/cod'), isFalse);
       expect(
-        contract.supports('POST', '/rider/return-pickups/3/collect'),
+        contract.supports('GET', '/rider/return-pickups/3/collect'),
         isFalse,
       );
       expect(contract.supports('GET', '/courier/trips'), isFalse);
-      expect(contract.supports('POST', '/buyer/checkout/reconcile'), isFalse);
+      expect(contract.supports('POST', '/buyer/checkout/reconcile'), isTrue);
       expect(contract.supports('GET', '/rider/jobs/'), isTrue);
       expect(contract.supports('GET', '/rider/pickups//confirm'), isFalse);
     });
@@ -114,7 +107,7 @@ void main() {
     test('an unsupported endpoint throws ApiNotImplementedException', () {
       const contract = WebZefanyaContract(allowWrites: true);
       expect(
-        () => contract.check('GET', '/rider/cod'),
+        () => contract.check('GET', '/rider/deliveries/3/completion-status'),
         throwsA(isA<ApiNotImplementedException>()),
       );
       expect(
@@ -135,6 +128,28 @@ void main() {
       expect(
         () => contract.check('POST', '/rider/token/refresh'),
         returnsNormally,
+      );
+    });
+
+    test('release allows only the verified business writes', () {
+      const contract = WebZefanyaContract(allowVerifiedWrites: true);
+      for (final path in [
+        '/buyer/cart/items',
+        '/buyer/checkout/quote',
+        '/buyer/checkout/reconcile',
+        '/buyer/checkout',
+        '/rider/scan/verify',
+        '/rider/deliveries/42/deliver',
+      ]) {
+        expect(() => contract.check('POST', path), returnsNormally);
+      }
+      expect(
+        () => contract.check('POST', '/rider/availability'),
+        throwsA(isA<ApiNotImplementedException>()),
+      );
+      expect(
+        () => contract.check('DELETE', '/buyer/cart/items/42'),
+        throwsA(isA<ApiNotImplementedException>()),
       );
     });
 

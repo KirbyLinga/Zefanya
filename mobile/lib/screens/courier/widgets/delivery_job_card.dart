@@ -15,12 +15,20 @@ import '../../../state/courier_state.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/money_format.dart';
 import '../../../widgets/editorial_shapes.dart';
+import '../../../widgets/editorial_status_badge.dart';
 
 class DeliveryJobCard extends StatelessWidget {
-  const DeliveryJobCard({super.key, required this.assignedJob, required this.onTap, this.index = 0});
+  const DeliveryJobCard({
+    super.key,
+    required this.assignedJob,
+    required this.onTap,
+    this.index = 0,
+    this.pickup = false,
+  });
 
   final AssignedJob assignedJob;
   final VoidCallback onTap;
+  final bool pickup;
 
   /// Position in its list — alternates which diagonal the card's big
   /// corners sit on, same as ProductCard on the buyer side, so a scrolled
@@ -28,97 +36,151 @@ class DeliveryJobCard extends StatelessWidget {
   final int index;
 
   static const _statusLabels = {
-    DeliveryMilestone.accepted:        'Assigned',
+    DeliveryMilestone.accepted: 'Assigned',
     DeliveryMilestone.arrivedAtSeller: 'At Seller',
-    DeliveryMilestone.pickedUp:        'Picked Up',
+    DeliveryMilestone.pickedUp: 'Picked Up',
     DeliveryMilestone.atSortingCenter: 'At Sorting',
-    DeliveryMilestone.sorted:          'Sorted',
-    DeliveryMilestone.assignedToRider: 'To Rider',
-    DeliveryMilestone.inTransit:       'In Transit',
-    DeliveryMilestone.delivered:       'Delivered',
-    DeliveryMilestone.failedDelivery:  'Failed',
-    DeliveryMilestone.returnToSender:  'Returning',
+    DeliveryMilestone.sorted: 'Sorted',
+    DeliveryMilestone.assignedToRider: 'Assigned',
+    DeliveryMilestone.inTransit: 'In Transit',
+    DeliveryMilestone.delivered: 'Delivered',
+    DeliveryMilestone.failedDelivery: 'Delivery failed',
+    DeliveryMilestone.returnToSender: 'Returning',
   };
 
   // Resolved per call rather than cached in a `static const` map: several
   // of these tokens (warning, primaryDark, danger) differ per mode, and a
   // const map would freeze whichever mode loaded first.
   static Map<DeliveryMilestone, Color> get _statusColors => {
-        DeliveryMilestone.accepted:        AppColors.neutral,
-        DeliveryMilestone.arrivedAtSeller: AppColors.primary,
-        DeliveryMilestone.pickedUp:        AppColors.secondary,
-        DeliveryMilestone.atSortingCenter: AppColors.warning,
-        DeliveryMilestone.sorted:          AppColors.tertiary,
-        DeliveryMilestone.assignedToRider: AppColors.tertiary,
-        DeliveryMilestone.inTransit:       AppColors.primaryDark,
-        DeliveryMilestone.delivered:       AppColors.tertiary,
-        DeliveryMilestone.failedDelivery:  AppColors.danger,
-        DeliveryMilestone.returnToSender:  AppColors.danger,
-      };
+    DeliveryMilestone.accepted: AppColors.neutral,
+    DeliveryMilestone.arrivedAtSeller: AppColors.primary,
+    DeliveryMilestone.pickedUp: AppColors.secondary,
+    DeliveryMilestone.atSortingCenter: AppColors.warning,
+    DeliveryMilestone.sorted: AppColors.tertiary,
+    DeliveryMilestone.assignedToRider: AppColors.tertiary,
+    DeliveryMilestone.inTransit: AppColors.primaryDark,
+    DeliveryMilestone.delivered: AppColors.tertiary,
+    DeliveryMilestone.failedDelivery: AppColors.danger,
+    DeliveryMilestone.returnToSender: AppColors.danger,
+  };
 
   @override
   Widget build(BuildContext context) {
     AppColors.watch(context);
     final theme = Theme.of(context);
     final job = assignedJob.job;
-    final statusColor = _statusColors[assignedJob.milestone]!;
+    final milestone = assignedJob.milestone;
+    final statusColor = _statusColors[milestone]!;
     final shape = editorialRadius(index, ShapeTier.card);
+    final action = switch (milestone) {
+      DeliveryMilestone.accepted => 'Open pickup',
+      DeliveryMilestone.arrivedAtSeller => 'Verify pickup',
+      DeliveryMilestone.pickedUp => 'View hub handoff',
+      DeliveryMilestone.assignedToRider => 'Open delivery',
+      DeliveryMilestone.inTransit => 'Continue delivery',
+      DeliveryMilestone.failedDelivery => 'Review failed delivery',
+      DeliveryMilestone.returnToSender => 'View return',
+      _ => 'View job',
+    };
 
     return InkWell(
       onTap: onTap,
       borderRadius: shape,
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppColors.surfaceMuted,
           borderRadius: shape,
+          border: Border.all(color: AppColors.divider),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            Wrap(
+              spacing: 10,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Expanded(child: Text(job.shopName, style: theme.textTheme.titleSmall)),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.18),
-                    borderRadius: radiusOf(ShapeTier.pill),
-                  ),
-                  child: Text(
-                    _statusLabels[assignedJob.milestone]!,
-                    style: theme.textTheme.labelMedium
-                        ?.copyWith(color: _statusTextColor(statusColor), fontWeight: FontWeight.w700),
-                  ),
+                Text(pickup ? 'PICKUP' : 'DELIVERY', style: AppType.eyebrow),
+                EditorialStatusBadge(
+                  label: _statusLabels[milestone]!,
+                  tint: statusColor,
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            _iconLine(theme, Icons.storefront_outlined, 'Pickup', job.pickupAddress),
-            const SizedBox(height: 6),
-            _iconLine(theme, Icons.location_on_outlined, 'Deliver to', '${job.buyerName} — ${job.deliveryArea}'),
-            const SizedBox(height: 6),
-            _iconLine(theme, Icons.inventory_2_outlined, 'Package', job.packageSize),
+            const SizedBox(height: 8),
+            Text(
+              pickup ? job.shopName : job.buyerName,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 5),
+            _iconLine(
+              theme,
+              Icons.location_on_outlined,
+              pickup ? 'Pickup address' : 'Delivery address',
+              pickup ? job.pickupAddress : job.deliveryArea,
+            ),
+            if (!pickup) ...[
+              const SizedBox(height: 5),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.storefront_outlined,
+                    size: 16,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      job.shopName,
+                      semanticsLabel: 'Seller: ${job.shopName}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 6),
             _iconLine(
               theme,
-              job.hasCod ? Icons.payments_outlined : Icons.verified_outlined,
-              job.hasCod ? 'Collect COD' : 'Payment',
-              job.hasCod ? formatPeso(job.codAmount) : job.paymentLabel,
+              Icons.inventory_2_outlined,
+              job.parcelCount == 1 ? '1 parcel' : '${job.parcelCount} parcels',
+              job.packageSize,
             ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
+            if (!pickup && job.hasCod) ...[
+              const SizedBox(height: 6),
+              _iconLine(
+                theme,
+                Icons.payments_outlined,
+                'Collect COD',
+                formatPeso(job.codAmount),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Divider(height: 1, color: AppColors.divider),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 14,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Text('DELIVERY FEE', style: AppType.eyebrow),
-                // The fee is the one number a courier actually scans a
-                // job list for — same reasoning as the buyer side's price
-                // treatment, applied to whatever number matters most on
-                // this screen. Was titleSmall/w700, same weight as the
-                // shop name above it.
-                Text(formatPeso(job.fee), style: AppType.priceNumeral(26)),
+                Text(
+                  action,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  'Fee ${formatPeso(job.fee)}',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ],
             ),
           ],
@@ -127,12 +189,6 @@ class DeliveryJobCard extends StatelessWidget {
     );
   }
 
-  // Darken toward black so light tokens (primary pink, secondary blush,
-  // tertiary sage) still read as legible text on their own pale pill
-  // background — using the raw color for both the fill and the text
-  // would be near-invisible for the lighter stages.
-  static Color _statusTextColor(Color base) => Color.lerp(base, Colors.black, 0.35)!;
-
   Widget _iconLine(ThemeData theme, IconData icon, String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,11 +196,17 @@ class DeliveryJobCard extends StatelessWidget {
         Icon(icon, size: 16, color: AppColors.textSecondary),
         const SizedBox(width: 8),
         Expanded(
-          child: RichText(
-            text: TextSpan(
+          child: Text.rich(
+            TextSpan(
               style: theme.textTheme.bodySmall,
               children: [
-                TextSpan(text: '$label: ', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                TextSpan(
+                  text: '$label: ',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
                 TextSpan(text: value),
               ],
             ),

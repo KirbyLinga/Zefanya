@@ -21,6 +21,7 @@ import 'package:zefanya/data/repositories/repositories.dart';
 import 'package:zefanya/main.dart';
 import 'package:zefanya/screens/buyer/buyer_shell.dart';
 import 'package:zefanya/screens/courier/courier_shell.dart';
+import 'package:zefanya/screens/courier/webzefanya_courier_portal.dart';
 import 'package:zefanya/services/google_sign_in_service.dart';
 import 'package:zefanya/state/auth_state.dart';
 import 'package:zefanya/state/cart_state.dart';
@@ -38,11 +39,15 @@ import 'package:zefanya/theme/app_theme.dart';
 
 Future<AuthState> _signedIn(UserRole role) async {
   final auth = AuthState();
-  await auth.login(
-    role: role,
-    email: role == UserRole.courier ? 'courier@example.ph' : 'buyer@example.ph',
-    password: 'Password1!',
-  );
+  if (role == UserRole.linehaul) {
+    await auth.startDemo(role);
+  } else {
+    await auth.login(
+      role: role,
+      email: role == UserRole.courier ? 'courier@example.ph' : 'buyer@example.ph',
+      password: 'Password1!',
+    );
+  }
   expect(auth.status, AccountStatus.active);
   expect(auth.role, role);
   return auth;
@@ -150,12 +155,16 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       final auth = await _signedIn(role);
       await _pumpGate(tester, auth);
+      if (role == UserRole.linehaul) {
+        expect(find.byType(WebZefanyaCourierPortal), findsOneWidget);
+      }
       await auth.logout();
       await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byType(BuyerShell), findsNothing);
       expect(find.byType(CourierShell), findsNothing);
+      expect(find.byType(WebZefanyaCourierPortal), findsNothing);
       expect(auth.isLoggedIn, isFalse);
     });
   }

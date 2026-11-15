@@ -47,7 +47,7 @@ import 'catalog_repository.dart';
 import 'chat_repository.dart';
 import 'courier_repository.dart';
 import 'google_auth_repository.dart';
-import 'linehaul_repository.dart';
+import 'courier_transfer_repository.dart';
 import 'order_repository.dart';
 import 'return_repository.dart';
 import 'review_repository.dart';
@@ -100,7 +100,7 @@ class Repositories {
   final ChatRepository chat;
   final CourierRepository courier;
   final ReturnRepository returns;
-  final LinehaulRepository? linehaul;
+  final CourierTransferRepository? linehaul;
 
   /// The network client, present only in live mode.
   ///
@@ -132,7 +132,7 @@ class Repositories {
     returns: MockReturnRepository(),
     chat: MockChatRepository(),
     courier: const MockCourierRepository(),
-    linehaul: const LinehaulRepository.demo(),
+    linehaul: const CourierTransferRepository.demo(),
   );
 
   /// The live set, built against [client].
@@ -156,7 +156,6 @@ class Repositories {
     returns: LiveReturnRepository(client),
     chat: LiveChatRepository(client),
     courier: LiveCourierRepository(client),
-    linehaul: LinehaulRepository(client),
     client: client,
   );
 
@@ -199,7 +198,9 @@ class Repositories {
     returns: LiveReturnRepository(client),
     chat: LiveChatRepository(client),
     courier: WebZefanyaCourierRepository(client),
-    linehaul: null,
+    linehaul: const BackendCapabilities.webzefanya().courierLogin
+        ? CourierTransferRepository(client)
+        : null,
     client: client,
     capabilities: const BackendCapabilities.webzefanya(),
   );
@@ -227,6 +228,7 @@ class Repositories {
     ApiClient? client,
     BackendProfile profile = BackendProfile.courierDemo,
     bool allowWrites = false,
+    bool allowVerifiedWrites = false,
     String otherBaseUrl = '',
   }) {
     if (!useLive) return Repositories.mock();
@@ -245,6 +247,7 @@ class Repositories {
                 tokenStore ??
                 scopedTokenStore(BackendProfile.webzefanya, baseUrl),
             allowWrites: allowWrites,
+            allowVerifiedWrites: allowVerifiedWrites,
           );
       return Repositories.webzefanya(resolved);
     }

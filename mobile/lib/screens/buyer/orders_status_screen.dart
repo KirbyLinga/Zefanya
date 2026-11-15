@@ -114,7 +114,8 @@ class _OrdersStatusScreenState extends State<OrdersStatusScreen> {
     final failure = orderState.loadFailure;
     if (failure != null) {
       return Scaffold(
-        backgroundColor: Colors.transparent, // the app-wide gradient in main.dart paints this
+        backgroundColor: Colors
+            .transparent, // the app-wide gradient in main.dart paints this
         body: SafeArea(child: _OrdersLoadFailure(error: failure)),
       );
     }
@@ -128,7 +129,10 @@ class _OrdersStatusScreenState extends State<OrdersStatusScreen> {
           child: Column(
             children: [
               const SizedBox(height: AppSpacing.s24),
-              ...List.generate(4, (i) => EaseInFrame(index: i, child: _OrderSkeleton())),
+              ...List.generate(
+                4,
+                (i) => EaseInFrame(index: i, child: _OrderSkeleton()),
+              ),
             ],
           ),
         ),
@@ -145,14 +149,20 @@ class _OrdersStatusScreenState extends State<OrdersStatusScreen> {
             if (mounted) _watchController(controller);
           });
           return Scaffold(
-            backgroundColor: Colors.transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
+            backgroundColor: Colors
+                .transparent, // was AppColors.background — the app-wide gradient in main.dart now paints this
             body: SafeArea(
               child: Column(
                 children: [
                   EaseInFrame(
                     index: 0,
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(AppSpacing.s24, AppSpacing.s20, AppSpacing.s24, AppSpacing.s8),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.s24,
+                        AppSpacing.s20,
+                        AppSpacing.s24,
+                        AppSpacing.s8,
+                      ),
                       child: _OrderStageStepper(controller: controller),
                     ),
                   ),
@@ -160,8 +170,14 @@ class _OrdersStatusScreenState extends State<OrdersStatusScreen> {
                     child: TabBarView(
                       children: [
                         _OrderList(status: OrderStatus.toShip, orders: orders),
-                        _OrderList(status: OrderStatus.inTransit, orders: orders),
-                        _OrderList(status: OrderStatus.outForDelivery, orders: orders),
+                        _OrderList(
+                          status: OrderStatus.inTransit,
+                          orders: orders,
+                        ),
+                        _OrderList(
+                          status: OrderStatus.outForDelivery,
+                          orders: orders,
+                        ),
                         _OrderList(status: OrderStatus.toRate, orders: orders),
                       ],
                     ),
@@ -201,7 +217,10 @@ class _OrdersLoadFailure extends StatelessWidget {
       title: 'Your orders could not be loaded',
       subtitle: Microcopy.calmError(error.message),
       action: error.isRetryable
-          ? TextButton(onPressed: () => _retry(context), child: const Text('Retry'))
+          ? TextButton(
+              onPressed: () => _retry(context),
+              child: const Text('Retry'),
+            )
           : null,
       tint: AppColors.secondary,
     );
@@ -230,7 +249,12 @@ class _OrderStageStepper extends StatelessWidget {
 
   final TabController controller;
 
-  static const _labels = ['To Ship', 'In Transit', 'Out for Delivery', 'Delivered'];
+  static const _labels = [
+    'To Ship',
+    'In Transit',
+    'Out for Delivery',
+    'Delivered',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -380,7 +404,12 @@ class _OrderSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     AppColors.watch(context);
     return Container(
-      margin: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s8, AppSpacing.s20, AppSpacing.s8),
+      margin: const EdgeInsets.fromLTRB(
+        AppSpacing.s20,
+        AppSpacing.s8,
+        AppSpacing.s20,
+        AppSpacing.s8,
+      ),
       padding: const EdgeInsets.all(AppSpacing.s16),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
@@ -391,7 +420,9 @@ class _OrderSkeleton extends StatelessWidget {
         children: [
           ShimmerBox(child: Container(height: AppSpacing.s12, width: 120)),
           const SizedBox(height: AppSpacing.s8),
-          ShimmerBox(child: Container(height: AppSpacing.s12, width: double.infinity)),
+          ShimmerBox(
+            child: Container(height: AppSpacing.s12, width: double.infinity),
+          ),
           const SizedBox(height: AppSpacing.s8),
           ShimmerBox(child: Container(height: AppSpacing.s8, width: 80)),
           const SizedBox(height: AppSpacing.s16),
@@ -415,18 +446,18 @@ class _OrderList extends StatelessWidget {
   final List<_Order> orders;
 
   static IconData _emptyIcon(OrderStatus status) => switch (status) {
-        OrderStatus.toShip         => Icons.inventory_2_outlined,
-        OrderStatus.inTransit      => Icons.local_shipping_outlined,
-        OrderStatus.outForDelivery => Icons.directions_bike_outlined,
-        OrderStatus.toRate         => Icons.star_border,
-      };
+    OrderStatus.toShip => Icons.inventory_2_outlined,
+    OrderStatus.inTransit => Icons.local_shipping_outlined,
+    OrderStatus.outForDelivery => Icons.directions_bike_outlined,
+    OrderStatus.toRate => Icons.star_border,
+  };
 
   static String _emptyTitle(OrderStatus status) => switch (status) {
-        OrderStatus.toShip         => 'No orders to ship yet',
-        OrderStatus.inTransit      => 'Nothing in transit',
-        OrderStatus.outForDelivery => 'Nothing out for delivery',
-        OrderStatus.toRate         => 'No delivered orders yet',
-      };
+    OrderStatus.toShip => 'No orders to ship yet',
+    OrderStatus.inTransit => 'Nothing in transit',
+    OrderStatus.outForDelivery => 'Nothing out for delivery',
+    OrderStatus.toRate => 'No delivered orders yet',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -463,7 +494,12 @@ class _OrderList extends StatelessWidget {
       color: AppColors.primaryDark,
       onRefresh: () => context.read<OrderState>().refresh(),
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s16, AppSpacing.s20, 120),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.s20,
+          AppSpacing.s16,
+          AppSpacing.s20,
+          120,
+        ),
         itemCount: filtered.length,
         itemBuilder: (context, i) => EaseInFrame(
           index: i.clamp(0, 5),
@@ -491,44 +527,46 @@ class _OrderCard extends StatelessWidget {
   // and primaryDark have a different value in each mode, and a const map
   // would freeze whichever mode happened to be active at first touch.
   static Map<OrderStatus, Color> get _statusColors => {
-        OrderStatus.toShip: AppColors.neutral,
-        OrderStatus.inTransit: AppColors.warning,
-        OrderStatus.outForDelivery: AppColors.primaryDark,
-        OrderStatus.toRate: AppColors.tertiary,
-      };
+    OrderStatus.toShip: AppColors.neutral,
+    OrderStatus.inTransit: AppColors.warning,
+    OrderStatus.outForDelivery: AppColors.primaryDark,
+    OrderStatus.toRate: AppColors.tertiary,
+  };
 
   String _statusLabel(ReturnRequest? request) => order.cancelled
       ? 'Cancelled'
       : order.buyerConfirmed
-          ? 'Completed'
-          : request?.orderLabel ?? _statusLabels[order.status]!;
+      ? 'Completed'
+      : request?.orderLabel ?? _statusLabels[order.status]!;
 
   Color _statusColor(ReturnRequest? request) => order.cancelled
       ? AppColors.danger
       : request != null
-          ? _returnStatusColor(request.status)
-          : _statusColors[order.status]!;
+      ? _returnStatusColor(request.status)
+      : _statusColors[order.status]!;
 
   static Color _returnStatusColor(ReturnStatus status) => switch (status) {
-        ReturnStatus.submitted => AppColors.warning,
-        ReturnStatus.rejected => AppColors.danger,
-        ReturnStatus.escalated => AppColors.primaryDark,
-        ReturnStatus.refunded => AppColors.tertiary,
-      };
+    ReturnStatus.submitted => AppColors.warning,
+    ReturnStatus.rejected => AppColors.danger,
+    ReturnStatus.escalated => AppColors.primaryDark,
+    ReturnStatus.refunded => AppColors.tertiary,
+    ReturnStatus.returned => AppColors.tertiary,
+  };
 
   @override
   Widget build(BuildContext context) {
     AppColors.watch(context);
     final theme = Theme.of(context);
-    final returnRequest =
-        context.watch<OrderState>().returns.latestForOrder(order.id);
+    final returnRequest = context.watch<OrderState>().returns.latestForOrder(
+      order.id,
+    );
     final statusColor = _statusColor(returnRequest);
     final radius = editorialRadius(index, ShapeTier.card);
 
     return InkWell(
-      onTap: () => Navigator.of(context).push(
-        AppPageRoute(builder: (_) => OrderDetailScreen(order: order)),
-      ),
+      onTap: () => Navigator.of(
+        context,
+      ).push(AppPageRoute(builder: (_) => OrderDetailScreen(order: order))),
       borderRadius: radius,
       child: Container(
         margin: const EdgeInsets.only(bottom: AppSpacing.s16),
@@ -537,78 +575,94 @@ class _OrderCard extends StatelessWidget {
           borderRadius: radius,
         ),
         clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.s16, AppSpacing.s12, AppSpacing.s16, AppSpacing.s12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.s16,
+                AppSpacing.s12,
+                AppSpacing.s16,
+                AppSpacing.s12,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.storefront_outlined,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: AppSpacing.s4),
+                        Expanded(
+                          child: Text(
+                            order.shopName,
+                            style: theme.textTheme.titleSmall,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _statusBadge(theme, statusColor, _statusLabel(returnRequest)),
+                ],
+              ),
+            ),
+            // The perforation: this card is standing in for a shipping
+            // stub, so the seam between "what you bought" and "where it
+            // is" is torn, not a flat Divider rule.
+            const _PerforationLine(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.s16,
+                AppSpacing.s12,
+                AppSpacing.s16,
+                AppSpacing.s16,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Order number as an eyebrow: it's a reference code,
+                  // which is exactly what the tiny all-caps kicker is
+                  // for, and it stops the stub half of the card from
+                  // opening with three lines of identical bodySmall.
+                  Text(order.id, style: AppType.eyebrow),
+                  const SizedBox(height: AppSpacing.s4),
+                  Text(order.itemSummary, style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: AppSpacing.s4),
+                  Row(
                     children: [
-                      Icon(Icons.storefront_outlined, size: 16, color: AppColors.textSecondary),
+                      Icon(Icons.schedule, size: 14, color: AppColors.accent),
                       const SizedBox(width: AppSpacing.s4),
-                      Expanded(
+                      Flexible(
                         child: Text(
-                          order.shopName,
-                          style: theme.textTheme.titleSmall,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          order.cancelled
+                              ? 'Cancelled${order.cancellationReason == null ? '' : ' — ${order.cancellationReason}'}'
+                              : order.eta,
+                          // ETA is the number/phrase the buyer is actually
+                          // here to read — bumped from bodySmall to
+                          // titleSmall so it has enough weight to be found
+                          // at a glance.
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: order.cancelled
+                                ? AppColors.danger
+                                : AppColors.accent,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
-                _statusBadge(theme, statusColor, _statusLabel(returnRequest)),
-              ],
+                  const SizedBox(height: AppSpacing.s12),
+                  _actionRow(context, theme, returnRequest),
+                ],
+              ),
             ),
-          ),
-          // The perforation: this card is standing in for a shipping
-          // stub, so the seam between "what you bought" and "where it
-          // is" is torn, not a flat Divider rule.
-          const _PerforationLine(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.s16, AppSpacing.s12, AppSpacing.s16, AppSpacing.s16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Order number as an eyebrow: it's a reference code,
-                // which is exactly what the tiny all-caps kicker is
-                // for, and it stops the stub half of the card from
-                // opening with three lines of identical bodySmall.
-                Text(order.id, style: AppType.eyebrow),
-                const SizedBox(height: AppSpacing.s4),
-                Text(order.itemSummary, style: theme.textTheme.bodyMedium),
-                const SizedBox(height: AppSpacing.s4),
-                Row(
-                  children: [
-                    Icon(Icons.schedule, size: 14, color: AppColors.accent),
-                    const SizedBox(width: AppSpacing.s4),
-                    Flexible(
-                      child: Text(
-                        order.cancelled
-                            ? 'Cancelled${order.cancellationReason == null ? '' : ' — ${order.cancellationReason}'}'
-                            : order.eta,
-                        // ETA is the number/phrase the buyer is actually
-                        // here to read — bumped from bodySmall to
-                        // titleSmall so it has enough weight to be found
-                        // at a glance.
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: order.cancelled ? AppColors.danger : AppColors.accent,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.s12),
-                _actionRow(context, theme, returnRequest),
-              ],
-            ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -620,14 +674,20 @@ class _OrderCard extends StatelessWidget {
     // _statusTextColor helper.
     final textColor = Color.lerp(color, Colors.black, 0.40)!;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: AppSpacing.s4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s8,
+        vertical: AppSpacing.s4,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
         borderRadius: radiusOf(ShapeTier.pill),
       ),
       child: Text(
         label,
-        style: theme.textTheme.labelSmall?.copyWith(color: textColor, fontWeight: FontWeight.w700),
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: textColor,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -637,7 +697,10 @@ class _OrderCard extends StatelessWidget {
   void _contactSeller(BuildContext context) {
     if (!FeatureFlags.chatLive) return;
     Navigator.of(context).push(
-      AppPageRoute(builder: (_) => ChatScreen(contactName: order.shopName, contactRole: 'Seller')),
+      AppPageRoute(
+        builder: (_) =>
+            ChatScreen(contactName: order.shopName, contactRole: 'Seller'),
+      ),
     );
   }
 
@@ -668,9 +731,9 @@ class _OrderCard extends StatelessWidget {
         content: Text('$added item${added == 1 ? '' : 's'} added to cart'),
         action: SnackBarAction(
           label: 'View Cart',
-          onPressed: () => Navigator.of(context).push(
-            AppPageRoute(builder: (_) => const CartScreen()),
-          ),
+          onPressed: () => Navigator.of(
+            context,
+          ).push(AppPageRoute(builder: (_) => const CartScreen())),
         ),
       ),
     );
@@ -697,14 +760,24 @@ class _OrderCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s20, AppSpacing.s20, AppSpacing.s4),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.s20,
+                        AppSpacing.s20,
+                        AppSpacing.s20,
+                        AppSpacing.s4,
+                      ),
                       child: Text(
                         'Cancel ${order.id}?',
                         style: theme.textTheme.titleMedium,
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.s8),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.s20,
+                        0,
+                        AppSpacing.s20,
+                        AppSpacing.s8,
+                      ),
                       child: Text(
                         'The seller is notified and the item returns to stock. '
                         'This cannot be undone.',
@@ -714,12 +787,14 @@ class _OrderCard extends StatelessWidget {
                       ),
                     ),
                     for (final option in OrderState.cancellationReasons)
-                      RadioListTile<String>(
-                        value: option,
-                        title: Text(option),
-                      ),
+                      RadioListTile<String>(value: option, title: Text(option)),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s8, AppSpacing.s20, AppSpacing.s16),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.s20,
+                        AppSpacing.s8,
+                        AppSpacing.s20,
+                        AppSpacing.s16,
+                      ),
                       child: ElevatedButton(
                         onPressed: selected == null
                             ? null
@@ -947,11 +1022,16 @@ class _DashPainter extends CustomPainter {
     var x = 0.0;
     final count = (size.width / (dashWidth + gap)).ceil();
     for (var i = 0; i < count; i++) {
-      canvas.drawLine(Offset(x, 0), Offset(math.min(x + dashWidth, size.width), 0), paint);
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(math.min(x + dashWidth, size.width), 0),
+        paint,
+      );
       x += dashWidth + gap;
     }
   }
 
   @override
-  bool shouldRepaint(covariant _DashPainter oldDelegate) => oldDelegate.color != color;
+  bool shouldRepaint(covariant _DashPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

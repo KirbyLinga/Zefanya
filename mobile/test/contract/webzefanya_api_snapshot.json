@@ -4,8 +4,56 @@
   "source_head": "00eea861",
   "generated_on": "2026-11-14",
   "note": "The working tree had uncommitted changes when generated; the snapshot reflects the served tree, not HEAD.",
-  "route_count": 68,
+  "route_count": 79,
   "routes": [
+    {
+      "method": "GET",
+      "path": "/rider/cod",
+      "name": "api.rider.cod",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/rider/payouts",
+      "name": "api.rider.payouts",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/rider/proofs/{deliveryProof}",
+      "name": "api.rider.proofs.show",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/rider/return-pickups",
+      "name": "api.rider.return-pickups.index",
+      "middleware": []
+    },
+    {
+      "method": "GET",
+      "path": "/rider/waybills/{sellerOrder}",
+      "name": "api.rider.waybills.show",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/pickups/stops/{pickupSession}/finish",
+      "name": "api.rider.pickups.stops.finish",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/pickups/{sellerOrder}/failed",
+      "name": "api.rider.pickups.failed",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/rider/return-pickups/{parcelReturn}/collect",
+      "name": "api.rider.return-pickups.collect",
+      "middleware": []
+    },
     {
       "method": "GET",
       "path": "/buyer/addresses",
@@ -94,6 +142,12 @@
       "method": "POST",
       "path": "/buyer/checkout/quote",
       "name": "api.buyer.checkout.quote",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/buyer/checkout/reconcile",
+      "name": "api.buyer.checkout.reconcile",
       "middleware": []
     },
     {
@@ -212,6 +266,12 @@
     },
     {
       "method": "GET",
+      "path": "/buyer/reviews/mine",
+      "name": "api.buyer.reviews.mine",
+      "middleware": []
+    },
+    {
+      "method": "GET",
       "path": "/buyer/shipments",
       "name": "api.buyer.shipments.index",
       "middleware": []
@@ -220,6 +280,12 @@
       "method": "GET",
       "path": "/buyer/shipments/{shipment}",
       "name": "api.buyer.shipments.show",
+      "middleware": []
+    },
+    {
+      "method": "PATCH",
+      "path": "/buyer/shipments/{shipment}/products/{product}/review",
+      "name": "api.buyer.reviews.save",
       "middleware": []
     },
     {
@@ -416,6 +482,12 @@
       "method": "POST",
       "path": "/rider/token/refresh",
       "name": "api.rider.token.refresh",
+      "middleware": []
+    },
+    {
+      "method": "POST",
+      "path": "/v1/buyer/checkout/quote",
+      "name": "api.v1.buyer.checkout.quote",
       "middleware": []
     }
   ]
