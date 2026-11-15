@@ -294,6 +294,7 @@ class StoreProductRequest extends FormRequest
             'new_store_category' => ['nullable', 'string', 'max:50'],
             'brand' => ['nullable', 'string', 'max:100'],
             'condition' => ['nullable', 'string', 'max:100'],
+            'garment_type' => ['nullable', 'string', \Illuminate\Validation\Rule::in(\App\Support\SizeGuide::keys())],
             'dimensions' => [$required, 'array:length,width,height'],
             'dimensions.length' => [$required, 'numeric', 'gt:0'],
             'dimensions.width' => [$required, 'numeric', 'gt:0'],

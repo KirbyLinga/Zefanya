@@ -15,6 +15,8 @@ return new class extends Migration
             $table->uuid('creation_key')->nullable();
             $table->string('brand', 100)->nullable();
             $table->string('condition', 100)->nullable();
+            // Seller-chosen garment type (config/size_guide.php key); null when not applicable.
+            $table->string('garment_type', 30)->nullable();
             $table->unique(['seller_id', 'creation_key'], 'product_seller_creation_unique');
         });
     }
@@ -26,7 +28,7 @@ return new class extends Migration
     {
         Schema::table('products', function (Blueprint $table) {
             $table->dropUnique('product_seller_creation_unique');
-            $table->dropColumn(['creation_key', 'brand', 'condition']);
+            $table->dropColumn(['creation_key', 'brand', 'condition', 'garment_type']);
         });
     }
 };

@@ -90,6 +90,13 @@ class ProductPublishingService
                     'stock_quantity' => ! $product->exists ? 0 : $data['stock_quantity'],
                     'low_stock_threshold' => $data['low_stock_threshold'] ?? 5,
                 ]);
+                if (\App\Support\SizeGuide::columnExists()) {
+                    // Only offered for apparel categories; anything else clears it.
+                    $categoryLabel = $product->category_id ? \App\Models\Shared\Category::query()->whereKey($product->category_id)->value('label') : null;
+                    $product->garment_type = \App\Support\SizeGuide::appliesToCategoryLabel($categoryLabel)
+                        ? (filled($data['garment_type'] ?? null) ? $data['garment_type'] : null)
+                        : null;
+                }
                 $product->forceFill(['status' => $data['status']]);
                 $product->save();
                 if (array_key_exists('store_category_ids', $data) || filled($data['new_store_category'] ?? null)) {

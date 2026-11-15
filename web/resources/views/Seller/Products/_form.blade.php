@@ -163,6 +163,20 @@
             <div class="mt-4 grid gap-4 sm:grid-cols-3">
                 <label class="flex flex-col gap-2">Brand<input name="brand" maxlength="100" value="{{ old('brand', $product->brand ?? 'No brand') }}" class="{{ $inputClass }}"></label>
                 <label class="flex flex-col gap-2">Condition<input name="condition" maxlength="100" value="{{ old('condition', $product->condition ?? 'New') }}" class="{{ $inputClass }}"></label>
+                @if (\App\Support\SizeGuide::columnExists())
+                    <label class="flex flex-col gap-2 sm:col-span-3" data-pf-garment-type>Garment type <span class="font-normal text-[var(--text-muted)]">(optional, Women's Apparel only; shows a length guide to Buyers)</span>
+                        <select name="garment_type" class="{{ $inputClass }}">
+                            <option value="">Not specified</option>
+                            @foreach (\App\Support\SizeGuide::groups() as $guideGroup)
+                                <optgroup label="{{ $guideGroup['label'] }}">
+                                    @foreach ($guideGroup['types'] as $guideKey => $guideType)
+                                        <option value="{{ $guideKey }}" @selected(old('garment_type', $product->garment_type) === $guideKey)>{{ $guideType['label'] }} — {{ $guideType['cm'] }} cm ({{ $guideType['in'] }} in)</option>
+                                    @endforeach
+                                </optgroup>
+                            @endforeach
+                        </select>
+                    </label>
+                @endif
                 <label for="low_stock_threshold" class="text-[var(--text-ink)] flex flex-col gap-2">Low-stock alert at<input name="low_stock_threshold" id="low_stock_threshold" type="number" step="1" min="0" value="{{ old('low_stock_threshold', $product->low_stock_threshold ?? 5) }}" class="{{ $inputClass }}"></label>
             </div>
         </details>

@@ -52,6 +52,13 @@
           <dd class="text-buyer-ink">{{ $product->condition }}</dd>
         </div>
       @endif
+      @php($garment = \App\Support\SizeGuide::columnExists() ? \App\Support\SizeGuide::find($product->garment_type) : null)
+      @if ($garment)
+        <div class="{{ $specRowClass }}" data-garment-type>
+          <dt class="text-buyer-ink-soft">{{ $garment['group'] }} type</dt>
+          <dd class="text-buyer-ink">{{ $garment['label'] }} <span class="text-buyer-ink-soft">({{ $garment['cm'] }} cm / {{ $garment['in'] }} in long)</span></dd>
+        </div>
+      @endif
       @foreach ($product->options as $option)
         <div class="{{ $specRowClass }}">
           <dt class="text-buyer-ink-soft">{{ $option->name }}</dt>
@@ -65,6 +72,26 @@
     <div id="description" class="scroll-mt-24 border-t border-buyer-line px-5 py-4">
       <h2 class="mb-2 font-serif text-[15px] font-semibold text-buyer-ink">Description</h2>
       <p class="whitespace-pre-line text-[14px] leading-relaxed text-buyer-ink-soft">{{ $description }}</p>
+    </div>
+  @endif
+  @if ($garment)
+    <div id="length-guide" class="scroll-mt-24 border-t border-buyer-line px-5 py-4" data-length-guide>
+      <h2 class="mb-2 font-serif text-[15px] font-semibold text-buyer-ink">Length guide — {{ $garment['group'] }}</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-[14px]">
+          <caption class="sr-only">Typical {{ strtolower($garment['group']) }} lengths</caption>
+          <thead><tr class="border-b border-buyer-line text-buyer-ink"><th scope="col" class="py-2 pr-4 font-semibold">Type</th><th scope="col" class="py-2 font-semibold">Length</th></tr></thead>
+          <tbody>
+            @foreach (\App\Support\SizeGuide::groups()[$garment['group_key']]['types'] as $guideKey => $guideType)
+              <tr class="border-b border-buyer-line last:border-b-0 {{ $guideKey === $product->garment_type ? 'bg-cream font-semibold text-buyer-ink' : 'text-buyer-ink-soft' }}" @if ($guideKey === $product->garment_type) aria-current="true" @endif>
+                <th scope="row" class="py-2 pr-4 font-normal">{{ $guideType['label'] }}@if ($guideKey === $product->garment_type) <span class="sr-only">(this item)</span>@endif</th>
+                <td class="py-2">{{ $guideType['cm'] }} cm ({{ $guideType['in'] }} in)</td>
+              </tr>
+            @endforeach
+          </tbody>
+        </table>
+      </div>
+      <p class="mt-2 text-[12px] text-buyer-ink-soft">General guide only. Check the product description or message the Seller for exact measurements.</p>
     </div>
   @endif
   <div id="returns" class="scroll-mt-24 border-t border-buyer-line px-5 py-4">

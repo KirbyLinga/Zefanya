@@ -317,6 +317,9 @@ class ProductApprovalService
             'brand' => (string) ($product->brand ?? ''),
             'condition' => (string) ($product->condition ?? ''),
         ];
+        if (\App\Support\SizeGuide::columnExists()) {
+            $fields['garment_type'] = (string) ($product->garment_type ?? '');
+        }
         foreach ($fields as $key => $current) {
             if (array_key_exists($key, $data) && trim((string) ($data[$key] ?? '')) !== trim($current)) {
                 return true;

@@ -46,6 +46,7 @@ class Product extends Model
         'dimensions',
         'brand',
         'condition',
+        'garment_type',
         'restriction_reason',
         'restricted_at',
         'restricted_by',
