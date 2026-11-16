@@ -44,10 +44,7 @@ abstract class GoogleSignInService {
 
 /// Real Google Sign-In. Used only in live builds.
 class NativeGoogleSignInService implements GoogleSignInService {
-  NativeGoogleSignInService({
-    this.clientId = '',
-    this.serverClientId = '',
-  });
+  NativeGoogleSignInService({this.clientId = '', this.serverClientId = ''});
 
   final String clientId;
   final String serverClientId;
@@ -130,9 +127,11 @@ class NativeGoogleSignInService implements GoogleSignInService {
 
   @override
   Future<void> signOut() async {
-    // Best-effort: signing out of the app must not fail because Google's SDK
-    // was never initialised (a live build that never tapped the button) or
-    // because the device is offline.
+    // Password-only sessions have no Google session to clear. On Web, asking
+    // an uninitialized Google SDK to sign out can wait for its external script.
+    if (_initializing == null) return;
+
+    // Google account chooser cleanup is best effort.
     try {
       await GoogleSignIn.instance.signOut();
     } catch (_) {

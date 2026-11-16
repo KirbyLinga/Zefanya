@@ -16,12 +16,28 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+// The Google plugin's platform contract lets this test detect SDK calls.
+// ignore: depend_on_referenced_packages
+import 'package:google_sign_in_platform_interface/google_sign_in_platform_interface.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zefanya/config/dev_flags.dart';
 import 'package:zefanya/screens/auth/login_screen.dart';
+import 'package:zefanya/services/google_sign_in_service.dart';
 import 'package:zefanya/state/auth_state.dart';
 import 'package:zefanya/theme/app_theme.dart';
+
+class _SignOutProbe extends GoogleSignInPlatform {
+  int signOutCalls = 0;
+
+  @override
+  Future<void> signOut(SignOutParams params) async {
+    signOutCalls++;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 /// Pumps the login screen with an AuthState that uses mock Google services.
 Future<void> _pumpLogin(WidgetTester tester, AuthState auth) async {
@@ -38,6 +54,17 @@ Future<void> _pumpLogin(WidgetTester tester, AuthState auth) async {
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  test('password-only logout does not contact the Google SDK', () async {
+    final previous = GoogleSignInPlatform.instance;
+    final probe = _SignOutProbe();
+    GoogleSignInPlatform.instance = probe;
+    addTearDown(() => GoogleSignInPlatform.instance = previous);
+
+    await NativeGoogleSignInService().signOut();
+
+    expect(probe.signOutCalls, 0);
+  });
 
   testWidgets('Google button follows the build configuration', (tester) async {
     final auth = AuthState();
