@@ -1,0 +1,116 @@
+[
+  {
+    "file": "catalog-1-0.jpg",
+    "product": 1,
+    "category": 1,
+    "label": "The Midnight Library \u2013 Matt Haig"
+  },
+  {
+    "file": "catalog-1-1.jpg",
+    "product": 1,
+    "category": 1,
+    "label": "The Midnight Library \u2013 Matt Haig"
+  },
+  {
+    "file": "catalog-2-0.jpg",
+    "product": 2,
+    "category": 1,
+    "label": "Atomic Habits \u2013 James Clear"
+  },
+  {
+    "file": "catalog-2-1.jpg",
+    "product": 2,
+    "category": 1,
+    "label": "Atomic Habits \u2013 James Clear"
+  },
+  {
+    "file": "catalog-3-0.jpg",
+    "product": 3,
+    "category": 1,
+    "label": "Rich Dad Poor Dad"
+  },
+  {
+    "file": "catalog-4-0.jpg",
+    "product": 4,
+    "category": 8,
+    "label": "Game Cases"
+  },
+  {
+    "file": "catalog-4-1.jpg",
+    "product": 4,
+    "category": 8,
+    "label": "Game Cases"
+  },
+  {
+    "file": "catalog-5-0.jpg",
+    "product": 5,
+    "category": 7,
+    "label": "Women's Blouse"
+  },
+  {
+    "file": "catalog-5-1.jpg",
+    "product": 5,
+    "category": 7,
+    "label": "Women's Blouse"
+  },
+  {
+    "file": "catalog-5-2.jpg",
+    "product": 5,
+    "category": 7,
+    "label": "Women's Blouse"
+  },
+  {
+    "file": "catalog-5-3.jpg",
+    "product": 5,
+    "category": 7,
+    "label": "Women's Blouse"
+  },
+  {
+    "file": "catalog-6-0.jpg",
+    "product": 6,
+    "category": 7,
+    "label": "Women's Blouse"
+  },
+  {
+    "file": "catalog-6-1.jpg",
+    "product": 6,
+    "category": 7,
+    "label": "Women's Blouse"
+  },
+  {
+    "file": "catalog-6-2.jpg",
+    "product": 6,
+    "category": 7,
+    "label": "Women's Blouse"
+  },
+  {
+    "file": "catalog-6-3.jpg",
+    "product": 6,
+    "category": 7,
+    "label": "Women's Blouse"
+  },
+  {
+    "file": "catalog-7-0.jpg",
+    "product": 7,
+    "category": 7,
+    "label": "Elegant Puff Sleeve Ribbon Midi Dress"
+  },
+  {
+    "file": "catalog-7-1.jpg",
+    "product": 7,
+    "category": 7,
+    "label": "Elegant Puff Sleeve Ribbon Midi Dress"
+  },
+  {
+    "file": "catalog-7-2.jpg",
+    "product": 7,
+    "category": 7,
+    "label": "Elegant Puff Sleeve Ribbon Midi Dress"
+  },
+  {
+    "file": "catalog-7-3.jpg",
+    "product": 7,
+    "category": 7,
+    "label": "Elegant Puff Sleeve Ribbon Midi Dress"
+  }
+]

@@ -1,0 +1,665 @@
+<?php
+
+namespace Tests\Feature\Http\Controllers\Buyer;
+
+use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
+use App\Enums\PaymentStatus;
+use App\Http\Controllers\Buyer\CheckoutController;
+use App\Models\Buyer\Buyer;
+use App\Models\Buyer\BuyerAddress;
+use App\Models\Buyer\CartItem;
+use App\Models\Buyer\CheckoutToken;
+use App\Models\Catalog\InventoryTransaction;
+use App\Models\Catalog\Product;
+use App\Models\Logistics\LogisticsHub;
+use App\Models\Logistics\ParcelRoute;
+use App\Models\Logistics\TransportConnection;
+use App\Models\Seller\Seller;
+use App\Models\Shared\Order;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\Payment;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\Voucher;
+use App\Services\Logistics\LogisticsHubService;
+use App\Services\Logistics\RoutePlannerService;
+use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Testing\TestResponse;
+use Illuminate\Validation\ValidationException;
+use Mockery;
+use Tests\Support\BootstrapsCheckoutCarriers;
+use Tests\TestCase;
+
+class CheckoutControllerTest extends TestCase
+{
+    use BootstrapsCheckoutCarriers;
+    use LazilyRefreshDatabase;
+
+    private Buyer $buyer;
+
+    private Seller $sellerA;
+
+    private Seller $sellerB;
+
+    private Product $productA;
+
+    private Product $productB;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->buyer = Buyer::factory()->create([
+            'province_name' => 'Metro Manila',
+            'municipality_name' => 'Quezon City',
+            'barangay_name' => 'Diliman',
+            'street' => 'Maple Street',
+            'house_number' => '123',
+            'address_detail' => 'Near the corner',
+        ]);
+        $this->sellerA = Seller::factory()->create();
+        $this->sellerB = Seller::factory()->create();
+
+        $this->productA = Product::factory()->create([
+            'seller_id' => $this->sellerA->id,
+            'name' => 'Walnut Desk',
+            'price' => 100.00,
+            'stock_quantity' => 5,
+        ]);
+
+        $this->productB = Product::factory()->create([
+            'seller_id' => $this->sellerB->id,
+            'name' => 'Brass Lamp',
+            'price' => 25.50,
+            'stock_quantity' => 3,
+        ]);
+
+        $this->bootstrapCheckoutCarriers($this->buyer, [$this->sellerA, $this->sellerB]);
+    }
+
+    /**
+     * Park the checkout selection (same session keys CheckoutController@index uses).
+     *
+     * @param  array<int, int>  $ids
+     */
+    private function parkSelection(array $ids, ?string $voucherCode = null): void
+    {
+        session([
+            CheckoutController::SESSION_KEY => $ids,
+            'cart_voucher' => $voucherCode,
+        ]);
+    }
+
+    // ── Happy path ───────────────────────────────────────────────────────────
+
+    public function test_a_buyer_places_an_order_across_two_sellers(): void
+    {
+        $cartA = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+            'quantity' => 2,
+        ]);
+        $cartB = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productB->id,
+            'quantity' => 1,
+        ]);
+
+        // An unparked line must SURVIVE checkout — only the selection is purchased.
+        $unselected = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => Product::factory()->create(['seller_id' => $this->sellerA->id, 'price' => 10.00]),
+            'quantity' => 1,
+        ]);
+
+        Voucher::factory()->fixed(5000)->create(['code' => 'ZEFANYANEW']);
+        $this->parkSelection([$cartA->id, $cartB->id], 'ZEFANYANEW');
+
+        $response = $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), [
+                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+                ...$this->checkoutCarrierPayload([$this->sellerA, $this->sellerB]),
+            ]);
+
+        // DEBUG: Check response status and location
+        $location = $response->headers->get('Location');
+        if (! str_contains($location ?? '', 'checkout/success')) {
+            $this->fail("Expected success redirect, got: $location. Session errors: ".json_encode(session('errors')?->all() ?? []).'. Session flash: '.json_encode(session()->all()));
+        }
+
+        // subtotal = 2×10000 + 1×2550 = 22550; discount 5000; shipping 10000; total 27550.
+        $this->assertGreaterThan(0, Order::count(), 'No orders created after checkout');
+        $order = Order::query()->first();
+        $this->assertNotNull($order, 'Expected at least one order');
+        $this->assertSame(22550, $order->subtotal_minor);
+        $this->assertSame(5000, $order->discount_minor);
+        $this->assertSame(27550, $order->total_minor);
+        $this->assertSame(OrderStatus::Placed, $order->status);
+        $this->assertSame($this->buyer->id, $order->buyer_id);
+        $this->assertMatchesRegularExpression('/^ORD-\d{8}-[A-Z0-9]{6}$/', $order->reference);
+
+        // Address snapshot from the buyer's profile.
+        $this->assertSame($this->buyer->fullName(), $order->shipping_address['name']);
+        $this->assertSame('123, Maple Street, First, San Fernando, Pampanga, Near the corner', $order->shipping_address['full']);
+        $this->assertSame($this->buyer->contact_no, $order->shipping_address['phone']);
+
+        // One seller_order per shop, one per (order, seller) pair.
+        $this->assertSame(2, $order->sellerOrders()->count());
+        $subtotals = $order->sellerOrders->pluck('subtotal_minor', 'seller_id');
+        $this->assertSame(20000, (int) $subtotals[$this->sellerA->id]);
+        $this->assertSame(2550, (int) $subtotals[$this->sellerB->id]);
+
+        // Order items belong to seller_orders and snapshot name + price.
+        $this->assertSame(2, OrderItem::query()->count());
+        $itemA = OrderItem::query()->where('product_id', $this->productA->id)->first();
+        $this->assertNotNull($itemA);
+        $this->assertSame(
+            $itemA->seller_order_id,
+            (int) $order->sellerOrders->firstWhere('seller_id', $this->sellerA->id)->id,
+        );
+        $this->assertSame('Walnut Desk', $itemA->product_name);
+        $this->assertSame(2, $itemA->quantity);
+        $this->assertSame(10000, $itemA->price_minor);
+        $this->assertSame(2550, (int) OrderItem::query()->where('product_id', $this->productB->id)->value('price_minor'));
+
+        // One pending COD payment per seller_order; they sum to the order total.
+        $payments = Payment::query()->get();
+        $this->assertSame(2, $payments->count());
+        $this->assertTrue($payments->every(fn (Payment $p): bool => $p->status === PaymentStatus::Pending));
+        $this->assertTrue($payments->every(fn (Payment $p): bool => $p->method === PaymentMethod::Cod));
+        $this->assertNull($payments->first()->paid_at);
+        $this->assertSame(27550, (int) $payments->sum('amount_minor'));
+        foreach ($payments as $payment) {
+            $this->assertLessThanOrEqual($payment->sellerOrder->subtotal_minor + $payment->sellerOrder->shipping_fee_minor, $payment->amount_minor);
+            $this->assertGreaterThan(0, $payment->amount_minor);
+        }
+
+        // Stock decremented inside the transaction, with a ledger row each.
+        $this->assertSame(3, $this->productA->fresh()->stock_quantity);
+        $this->assertSame(2, $this->productB->fresh()->stock_quantity);
+        $this->assertSame(2, InventoryTransaction::query()->where('reason', 'checkout')->count());
+        $ledgerA = InventoryTransaction::query()->where('product_id', $this->productA->id)->first();
+        $this->assertSame(5, $ledgerA->quantity_before);
+        $this->assertSame(3, $ledgerA->quantity_after);
+        $this->assertSame(-2, $ledgerA->delta);
+
+        // Purchased lines removed; the unparked line survives; session cleared.
+        $this->assertSame(1, CartItem::where('buyer_id', $this->buyer->id)->count());
+        $this->assertTrue($unselected->fresh()->exists);
+        $response->assertSessionMissing(CheckoutController::SESSION_KEY);
+        $response->assertSessionMissing('cart_voucher');
+
+        // Redirects to the confirmation page showing the reference.
+        $response->assertRedirect(route('buyer.checkout.success', $order));
+        $this->get($response->headers->get('Location'))
+            ->assertOk()
+            ->assertSee($order->reference);
+    }
+
+    public function test_checkout_snapshots_each_sellers_parcel_weight(): void
+    {
+        $this->productA->forceFill(['weight_grams' => 1200])->save();
+        $this->productA->variants()->update(['weight_grams' => 1200]);
+        $this->productB->forceFill(['weight_grams' => 300])->save();
+        $this->productB->variants()->update(['weight_grams' => 300]);
+
+        $cartA = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+            'variant_id' => $this->productA->variants()->orderBy('id')->value('id'),
+            'quantity' => 2,
+        ]);
+        $cartB = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productB->id,
+            'variant_id' => $this->productB->variants()->orderBy('id')->value('id'),
+            'quantity' => 3,
+        ]);
+
+        $this->parkSelection([$cartA->id, $cartB->id]);
+
+        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), [
+            'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+            ...$this->checkoutCarrierPayload([$this->sellerA, $this->sellerB]),
+        ]);
+
+        $weights = Order::query()->sole()->sellerOrders()
+            ->pluck('parcel_weight_grams', 'seller_id');
+
+        $this->assertSame(2400, (int) $weights[$this->sellerA->id]);
+        $this->assertSame(900, (int) $weights[$this->sellerB->id]);
+
+        // A later catalog edit must not rewrite the parcel already checked out.
+        $this->productA->forceFill(['weight_grams' => 9000])->save();
+        $this->productA->variants()->update(['weight_grams' => 9000]);
+        $this->assertSame(
+            2400,
+            (int) Order::query()->sole()->sellerOrders()
+                ->where('seller_id', $this->sellerA->id)
+                ->value('parcel_weight_grams'),
+        );
+    }
+
+    public function test_a_single_seller_order_carries_the_full_discount(): void
+    {
+        $cart = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+            'quantity' => 1,
+        ]);
+
+        Voucher::factory()->fixed(5000)->create(['code' => 'ZEFANYANEW']);
+        $this->parkSelection([$cart->id], 'ZEFANYANEW');
+
+        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), [
+            'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+            ...$this->checkoutCarrierPayload([$this->sellerA]),
+        ]);
+
+        $order = Order::query()->sole();
+        $this->assertSame(10000, $order->subtotal_minor);
+        $this->assertSame(5000, $order->discount_minor);
+        $this->assertSame(10000, $order->total_minor);
+
+        // One shop: the whole discount lands on its payment.
+        $this->assertSame(1, Payment::query()->count());
+        $this->assertSame(10000, (int) Payment::query()->value('amount_minor'));
+    }
+
+    // ── Rejections (no partial writes) ───────────────────────────────────────
+
+    public function test_insufficient_stock_rejects_the_order_without_partial_writes(): void
+    {
+        // Parked at qty 2, then another buyer drains the stock to 1.
+        $cartA = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+            'quantity' => 2,
+        ]);
+        $cartB = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productB->id,
+            'quantity' => 1,
+        ]);
+        $this->parkSelection([$cartA->id, $cartB->id]);
+
+        $this->productA->variants()->sole()->update(['stock_quantity' => 1]);
+        $this->productA->syncVariantRollups();
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])
+            ->assertRedirect(route('buyer.cart.index'))
+            ->assertSessionHas('error');
+
+        // Nothing was written: no order tree, no stock change, no ledger row.
+        // (Stock stays at the DRAINED value — the failed checkout touched nothing.)
+        $this->assertSame(0, Order::query()->count());
+        $this->assertSame(0, Payment::query()->count());
+        $this->assertSame(1, $this->productA->fresh()->stock_quantity);
+        $this->assertSame(3, $this->productB->fresh()->stock_quantity);
+        $this->assertSame(0, InventoryTransaction::query()->count());
+        $this->assertSame(2, CartItem::where('buyer_id', $this->buyer->id)->count());
+    }
+
+    public function test_an_item_removed_from_the_cart_after_parking_rejects_the_order(): void
+    {
+        $cartA = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+        ]);
+        $this->parkSelection([$cartA->id]);
+
+        $cartA->delete();
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])
+            ->assertRedirect(route('buyer.cart.index'))
+            ->assertSessionHas('error');
+
+        $this->assertSame(0, Order::query()->count());
+    }
+
+    public function test_an_item_that_became_unavailable_after_parking_rejects_the_order(): void
+    {
+        $cartA = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+        ]);
+        $this->parkSelection([$cartA->id]);
+
+        $this->productA->delete(); // soft delete → unavailable
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])
+            ->assertRedirect(route('buyer.cart.index'))
+            ->assertSessionHas('error');
+
+        $this->assertSame(0, Order::query()->count());
+    }
+
+    public function test_a_tampered_selection_cannot_check_out_another_buyers_line(): void
+    {
+        $otherBuyer = Buyer::factory()->create();
+        $foreignItem = CartItem::factory()->create([
+            'buyer_id' => $otherBuyer->id,
+            'product_id' => $this->productA->id,
+        ]);
+        $this->parkSelection([$foreignItem->id]);
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])
+            ->assertRedirect(route('buyer.cart.index'))
+            ->assertSessionHas('error');
+
+        $this->assertSame(0, Order::query()->count());
+        $this->assertSame(5, $this->productA->fresh()->stock_quantity);
+    }
+
+    public function test_an_empty_selection_redirects_back_to_the_cart(): void
+    {
+        $this->parkSelection([]);
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])
+            ->assertRedirect(route('buyer.cart.index'))
+            ->assertSessionHas('error');
+
+        $this->assertSame(0, Order::query()->count());
+    }
+
+    public function test_guests_cannot_place_orders(): void
+    {
+        $this->parkSelection([999]);
+
+        $this->post(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])
+            ->assertRedirect(route('home', ['login' => 1]));
+
+        $this->assertGuest('buyer');
+        $this->get(route('home', ['login' => 1]))->assertOk()
+            ->assertSee('id="loginModalOverlay"', false)
+            ->assertSee('action="'.route('unified.login').'"', false);
+        $this->postJson(route('buyer.checkout.store'), ['checkout_token' => CheckoutToken::issue($this->buyer->id)->token])
+            ->assertUnauthorized();
+        $this->assertDatabaseCount('payments', 0);
+        $this->assertDatabaseCount('inventory_transactions', 0);
+
+        $this->assertSame(0, Order::query()->count());
+    }
+
+    public function test_an_invalid_parked_voucher_stops_the_order_until_the_buyer_confirms_the_new_total(): void
+    {
+        $cart = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+        ]);
+
+        Voucher::factory()->fixed(5000)->expired()->create(['code' => 'OLDCODE']);
+        $this->parkSelection([$cart->id], 'OLDCODE');
+
+        $token = CheckoutToken::issue($this->buyer->id)->token;
+        $payload = ['checkout_token' => $token, ...$this->checkoutCarrierPayload([$this->sellerA])];
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), $payload)
+            ->assertRedirect(route('buyer.checkout.index', ['items' => [$cart->id]]))
+            ->assertSessionHas('error', fn (string $message) => str_contains($message, 'expired'));
+        $this->assertSame(0, Order::query()->count());
+
+        // Confirming again places it at the total the page now shows.
+        $this->post(route('buyer.checkout.store'), $payload)->assertRedirect();
+
+        $order = Order::query()->sole();
+        $this->assertSame(10000, $order->subtotal_minor);
+        $this->assertSame(0, $order->discount_minor);
+        $this->assertSame(15000, $order->total_minor);
+        $this->assertSame(15000, (int) Payment::query()->value('amount_minor'));
+    }
+
+    // ── Checkout index: invalid / stale selections ───────────────────────
+
+    public function test_a_selection_of_only_invalid_ids_redirects_back_to_the_cart_with_an_error(): void
+    {
+        // No cart items exist for this buyer; every requested id is invalid.
+        $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.checkout.index', ['items' => [999, 888]]))
+            ->assertRedirect(route('buyer.cart.index'))
+            ->assertSessionHas('error');
+    }
+
+    public function test_a_selection_of_only_foreign_ids_redirects_back_to_the_cart_with_an_error(): void
+    {
+        $otherBuyer = Buyer::factory()->create();
+        $foreign = CartItem::factory()->create(['buyer_id' => $otherBuyer->id]);
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.checkout.index', ['items' => [$foreign->id]]))
+            ->assertRedirect(route('buyer.cart.index'))
+            ->assertSessionHas('error');
+    }
+
+    public function test_a_partially_invalid_selection_keeps_the_valid_items_without_error(): void
+    {
+        $mine = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+        ]);
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.checkout.index', ['items' => [$mine->id, 424242]]))
+            ->assertOk();
+
+        $this->assertSame([$mine->id], session(CheckoutController::SESSION_KEY));
+    }
+
+    // ── Confirmation page ownership ──────────────────────────────────────────
+
+    public function test_another_buyer_cannot_open_someone_elses_confirmation(): void
+    {
+        $cart = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+        ]);
+        $this->parkSelection([$cart->id]);
+        $this->actingAs($this->buyer, 'buyer')->post(route('buyer.checkout.store'), [
+            'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+            ...$this->checkoutCarrierPayload([$this->sellerA]),
+        ]);
+
+        $order = Order::query()->sole();
+
+        $this->actingAs(Buyer::factory()->create(), 'buyer')
+            ->get(route('buyer.checkout.success', $order))
+            ->assertNotFound();
+
+        $this->actingAs($this->buyer, 'buyer')
+            ->get(route('buyer.checkout.success', $order))
+            ->assertOk();
+    }
+
+    // ── Phase 4: Route validation and transaction safety ──────────────────────
+
+    public function test_checkout_transaction_rolls_back_when_route_validation_fails(): void
+    {
+        // Route planning runs last in the transaction, so every earlier write
+        // must roll back. We use mocking to force route planning to fail.
+
+        $cartA = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+            'quantity' => 2,
+        ]);
+
+        $initialStock = $this->productA->stock_quantity;
+        $this->parkSelection([$cartA->id]);
+
+        // Mock RoutePlannerService to throw ValidationException for this test
+        $mockRoutePlanner = Mockery::mock(RoutePlannerService::class);
+        $mockRoutePlanner->shouldReceive('planRoute')->andThrow(
+            ValidationException::withMessages([
+                'route' => 'No connected route exists from origin to destination.',
+            ])
+        );
+        app()->instance(RoutePlannerService::class, $mockRoutePlanner);
+
+        $token = CheckoutToken::issue($this->buyer->id)->token;
+
+        $response = $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), [
+                'checkout_token' => $token,
+                ...$this->checkoutCarrierPayload([$this->sellerA]),
+            ]);
+
+        $this->assertCheckoutRolledBack($response, $cartA, $initialStock, route('buyer.cart.index'), 'No shipping route available');
+
+        // The rolled-back claim leaves the token usable for a retry.
+        $this->assertFalse((bool) CheckoutToken::query()->where('token', $token)->value('used'));
+    }
+
+    public function test_an_unconnected_destination_is_refused_before_any_write(): void
+    {
+        $this->coverSecondBarangayFromAnotherStation();
+        $this->buyer->forceFill(['barangay_code' => '0305401002', 'barangay_name' => 'Second'])->save();
+
+        $cartA = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+            'quantity' => 2,
+        ]);
+        $this->parkSelection([$cartA->id]);
+
+        $response = $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), [
+                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+                ...$this->checkoutCarrierPayload([$this->sellerA]),
+            ]);
+
+        // The real planner, reached through carrier validation, stops this ahead of the transaction.
+        $this->assertCheckoutRolledBack($response, $cartA, 5, route('buyer.checkout.index', ['items' => [$cartA->id]]), 'Shipping is not available');
+    }
+
+    public function test_a_connected_route_lets_checkout_succeed_and_persists_the_route(): void
+    {
+        $destination = $this->coverSecondBarangayFromAnotherStation();
+        $origin = LogisticsHub::query()->where('logistics_provider_id', $this->checkoutCarrier->id)
+            ->where('hub_type', LogisticsHub::STATION)->whereKeyNot($destination->id)->first();
+        TransportConnection::create([
+            'origin_hub_id' => $origin->id,
+            'destination_hub_id' => $destination->id,
+            'transport_mode' => TransportConnection::ROAD,
+            'is_active' => true,
+        ]);
+        $this->buyer->forceFill(['barangay_code' => '0305401002', 'barangay_name' => 'Second'])->save();
+
+        $cartA = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+            'quantity' => 2,
+        ]);
+        $this->parkSelection([$cartA->id]);
+
+        $response = $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), [
+                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+                ...$this->checkoutCarrierPayload([$this->sellerA]),
+            ]);
+
+        $order = Order::query()->sole();
+        $response->assertRedirect(route('buyer.checkout.success', $order));
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionMissing('error');
+
+        $sellerOrder = $order->sellerOrders()->sole();
+        $this->assertSame(1, Payment::query()->where('seller_order_id', $sellerOrder->id)->count());
+        $this->assertSame(3, $this->productA->fresh()->stock_quantity);
+        $this->assertFalse(CartItem::query()->whereKey($cartA->id)->exists());
+
+        $route = ParcelRoute::query()->where('seller_order_id', $sellerOrder->id)->sole();
+        $this->assertSame((int) $destination->id, (int) $route->destination_hub_id);
+        $this->assertSame([(int) $destination->id], array_column($route->legs, 'hub_id'));
+    }
+
+    public function test_the_route_follows_the_address_chosen_for_the_order(): void
+    {
+        // Profile barangay is unroutable from here; the chosen address shares the seller's hub.
+        $this->coverSecondBarangayFromAnotherStation();
+        $this->buyer->forceFill(['barangay_code' => '0305401002', 'barangay_name' => 'Second'])->save();
+        $chosen = BuyerAddress::query()->forceCreate([
+            'buyer_id' => $this->buyer->id,
+            'address_mode' => 'api',
+            'street' => 'Maple Street',
+            'province_code' => '030540000',
+            'province_name' => 'Pampanga',
+            'municipality_code' => '030540100',
+            'municipality_name' => 'San Fernando',
+            'barangay_code' => '0305401001',
+            'barangay_name' => 'First',
+        ]);
+
+        $cartA = CartItem::factory()->create([
+            'buyer_id' => $this->buyer->id,
+            'product_id' => $this->productA->id,
+            'quantity' => 1,
+        ]);
+        $this->parkSelection([$cartA->id]);
+
+        $response = $this->actingAs($this->buyer, 'buyer')
+            ->post(route('buyer.checkout.store'), [
+                'checkout_token' => CheckoutToken::issue($this->buyer->id)->token,
+                'address_id' => $chosen->id,
+                ...$this->checkoutCarrierPayload([$this->sellerA]),
+            ]);
+
+        $order = Order::query()->sole();
+        $response->assertRedirect(route('buyer.checkout.success', $order));
+        $this->assertSame('0305401001', $order->shipping_address['barangay_code']);
+
+        $route = ParcelRoute::query()->where('seller_order_id', $order->sellerOrders()->sole()->id)->sole();
+        $this->assertSame((int) $route->origin_hub_id, (int) $route->destination_hub_id);
+    }
+
+    private function assertCheckoutRolledBack(TestResponse $response, CartItem $cart, int $expectedStock, string $redirect, string $error): void
+    {
+        $response->assertRedirect($redirect);
+        $response->assertSessionHas('error', fn (string $flash): bool => str_contains($flash, $error));
+
+        $this->assertSame(0, Order::query()->count());
+        $this->assertSame(0, SellerOrder::query()->count());
+        $this->assertSame(0, Payment::query()->count());
+        $this->assertSame(0, OrderItem::query()->count());
+        $this->assertSame(0, ParcelRoute::query()->count());
+        $this->assertSame(0, InventoryTransaction::query()->where('reason', 'checkout')->count());
+        $this->assertSame($expectedStock, $this->productA->fresh()->stock_quantity);
+        $this->assertTrue(CartItem::query()->whereKey($cart->id)->exists());
+    }
+
+    /** A second Station Hub as the validated coverage for barangay 0305401002. */
+    private function coverSecondBarangayFromAnotherStation(): LogisticsHub
+    {
+        $origin = LogisticsHub::query()->where('logistics_provider_id', $this->checkoutCarrier->id)
+            ->where('hub_type', LogisticsHub::STATION)->firstOrFail();
+
+        $station = LogisticsHub::query()->create([
+            'logistics_provider_id' => $this->checkoutCarrier->id,
+            'parent_hub_id' => $origin->parent_hub_id,
+            'name' => 'Second Station',
+            'hub_type' => LogisticsHub::STATION,
+            'region_code' => $origin->region_code,
+            'province_code' => $origin->province_code,
+            'province_name' => $origin->province_name,
+            'city_municipality_code' => '030540100',
+            'municipality' => 'San Fernando',
+            'approval_status' => LogisticsHub::APPROVAL_APPROVED,
+            'is_active' => true,
+        ]);
+
+        (new LogisticsHubService)->saveCoverage($this->checkoutCarrier->id, [
+            'name' => 'Coverage 0305401002',
+            'station_hub_id' => $station->id,
+            'city_municipality_code' => '030540100',
+            'barangay_code' => '0305401002',
+            'is_active' => true,
+        ]);
+
+        return $station;
+    }
+}

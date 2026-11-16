@@ -1,0 +1,218 @@
+[
+    {
+        "handle": "sellerlaguna01",
+        "area": "laguna",
+        "name": "Calamba Tech Depot",
+        "theme": "electronics",
+        "municipality": 0,
+        "barangay": 0,
+        "description": "Gadgets, audio and accessories for work, school and play. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellerlaguna02",
+        "area": "laguna",
+        "name": "Santa Rosa Style House",
+        "theme": "apparel",
+        "municipality": 1,
+        "barangay": 0,
+        "description": "Everyday wear and weather-ready essentials. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellerlaguna03",
+        "area": "laguna",
+        "name": "San Pablo Soles",
+        "theme": "footwear",
+        "municipality": 2,
+        "barangay": 0,
+        "description": "Shoes and sandals for every step of the day. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellerlaguna04",
+        "area": "laguna",
+        "name": "Laguna Glow Beauty",
+        "theme": "beauty",
+        "municipality": 0,
+        "barangay": 3,
+        "description": "Makeup, fragrance and hair care picks. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellerbulacan01",
+        "area": "bulacan",
+        "name": "Malolos Home Essentials",
+        "theme": "home",
+        "municipality": 0,
+        "barangay": 0,
+        "description": "Kitchen and home essentials for Filipino households. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellerbulacan02",
+        "area": "bulacan",
+        "name": "Meycauayan Campus Corner",
+        "theme": "school",
+        "municipality": 1,
+        "barangay": 0,
+        "description": "Notebooks, pens, bags and tools for students. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellerbulacan03",
+        "area": "bulacan",
+        "name": "Baliuag Gems and Time",
+        "theme": "accessories",
+        "municipality": 2,
+        "barangay": 0,
+        "description": "Watches, shades, wallets and jewelry. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellerbulacan04",
+        "area": "bulacan",
+        "name": "Bulacan Pasalubong Hub",
+        "theme": "local",
+        "municipality": 0,
+        "barangay": 3,
+        "description": "Pasalubong favourites and local snacks. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellermetro01",
+        "area": "metro",
+        "name": "QC Gadget Garage",
+        "theme": "electronics",
+        "municipality": 0,
+        "barangay": 0,
+        "description": "Gadgets, audio and accessories for work, school and play. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellermetro02",
+        "area": "metro",
+        "name": "Makati Thread and Co",
+        "theme": "apparel",
+        "municipality": 1,
+        "barangay": 0,
+        "description": "Everyday wear and weather-ready essentials. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellermetro03",
+        "area": "metro",
+        "name": "Manila Sole Society",
+        "theme": "footwear",
+        "municipality": 2,
+        "barangay": 0,
+        "description": "Shoes and sandals for every step of the day. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellermetro04",
+        "area": "metro",
+        "name": "Metro Beauty Bar",
+        "theme": "beauty",
+        "municipality": 0,
+        "barangay": 3,
+        "description": "Makeup, fragrance and hair care picks. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellerbatangas01",
+        "area": "batangas",
+        "name": "Batangas Kitchen Corner",
+        "theme": "home",
+        "municipality": 0,
+        "barangay": 0,
+        "description": "Kitchen and home essentials for Filipino households. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellerbatangas02",
+        "area": "batangas",
+        "name": "Lipa Study Supplies",
+        "theme": "school",
+        "municipality": 1,
+        "barangay": 0,
+        "description": "Notebooks, pens, bags and tools for students. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellerbatangas03",
+        "area": "batangas",
+        "name": "Tanauan Time and Trinkets",
+        "theme": "accessories",
+        "municipality": 2,
+        "barangay": 0,
+        "description": "Watches, shades, wallets and jewelry. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellerbatangas04",
+        "area": "batangas",
+        "name": "Batangas Pantry Finds",
+        "theme": "local",
+        "municipality": 0,
+        "barangay": 3,
+        "description": "Pasalubong favourites and local snacks. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellerdavao01",
+        "area": "davao",
+        "name": "Davao Digital Depot",
+        "theme": "electronics",
+        "municipality": 0,
+        "barangay": 0,
+        "description": "Gadgets, audio and accessories for work, school and play. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellerdavao02",
+        "area": "davao",
+        "name": "Digos Denim and Co",
+        "theme": "apparel",
+        "municipality": 1,
+        "barangay": 0,
+        "description": "Everyday wear and weather-ready essentials. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellerdavao03",
+        "area": "davao",
+        "name": "Bansalan Boots and Sandals",
+        "theme": "footwear",
+        "municipality": 2,
+        "barangay": 0,
+        "description": "Shoes and sandals for every step of the day. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellerdavao04",
+        "area": "davao",
+        "name": "Davao Bloom Beauty",
+        "theme": "beauty",
+        "municipality": 0,
+        "barangay": 3,
+        "description": "Makeup, fragrance and hair care picks. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellercebu01",
+        "area": "cebu",
+        "name": "Cebu Home and Hearth",
+        "theme": "home",
+        "municipality": 0,
+        "barangay": 0,
+        "description": "Kitchen and home essentials for Filipino households. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellercebu02",
+        "area": "cebu",
+        "name": "Mandaue Paper Plus",
+        "theme": "school",
+        "municipality": 1,
+        "barangay": 0,
+        "description": "Notebooks, pens, bags and tools for students. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellercebu03",
+        "area": "cebu",
+        "name": "Lapu-Lapu Pearl and Watch",
+        "theme": "accessories",
+        "municipality": 2,
+        "barangay": 0,
+        "description": "Watches, shades, wallets and jewelry. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    },
+    {
+        "handle": "sellercebu04",
+        "area": "cebu",
+        "name": "Cebu Sweet Finds",
+        "theme": "local",
+        "municipality": 0,
+        "barangay": 3,
+        "description": "Pasalubong favourites and local snacks. DEMO STORE: a fictional shop created for testing Zefanya, not a real business."
+    }
+]

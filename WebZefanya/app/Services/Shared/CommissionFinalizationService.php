@@ -1,0 +1,97 @@
+<?php
+
+namespace App\Services\Shared;
+
+use App\Enums\OrderStatus;
+use App\Models\Shared\SellerOrder;
+use App\Services\Seller\SellerSettlementService;
+use App\Support\Money;
+use Illuminate\Support\Facades\DB;
+
+class CommissionFinalizationService
+{
+    /**
+     * Platform commission in basis points (1000 = 10%). Applied when an order is
+     * finalized and saved on it, so orders finalized at an earlier rate keep it.
+     */
+    public const COMMISSION_BPS = 1000;
+
+    public static function percentLabel(?int $bps = null): string
+    {
+        return rtrim(rtrim(number_format(($bps ?? self::COMMISSION_BPS) / 100, 2), '0'), '.').'%';
+    }
+
+    public function __construct(
+        private readonly SellerSettlementService $settlements = new SellerSettlementService,
+        private readonly VoucherFundingService $funding = new VoucherFundingService,
+    ) {}
+
+    public function finalize(SellerOrder $sellerOrder): SellerOrder
+    {
+        return DB::transaction(function () use ($sellerOrder): SellerOrder {
+            $order = SellerOrder::query()->whereKey($sellerOrder->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($order->status !== OrderStatus::Completed) {
+                throw new \InvalidArgumentException('Commission can only be finalized for a completed Seller order.');
+            }
+
+            $order->load('parcelReturn');
+            if ($order->parcelReturn?->releasesPendingEarnings()) {
+                $this->settlements->releasePendingForReturn($order);
+
+                return $order->fresh();
+            }
+
+            $financials = $this->financialsFor($order);
+            $commissionMinor = $financials['commission_minor'];
+            $sellerNetMinor = $financials['seller_net_minor'];
+
+            if ($order->commission_finalized_at === null) {
+                if ($order->commission_minor !== null || $order->seller_net_minor !== null) {
+                    throw new \InvalidArgumentException('Partial commission records require reconciliation before finalization.');
+                }
+
+                $order->forceFill($financials + ['commission_finalized_at' => now()])->save();
+            } else {
+                if ($order->commission_minor !== $commissionMinor
+                    || ($sellerNetMinor !== null && $order->seller_net_minor !== null && $order->seller_net_minor !== $sellerNetMinor)) {
+                    throw new \InvalidArgumentException('Finalized commission does not match the recorded subtotal and voucher funding.');
+                }
+
+                // A formerly unknown net can only be resolved from a recorded allocation.
+                if ($order->seller_net_minor === null && $sellerNetMinor !== null) {
+                    $order->forceFill(['seller_net_minor' => $sellerNetMinor])->save();
+                }
+            }
+
+            $this->settlements->syncFinalizedOrder($order);
+
+            return $order;
+        }, 3);
+    }
+
+    /** @return array{commission_bps: int, commission_minor: int, seller_net_minor: int|null} */
+    public function financialsFor(SellerOrder $order): array
+    {
+        if ($order->subtotal_minor === null || $order->subtotal_minor < 0) {
+            throw new \InvalidArgumentException('Commission requires a non-negative recorded subtotal.');
+        }
+
+        // Half-up in integer centavos after Seller-funded discounts, excluding shipping.
+        $allocation = $this->funding->allocationFor($order);
+        $sellerFundedDiscount = $order->seller_funded_discount_minor ?? $allocation['seller_minor'] ?? 0;
+        $bps = $order->commission_bps ?? self::COMMISSION_BPS;
+        if ($bps < 0 || $bps > 10000) {
+            throw new \InvalidArgumentException('The recorded commission rate is invalid.');
+        }
+        $commissionMinor = Money::percentage($order->subtotal_minor - $sellerFundedDiscount, $bps, 10000);
+
+        return [
+            'commission_bps' => $bps,
+            'commission_minor' => $commissionMinor,
+            'seller_net_minor' => $allocation['pending_reason'] === null
+                ? $order->subtotal_minor - $commissionMinor - $allocation['seller_minor']
+                : null,
+        ];
+    }
+}

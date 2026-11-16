@@ -1,0 +1,329 @@
+<?php
+
+namespace App\Providers;
+
+use App\Models\Buyer\CartItem;
+use App\Models\Buyer\Wishlist;
+use App\Models\Catalog\Product;
+use App\Models\Logistics\CourierAccount;
+use App\Models\Rider\Rider;
+use App\Models\Shared\Category;
+use App\Models\Shared\Incidents;
+use App\Models\Shared\Order;
+use App\Models\Shared\SellerOrder;
+use App\Policies\BuyerOrderPolicy;
+use App\Policies\IncidentsPolicy;
+use App\Policies\SellerOrderFleetPolicy;
+use App\Policies\SellerOrderPolicy;
+use App\Services\Logistics\CourierAccountService;
+use App\Services\Shared\OfferPricing;
+use App\View\Composers\RiderNotificationComposer;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
+use Illuminate\View\View as ViewInstance;
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     */
+    public function register(): void
+    {
+        $this->app->singleton(OfferPricing::class);
+    }
+
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
+    {
+        \App\Models\Catalog\ProductImage::observe(\App\Observers\VisualSearchImageObserver::class);
+
+        // Rider notifications and API tokens saved before the model moved to
+        // App\Models\Rider\Rider store this class name. Keep reading and
+        // writing it so those rows stay attached without changing any data.
+        Relation::morphMap(['App\Models\Rider' => Rider::class]);
+
+        // ── Login / auth throttling ─────────────────────────────────────────
+        // Throttle logins per e-mail+IP (5/min) with a looser per-IP ceiling
+        // (25/min), so one shared office/NAT IP cannot lock every user out.
+        // forgot-password and logout get their own, separate limits — logout
+        // must never share the login limiter.
+        RateLimiter::for('login', function (Request $request) {
+            $email = Str::lower((string) $request->input('email'));
+
+            return [
+                Limit::perMinute(5)->by('login-email:'.$email.'|'.$request->ip()),
+                Limit::perMinute(25)->by('login-ip:'.$request->ip()),
+            ];
+        });
+
+        // Bearer login has the same limits, with the API response envelope.
+        // Keep the existing web login limiter and its responses unchanged.
+        RateLimiter::for('api-login', function (Request $request) {
+            $email = Str::lower((string) $request->input('email'));
+            $response = fn (Request $request, array $headers) => response()->json([
+                'success' => false,
+                'message' => 'Too many login attempts. Please try again later.',
+                'data' => null,
+                'errors' => ['email' => ['Too many login attempts. Please try again later.']],
+            ], 429, $headers);
+
+            return [
+                Limit::perMinute(5)->by('api-login-email:'.$email.'|'.$request->ip())->response($response),
+                Limit::perMinute(25)->by('api-login-ip:'.$request->ip())->response($response),
+            ];
+        });
+
+        // Courier Mobile sign-in and activation: per normalized login ID and
+        // per IP in fixed 15-minute windows. Keyed by the ID whether or not it
+        // exists, with one response for every case, so neither the limit nor
+        // its message reveals which IDs are real. Reaching it never ends an
+        // existing session.
+        foreach (['courier-login', 'courier-activate'] as $limiter) {
+            RateLimiter::for($limiter, function (Request $request) use ($limiter) {
+                $id = CourierAccountService::normalizeLoginId($request->input('login_id'));
+                $minutes = (int) config('courier.login_decay_minutes', 15);
+                $response = fn (Request $request, array $headers) => response()->json([
+                    'success' => false,
+                    'message' => 'Too many attempts. Please try again later.',
+                    'data' => null,
+                    'errors' => ['login_id' => ['Too many attempts. Please try again later.']],
+                ], 429, $headers);
+
+                return [
+                    Limit::perMinutes($minutes, (int) config('courier.login_max_per_id', 5))->by($limiter.'-id:'.hash('sha256', $id))->response($response),
+                    Limit::perMinutes($minutes, (int) config('courier.login_max_per_ip', 30))->by($limiter.'-ip:'.$request->ip())->response($response),
+                ];
+            });
+        }
+
+        // Logistics issuing Courier app access codes: per company.
+        RateLimiter::for('courier-issue', fn (Request $request) => Limit::perHour((int) config('courier.issue_max_per_provider_per_hour', 30))
+            ->by('courier-issue:'.($request->user('logistics')?->getAuthIdentifier() ?? $request->ip())));
+
+        // Keep authenticated Courier budgets separate from each other and
+        // from numeric Buyer/Rider buckets, even when account IDs coincide.
+        foreach (['courier-refresh' => 10, 'courier-logout' => 30, 'courier-reads' => 60] as $name => $maximum) {
+            RateLimiter::for($name, function (Request $request) use ($name, $maximum) {
+                // ApiCourier runs first and binds the verified account.
+                $account = $request->user();
+                $subject = $account instanceof CourierAccount
+                    ? 'account:'.$account->getAuthIdentifier() : 'guest:'.$request->ip();
+
+                return Limit::perMinute($maximum)->by($name.':'.$subject);
+            });
+        }
+
+        RateLimiter::for('password-email', function (Request $request) {
+            $email = Str::lower((string) $request->input('email'));
+
+            return [
+                Limit::perMinute(5)->by('password-email:'.$email.'|'.$request->ip()),
+                Limit::perMinute(20)->by('password-email-ip:'.$request->ip()),
+            ];
+        });
+
+        RateLimiter::for('logout', fn (Request $request) => Limit::perMinute(30)
+            ->by('logout:'.$request->ip()));
+
+        // Named so they do not share one IP bucket the way `throttle:5,1`
+        // and `throttle:10,1` do (same signature, different max).
+        // Registration: tight per-email+IP limit, looser per-IP ceiling so a
+        // campus/office NAT cannot block every applicant on the same network.
+        RateLimiter::for('register', function (Request $request) {
+            $email = is_string($request->input('email')) ? Str::lower(trim($request->input('email'))) : '';
+
+            return [
+                Limit::perMinute(5)->by('register-email:'.$email.'|'.$request->ip()),
+                Limit::perMinute(30)->by('register-ip:'.$request->ip()),
+            ];
+        });
+        RateLimiter::for('otp-show', fn (Request $request) => Limit::perMinute(30)
+            ->by('otp-show:'.$request->ip()));
+        RateLimiter::for('otp-verify', fn (Request $request) => Limit::perMinute(10)
+            ->by('otp-verify:'.$request->ip()));
+        RateLimiter::for('otp-resend', fn (Request $request) => Limit::perMinute(5)
+            ->by('otp-resend:'.$request->ip()));
+        RateLimiter::for('password-update', fn (Request $request) => Limit::perMinute(5)
+            ->by('password-update:'.$request->ip()));
+        RateLimiter::for('google-auth', fn (Request $request) => Limit::perMinute(10)
+            ->by('google-auth:'.$request->ip()));
+
+        // Admin second factor: 5 attempts/minute per pending admin + IP. The
+        // challenge route has no authenticated user yet, so the session marker
+        // set by AuthController::login() is the per-account key.
+        RateLimiter::for('admin-2fa', function (Request $request) {
+            $pending = (string) $request->session()->get('admin.2fa.id', 'guest');
+
+            return Limit::perMinute(5)->by('admin-2fa:'.$pending.'|'.$request->ip());
+        });
+
+        // ── Policies for the order flow (Slice 1) ───────────────────────────
+        // BuyerOrderPolicy / SellerOrderFleetPolicy don't match Laravel's
+        // auto-discovery naming (Order → OrderPolicy), so they are registered
+        // explicitly. The fleet policy is exposed as a named ability because
+        // a model can only carry ONE policy and SellerOrder's is the owner's.
+        Gate::policy(Incidents::class, IncidentsPolicy::class);
+        Gate::policy(Order::class, BuyerOrderPolicy::class);
+        Gate::policy(SellerOrder::class, SellerOrderPolicy::class);
+        Gate::define('remediate-shipment-address', [SellerOrderFleetPolicy::class, 'remediateAddress']);
+        Gate::define('advance-shipment', [SellerOrderFleetPolicy::class, 'advance']);
+        // Mobile API: checkout quote may only use the buyer's own address; reviews list is the buyer's own.
+        Gate::define('quote-checkout', [\App\Policies\CheckoutPolicy::class, 'quote']);
+        Gate::policy(\App\Models\Buyer\Review::class, \App\Policies\ReviewPolicy::class);
+
+        // In production every generated URL (routes, assets, pagination, password
+        // resets) must be https — proxy headers alone are not guaranteed when the
+        // app sits behind a load balancer that terminates TLS.
+        if ($this->app->environment('production')) {
+            URL::forceScheme('https');
+        }
+
+        // Login-side single-account enforcement is handled by a Login event
+        // listener (see EventServiceProvider). That keeps every login path —
+        // password, Google and any future path — in one place instead of in
+        // each controller.
+
+        // buyer.php already applies its own prefix('buyer') and name('buyer.')
+        // inside the file (line 9), so we only wrap it in the web middleware here.
+        // admin.php and seller.php are loaded via bootstrap/app.php's then: closure.
+        Route::middleware('web')
+            ->group(base_path('routes/buyer.php'));
+
+        // The physical components folder is "Components" (capital C) while Laravel's
+        // default anonymous-component root is "components". On case-insensitive
+        // filesystems (Windows dev) <x-seller.*> resolves either way, but on
+        // case-sensitive filesystems (Linux deploy) it would not. Register the
+        // capitalized folder as an additional anonymous component path so module
+        // components (e.g. x-seller.sidebar) resolve on every platform.
+        // Must be an absolute path — it is registered as a view namespace.
+        Blade::anonymousComponentPath(
+            resource_path('views/Components')
+        );
+
+        // @manila($date, 'M d, Y g:i A'): display a stored UTC date in the
+        // business timezone (config app.schedule_timezone). Display only.
+        Blade::directive('manila', fn (string $expression): string => "<?php echo e(manila({$expression})); ?>");
+
+        // The navbar cart badge (#cartCount) must show the real cart size on
+        // EVERY buyer page. A view composer is used instead of passing the
+        // count from each layout so every existing
+        // @include('Components.navbar') call stays correct untouched.
+        // A composer's with() runs at render time, so it wins over the
+        // include's own data. Guests short-circuit before any query runs.
+        View::composer('*', function (ViewInstance $view): void {
+            $view->with('wishlistIds', $this->buyerWishlistIds());
+        });
+
+        View::composer('Components.navbar', function (ViewInstance $view): void {
+            $view->with('cartCount', $this->buyerCartCount());
+            $view->with('wishlistCount', $this->buyerWishlistCount());
+            $view->with('unreadNotificationCount', $this->buyerUnreadNotificationCount());
+            $view->with('categories', $this->getCategories());
+            $view->with('hasRealSaleDiscounts', $this->hasRealSaleDiscounts());
+        });
+
+        // Rider panel: the bell lives in Layouts/rider so it is present on
+        // every page, not only the dashboard.
+        View::composer('Layouts.rider', RiderNotificationComposer::class);
+    }
+
+    /**
+     * Number of the authenticated buyer's cart lines (available or
+     * not) — the number shown in the navbar badge. 0 for guests.
+     *
+     * One indexed aggregate per page render; deliberately not eager-loading
+     * anything here.
+     */
+    private function buyerCartCount(): int
+    {
+        if (! Auth::guard('buyer')->check()) {
+            return 0;
+        }
+
+        return (int) CartItem::query()
+            ->where('buyer_id', Auth::guard('buyer')->id())
+            ->count();
+    }
+
+    /**
+     * Total count of the authenticated buyer's wishlist items.
+     * 0 for guests.
+     */
+    private function buyerWishlistCount(): int
+    {
+        return $this->buyerWishlistIds()->count();
+    }
+
+    private function buyerWishlistIds(): Collection
+    {
+        $request = request();
+        $key = 'buyer_wishlist_ids.'.(Auth::guard('buyer')->id() ?? 'guest');
+
+        if (! $request->attributes->has($key)) {
+            $ids = Auth::guard('buyer')->check()
+                ? Wishlist::query()
+                    ->where('buyer_id', Auth::guard('buyer')->id())
+                    ->whereHas('product')
+                    ->pluck('product_id')
+                    ->mapWithKeys(fn ($id) => [(int) $id => true])
+                : collect();
+
+            $request->attributes->set($key, $ids);
+        }
+
+        return $request->attributes->get($key);
+    }
+
+    /**
+     * Count of unread database notifications for the authenticated buyer.
+     * 0 for guests.
+     */
+    private function buyerUnreadNotificationCount(): int
+    {
+        if (! Auth::guard('buyer')->check()) {
+            return 0;
+        }
+
+        return (int) Auth::guard('buyer')->user()
+            ->unreadNotifications()
+            ->count();
+    }
+
+    /**
+     * Get all categories for the navbar dropdown.
+     * Returns collection of categories ordered by ID.
+     */
+    private function getCategories()
+    {
+        return Category::query()
+            ->orderBy('id')
+            ->get(['id', 'label', 'icon']);
+    }
+
+    /**
+     * Whether the navbar's Sale link has anything to show. The navbar renders on
+     * every buyer page, so the answer is cached briefly: the link can lag a sale
+     * starting or ending by up to a minute, and the filtered page is still correct.
+     */
+    private function hasRealSaleDiscounts(): bool
+    {
+        return Cache::remember('buyer:has-real-sale-discounts', now()->addMinute(), fn (): bool => Product::query()
+            ->discoverable()
+            ->withRealSaleDiscount()
+            ->exists());
+    }
+}

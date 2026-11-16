@@ -1,0 +1,58 @@
+// lib/screens/courier/dev_qr_generator_screen.dart
+//
+// Dev-only QR generator screen. Renders a QR code for any tracking number
+// typed by the user. Reached only through Settings > About (seven taps);
+// nothing in the normal UI advertises it.
+
+import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+
+/// Dev-only QR code generator screen.
+///
+/// Renders a QR code for any tracking number typed by the user. Reached only
+/// from Developer options, which Settings reveals after seven taps on About.
+class DevQrGeneratorScreen extends StatelessWidget {
+  const DevQrGeneratorScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = TextEditingController(text: 'ZEF-DEV-00000');
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Dev QR Generator'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                hintText: 'Tracking number e.g. ZEF-DEV-00000',
+                border: OutlineInputBorder(),
+                labelText: 'Tracking number',
+              ),
+              textCapitalization: TextCapitalization.characters,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Done'),
+            ),
+            const SizedBox(height: 24),
+            Text('Rendered QR:', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            QrImageView(
+              data: controller.text.trim(),
+              version: 1,
+              size: 200.0,
+              backgroundColor: Colors.white,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

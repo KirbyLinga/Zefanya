@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+ bootstrap="tests/MySql/bootstrap.php" colors="true" cacheResult="false">
+ <testsuites>
+  <testsuite name="Isolated MySQL concurrency">
+   <file>tests/MySql/CheckoutConcurrencyTest.php</file>
+   <file>tests/MySql/SellerVacationConcurrencyTest.php</file>
+   <file>tests/MySql/SellerPayoutConcurrencyTest.php</file>
+   <file>tests/MySql/RiderPayoutConcurrencyTest.php</file>
+   <file>tests/MySql/CodRemittanceConcurrencyTest.php</file>
+   <file>tests/MySql/FinancialCalculationConcurrencyTest.php</file>
+   <file>tests/MySql/InventoryOversellingConcurrencyTest.php</file>
+   <file>tests/MySql/LowStockAlertConcurrencyTest.php</file>
+   <file>tests/MySql/DemoNetworkSeedersTest.php</file>
+   <file>tests/MySql/DemoMarketplaceTest.php</file>
+   <file>tests/MySql/DeliveryScenarioSeederTest.php</file>
+  </testsuite>
+ </testsuites>
+ <php>
+  <env name="APP_ENV" value="testing" force="true"/>
+ </php>
+</phpunit>

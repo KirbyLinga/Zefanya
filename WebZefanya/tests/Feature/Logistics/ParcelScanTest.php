@@ -1,0 +1,389 @@
+<?php
+
+namespace Tests\Feature\Logistics;
+
+use App\Enums\OrderStatus;
+use App\Models\Catalog\Product;
+use App\Models\Logistics\Area;
+use App\Models\Logistics\LogisticsHub;
+use App\Models\Logistics\LogisticsProvider;
+use App\Models\Rider\Courier;
+use App\Models\Seller\Seller;
+use App\Models\Shared\Order;
+use App\Models\Shared\OrderItem;
+use App\Models\Shared\SellerOrder;
+use App\Models\Shared\StatusHistory;
+use App\Services\Logistics\WaybillQrCode;
+use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Str;
+use Tests\Support\CreatesAssignableFleet;
+use Tests\TestCase;
+
+/**
+ * F2 Stage 2 — Logistics tracking verification for station receipt / sorting.
+ */
+class ParcelScanTest extends TestCase
+{
+    use CreatesAssignableFleet, LazilyRefreshDatabase;
+
+    private LogisticsProvider $provider;
+
+    private Courier $courier;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->provider = LogisticsProvider::factory()->create([
+            'status' => 'approved',
+            'email_verified_at' => now(),
+        ]);
+
+        $province = LogisticsHub::query()->create([
+            'logistics_provider_id' => $this->provider->id,
+            'name' => 'Pampanga Hub',
+            'hub_type' => LogisticsHub::PROVINCE,
+            'region_code' => '030000000',
+            'province_code' => $this->provider->province_code,
+            'province_name' => $this->provider->province_name,
+            'is_active' => true,
+            'approval_status' => LogisticsHub::APPROVAL_APPROVED,
+            'active_province_slot' => 1,
+        ]);
+        $station = LogisticsHub::query()->create([
+            'logistics_provider_id' => $this->provider->id,
+            'parent_hub_id' => $province->id,
+            'name' => 'San Fernando Station',
+            'hub_type' => LogisticsHub::STATION,
+            'region_code' => '030000000',
+            'province_code' => $this->provider->province_code,
+            'province_name' => $this->provider->province_name,
+            'municipality' => 'San Fernando',
+            'is_active' => true,
+            'approval_status' => LogisticsHub::APPROVAL_APPROVED,
+        ]);
+        Area::query()->create([
+            'logistics_provider_id' => $this->provider->id,
+            'station_hub_id' => $station->id,
+            'name' => 'Quezon City',
+            'municipality' => 'Quezon City',
+            'municipality_code' => '137404000',
+            'is_active' => true,
+            'barangay_code' => '1374040001',
+            'barangay_name' => 'First',
+            'coverage_validated_at' => now(),
+        ]);
+
+        $this->courier = $this->assignableCourier($this->provider, [], 'Quezon City', '137404000');
+    }
+
+    private function parcel(OrderStatus $status, ?Courier $courier = null, ?string $tracking = null): SellerOrder
+    {
+        $seller = Seller::factory()->create([
+            'status' => 'approved',
+            'municipality_name' => 'Quezon City',
+            'municipality_code' => '137404000',
+            'barangay_code' => '1374040001',
+        ]);
+
+        $order = Order::factory()->create([
+            'shipping_address' => [
+                'municipality' => 'Quezon City',
+                'municipality_code' => '137404000',
+                'barangay_code' => '1374040001',
+            ],
+        ]);
+
+        $sellerOrder = SellerOrder::factory()->status($status)->create([
+            'order_id' => $order->id,
+            'seller_id' => $seller->id,
+            'courier_id' => $courier?->id,
+        ]);
+
+        $sellerOrder->forceFill([
+            'tracking_number' => $tracking ?? ('TRK-20261021-'.strtoupper(Str::random(6))),
+            'origin_station_hub_id' => $courier?->rider?->station_hub_id,
+        ])->save();
+
+        $product = Product::factory()->create(['seller_id' => $seller->id, 'weight_grams' => 400]);
+        OrderItem::factory()->create([
+            'seller_order_id' => $sellerOrder->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ]);
+
+        return $sellerOrder->fresh();
+    }
+
+    public function test_scan_page_renders_for_approved_logistics(): void
+    {
+        $this->withoutVite();
+
+        $this->actingAs($this->provider, 'logistics')
+            ->get(route('logistics.scan.index'))
+            ->assertOk()
+            ->assertSee('data-parcel-scanner', false)
+            ->assertSee(route('logistics.scan.verify'), false);
+    }
+
+    public function test_logistics_can_verify_picked_up_parcel_read_only(): void
+    {
+        $parcel = $this->parcel(OrderStatus::PickedUp, $this->courier);
+        $before = StatusHistory::query()->where('seller_order_id', $parcel->id)->count();
+
+        $this->actingAs($this->provider, 'logistics')
+            ->postJson(route('logistics.scan.verify'), [
+                'tracking_number' => $parcel->tracking_number,
+            ])
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('context', 'station_receipt')
+            ->assertJsonPath('actions.0.key', 'confirm_station_receipt')
+            ->assertJsonPath('actions.0.url', route('logistics.incoming-parcels.toSortingCenter', $parcel));
+
+        $this->assertSame(OrderStatus::PickedUp, $parcel->fresh()->status);
+        $this->assertSame($before, StatusHistory::query()->where('seller_order_id', $parcel->id)->count());
+    }
+
+    public function test_station_receipt_confirm_after_verify_uses_existing_transition(): void
+    {
+        $parcel = $this->parcel(OrderStatus::PickedUp, $this->courier);
+
+        $token = $this->actingAs($this->provider, 'logistics')
+            ->postJson(route('logistics.scan.verify'), [
+                'tracking_number' => $parcel->tracking_number,
+                'method' => 'camera',
+            ])
+            ->assertOk()
+            ->json('actions.0.verification_token');
+
+        $this->assertNotEmpty($token);
+
+        $this->actingAs($this->provider, 'logistics')
+            ->post(route('logistics.incoming-parcels.toSortingCenter', $parcel), [
+                'verification_token' => $token,
+            ])
+            ->assertRedirect();
+
+        // Received at its only hub, so the same verified scan also sorted it.
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
+        $history = StatusHistory::query()
+            ->where('seller_order_id', $parcel->id)
+            ->where('to_status', OrderStatus::AtSortingCenter->value)
+            ->first();
+        $this->assertNotNull($history);
+        $this->assertStringContainsString('Verified via camera QR', (string) $history->note);
+
+        // The automatic sort is audited and carries the receipt scan's proof.
+        $sorted = StatusHistory::query()
+            ->where('seller_order_id', $parcel->id)
+            ->where('to_status', OrderStatus::Sorted->value)
+            ->first();
+        $this->assertNotNull($sorted);
+        $this->assertStringContainsString('Sorted automatically on Station Hub receipt.', (string) $sorted->note);
+        $this->assertStringContainsString('Verified via camera QR', (string) $sorted->note);
+    }
+
+    public function test_station_receipt_without_verification_token_is_rejected(): void
+    {
+        $parcel = $this->parcel(OrderStatus::PickedUp, $this->courier);
+
+        $this->actingAs($this->provider, 'logistics')
+            ->post(route('logistics.incoming-parcels.toSortingCenter', $parcel))
+            ->assertRedirect()
+            ->assertSessionHasErrors('verification_token');
+
+        $this->assertSame(OrderStatus::PickedUp, $parcel->fresh()->status);
+    }
+
+    public function test_replayed_logistics_verification_token_is_rejected(): void
+    {
+        $parcel = $this->parcel(OrderStatus::PickedUp, $this->courier);
+
+        $token = $this->actingAs($this->provider, 'logistics')
+            ->postJson(route('logistics.scan.verify'), [
+                'tracking_number' => $parcel->tracking_number,
+            ])
+            ->json('actions.0.verification_token');
+
+        $this->actingAs($this->provider, 'logistics')
+            ->post(route('logistics.incoming-parcels.toSortingCenter', $parcel), [
+                'verification_token' => $token,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
+
+        $this->actingAs($this->provider, 'logistics')
+            ->post(route('logistics.incoming-parcels.toSortingCenter', $parcel), [
+                'verification_token' => $token,
+            ])
+            ->assertRedirect();
+
+        // The replayed token neither receives nor sorts a second time.
+        foreach ([OrderStatus::AtSortingCenter, OrderStatus::Sorted] as $status) {
+            $this->assertSame(
+                1,
+                StatusHistory::query()
+                    ->where('seller_order_id', $parcel->id)
+                    ->where('to_status', $status->value)
+                    ->count(),
+            );
+        }
+    }
+
+    public function test_sort_confirm_after_verify_records_manual_method(): void
+    {
+        $parcel = $this->parcel(OrderStatus::AtSortingCenter, $this->courier);
+
+        $token = $this->actingAs($this->provider, 'logistics')
+            ->postJson(route('logistics.scan.verify'), [
+                'tracking_number' => $parcel->tracking_number,
+                'method' => 'manual',
+            ])
+            ->assertOk()
+            ->json('actions.0.verification_token');
+
+        $this->actingAs($this->provider, 'logistics')
+            ->post(route('logistics.parcel-sorting.sort', $parcel), [
+                'verification_token' => $token,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
+        $this->assertStringContainsString(
+            'Verified via manual tracking entry',
+            (string) StatusHistory::query()
+                ->where('seller_order_id', $parcel->id)
+                ->where('to_status', OrderStatus::Sorted->value)
+                ->value('note'),
+        );
+    }
+
+    public function test_sorting_action_offered_at_sorting_center(): void
+    {
+        $parcel = $this->parcel(OrderStatus::AtSortingCenter, $this->courier);
+
+        $this->actingAs($this->provider, 'logistics')
+            ->postJson(route('logistics.scan.verify'), [
+                'tracking_number' => $parcel->tracking_number,
+            ])
+            ->assertOk()
+            ->assertJsonPath('context', 'sorting')
+            ->assertJsonPath('actions.0.key', 'sort_parcel');
+    }
+
+    public function test_foreign_provider_cannot_verify_another_networks_parcel(): void
+    {
+        $parcel = $this->parcel(OrderStatus::PickedUp, $this->courier);
+        $other = LogisticsProvider::factory()->create([
+            'status' => 'approved',
+            'email_verified_at' => now(),
+        ]);
+
+        $this->actingAs($other, 'logistics')
+            ->postJson(route('logistics.scan.verify'), [
+                'tracking_number' => $parcel->tracking_number,
+            ])
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Scan rejected: this parcel is not authorized for your logistics company.')
+            ->assertJsonMissingPath('parcel');
+    }
+
+    public function test_unknown_tracking_rejected(): void
+    {
+        $this->actingAs($this->provider, 'logistics')
+            ->postJson(route('logistics.scan.verify'), [
+                'tracking_number' => 'TRK-00000000-MISSING',
+            ])
+            ->assertNotFound()
+            ->assertJsonPath('message', 'Parcel not found. Check the tracking number and try again.');
+    }
+
+    public function test_verify_uses_same_payload_as_waybill_qr(): void
+    {
+        $tracking = 'TRK-20261021-HUB001';
+        $parcel = $this->parcel(OrderStatus::PickedUp, $this->courier, $tracking);
+
+        $this->assertSame($tracking, (new WaybillQrCode)->payload($parcel->tracking_number));
+
+        $this->actingAs($this->provider, 'logistics')
+            ->postJson(route('logistics.scan.verify'), ['tracking_number' => $tracking])
+            ->assertOk()
+            ->assertJsonPath('parcel.tracking_number', $tracking);
+    }
+
+    public function test_duplicate_hub_scan_reports_already_received_without_repeating_the_transition(): void
+    {
+        $parcel = $this->parcel(OrderStatus::PickedUp, $this->courier);
+        $token = $this->actingAs($this->provider, 'logistics')
+            ->postJson(route('logistics.scan.verify'), ['tracking_number' => $parcel->tracking_number])
+            ->assertOk()->json('actions.0.verification_token');
+        $this->post(route('logistics.incoming-parcels.toSortingCenter', $parcel), ['verification_token' => $token])
+            ->assertSessionHas('success', 'Parcel received and sorted for Quezon City. Pickup rider released.');
+        $before = StatusHistory::where('seller_order_id', $parcel->id)->count();
+        // The receipt scan already sorted it, so a rescan points to rider assignment.
+        $this->postJson(route('logistics.scan.verify'), ['tracking_number' => $parcel->tracking_number])
+            ->assertOk()
+            ->assertJsonPath('message', 'Parcel already received and sorted. Assign its delivery rider in Assign deliveries.')
+            ->assertJsonPath('actions.0.key', 'open_assignments');
+        $this->post(route('logistics.incoming-parcels.toSortingCenter', $parcel), ['verification_token' => $token])
+            ->assertSessionHas('success', 'Parcel already received at the hub. No status change was made.');
+        $this->assertSame(OrderStatus::Sorted, $parcel->fresh()->status);
+        $this->assertSame($before, StatusHistory::where('seller_order_id', $parcel->id)->count());
+    }
+
+    public function test_out_of_order_scan_explains_block_and_does_not_offer_or_apply_hub_receipt(): void
+    {
+        $parcel = $this->parcel(OrderStatus::ReadyForPickup, $this->courier);
+        $before = StatusHistory::where('seller_order_id', $parcel->id)->count();
+        $this->actingAs($this->provider, 'logistics')
+            ->postJson(route('logistics.scan.verify'), ['tracking_number' => $parcel->tracking_number])
+            ->assertOk()
+            ->assertJsonCount(1, 'actions')
+            ->assertJsonPath('actions.0.key', 'open_details')
+            ->assertJsonPath('actions.0.method', 'GET')
+            ->assertJsonPath('message', 'Scan blocked: no hub receipt or sorting action is allowed while this parcel is Pickup Requested.');
+        $this->post(route('logistics.incoming-parcels.toSortingCenter', $parcel))
+            ->assertSessionHas('error', 'Scan blocked: this parcel must be picked up before it can be received at the hub.');
+        $this->assertSame(OrderStatus::ReadyForPickup, $parcel->fresh()->status);
+        $this->assertSame($before, StatusHistory::where('seller_order_id', $parcel->id)->count());
+    }
+
+    public function test_foreign_company_cannot_confirm_hub_receipt_or_change_status(): void
+    {
+        $parcel = $this->parcel(OrderStatus::PickedUp, $this->courier);
+        $before = StatusHistory::where('seller_order_id', $parcel->id)->count();
+        $other = LogisticsProvider::factory()->create(['status' => 'approved', 'email_verified_at' => now()]);
+        $this->actingAs($other, 'logistics')
+            ->post(route('logistics.incoming-parcels.toSortingCenter', $parcel))
+            ->assertForbidden();
+        $this->assertSame(OrderStatus::PickedUp, $parcel->fresh()->status);
+        $this->assertSame($before, StatusHistory::where('seller_order_id', $parcel->id)->count());
+    }
+
+    public function test_scan_page_verifies_a_tracking_number_handed_over_by_another_page(): void
+    {
+        $this->actingAs($this->provider, 'logistics')
+            ->get(route('logistics.scan.index', ['tracking' => 'TRK-20261104-ABC123']))
+            ->assertOk()
+            ->assertSee('data-auto-verify', false)
+            ->assertSee('value="TRK-20261104-ABC123"', false);
+
+        $this->get(route('logistics.scan.index'))->assertOk()->assertDontSee('data-auto-verify', false);
+    }
+
+    public function test_sorted_parcel_scan_points_to_assign_deliveries(): void
+    {
+        $parcel = $this->parcel(OrderStatus::Sorted, $this->courier);
+
+        $this->actingAs($this->provider, 'logistics')
+            ->postJson(route('logistics.scan.verify'), ['tracking_number' => $parcel->tracking_number])
+            ->assertOk()
+            ->assertJsonPath('actions.0.key', 'open_assignments')
+            ->assertJsonPath('actions.0.url', route('logistics.delivery-assignments.index').'#stage-rider')
+            ->assertJsonPath('actions.1.key', 'open_details');
+    }
+}

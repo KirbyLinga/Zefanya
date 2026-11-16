@@ -1,0 +1,165 @@
+<?php
+
+use App\Http\Controllers\Auth\UnifiedLoginController;
+use App\Http\Controllers\Buyer\AccountController;
+use App\Http\Controllers\Buyer\AccountEmailController;
+use App\Http\Controllers\Buyer\AccountPasswordController;
+use App\Http\Controllers\Buyer\AccountPhotoController;
+use App\Http\Controllers\Buyer\CartController;
+use App\Http\Controllers\Buyer\CategoryController;
+use App\Http\Controllers\Buyer\ChatController;
+use App\Http\Controllers\Buyer\CheckoutController;
+use App\Http\Controllers\Buyer\HelpController;
+use App\Http\Controllers\Buyer\HomeController;
+use App\Http\Controllers\Buyer\MessageController;
+use App\Http\Controllers\Buyer\NotificationController;
+use App\Http\Controllers\Buyer\OrderController;
+use App\Http\Controllers\Buyer\PageController;
+use App\Http\Controllers\Buyer\ProductController;
+use App\Http\Controllers\Buyer\ReviewController;
+use App\Http\Controllers\Buyer\SearchController;
+use App\Http\Controllers\Buyer\SettingsController;
+use App\Http\Controllers\Buyer\StoreCategoryController;
+use App\Http\Controllers\Buyer\StoreFollowController;
+use App\Http\Controllers\Buyer\VoucherWalletController;
+use App\Http\Controllers\Buyer\WishlistController;
+
+/*
+|--------------------------------------------------------------------------
+| Buyer Routes
+|--------------------------------------------------------------------------
+| Guest-accessible browsing (catalog) is open to everyone.
+| Identity-specific pages (cart, checkout, orders, account, chat) require auth:buyer.
+| Login/registration routes must stay outside auth:buyer so guests can reach them.
+*/
+
+// ── Guest-accessible browsing ──────────────────────────────
+Route::prefix('buyer')->name('buyer.')->group(function () {
+
+    // Catalog browsing — open to guests AND logged-in buyers
+    Route::get('/', [HomeController::class, 'index'])->name('home');
+    Route::get('/home', [HomeController::class, 'index']);
+    Route::get('/stores/{seller}', [StoreCategoryController::class, 'show'])->name('stores.show');
+    Route::get('/stores/{seller}/uncategorized', [StoreCategoryController::class, 'show'])->name('stores.uncategorized');
+    Route::get('/stores/{seller}/categories/{storeCategory}', [StoreCategoryController::class, 'show'])->name('stores.categories.show');
+    Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
+    Route::get('/categories/{id}', [CategoryController::class, 'show'])->name('categories.show');
+    Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+    Route::get('/products/load-more', [ProductController::class, 'loadMore'])->name('products.load-more');
+    Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');
+    Route::get('/visual-search', [\App\Http\Controllers\Buyer\VisualSearchController::class, 'index'])->name('visual-search.index');
+    Route::post('/visual-search', [\App\Http\Controllers\Buyer\VisualSearchController::class, 'search'])
+        ->middleware('throttle:10,1')->name('visual-search.search');
+    Route::get('/search', [SearchController::class, 'index'])->name('search.index');
+    Route::get('/search/suggestions', [SearchController::class, 'suggestions'])->name('search.suggestions');
+    // Legacy policy URLs now redirect to the single versioned policy pages.
+    Route::redirect('/pages/shipping-returns', '/policies/buyer-protection', 301)->name('pages.shipping-returns');
+    Route::redirect('/pages/privacy-policy', '/policies/privacy-policy', 301)->name('pages.privacy-policy');
+    Route::redirect('/pages/terms-of-service', '/policies/terms-of-service', 301)->name('pages.terms-of-service');
+    Route::get('/pages/about', [PageController::class, 'about'])->name('pages.about');
+    Route::get('/pages/contact', [PageController::class, 'contact'])->name('pages.contact');
+    // Help is public — the landing footer and guest shop both link here.
+    Route::get('/help', [HelpController::class, 'index'])->name('help.index');
+
+    // ── Login required from here down ──────────────────────
+    Route::middleware(['auth:buyer', 'buyer.active'])->group(function () {
+        Route::post('/products/{product}/reviews', [ReviewController::class, 'store'])
+            ->middleware('throttle:10,1')->name('products.reviews.store');
+        Route::patch('/reviews/{review}', [ReviewController::class, 'update'])
+            ->middleware('throttle:10,1')->name('reviews.update');
+
+        Route::post('/logout', [UnifiedLoginController::class, 'logout'])->name('logout');
+
+        Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
+        Route::post('/cart/add', [CartController::class, 'add'])->name('cart.add');
+        Route::get('/cart/summary', [CartController::class, 'summary'])->name('cart.summary');
+        Route::get('/cart/mini', [CartController::class, 'miniCart'])->name('cart.mini');
+
+        // NOTE: the literal /cart/voucher routes MUST be registered before the
+        // DELETE /cart/{id} wildcard below, otherwise Laravel's registration-order
+        // matching sends "DELETE /buyer/cart/voucher" to CartController@destroy
+        // with $id = "voucher" (a TypeError, not the voucher endpoint).
+        Route::post('/cart/voucher', [CartController::class, 'applyVoucher'])->name('cart.voucher.apply');
+        Route::delete('/cart/voucher', [CartController::class, 'removeVoucher'])->name('cart.voucher.remove');
+
+        Route::delete('/cart', [CartController::class, 'bulkDestroy'])->name('cart.bulk-destroy');
+        Route::patch('/cart/{id}', [CartController::class, 'update'])->name('cart.update');
+        Route::delete('/cart/{id}', [CartController::class, 'destroy'])->name('cart.destroy');
+
+        Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');
+        // Same budget as the app's checkout: repeated order placement is a COD abuse signal.
+        Route::post('/checkout', [CheckoutController::class, 'store'])->middleware('throttle:10,1')->name('checkout.store');
+        Route::get('/checkout/success/{order}', [CheckoutController::class, 'success'])->name('checkout.success');
+        Route::post('/checkout/buy-now', [CartController::class, 'buyNow'])->name('checkout.buy-now');
+
+        Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
+        require __DIR__.'/consumer-claims.php';
+        Route::middleware(\App\Http\Middleware\EnsureConsumerClaimsAvailable::class)->group(function (): void {
+            Route::get('/shipments/{shipment}/consumer-claims/create', [\App\Http\Controllers\ConsumerClaimController::class, 'create'])->name('consumer-claims.create');
+            Route::post('/shipments/{shipment}/consumer-claims', [\App\Http\Controllers\ConsumerClaimController::class, 'store'])->middleware('throttle:10,1')->name('consumer-claims.store');
+        });
+        Route::get('/orders/{order}/review', [OrderController::class, 'review'])->name('orders.review');
+        Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
+        Route::post('/orders/{order}/seller-orders/{sellerOrder}/return', [OrderController::class, 'requestReturn'])
+            ->name('orders.requestReturn');
+        Route::post('/orders/{order}/seller-orders/{sellerOrder}/return/escalate', [OrderController::class, 'escalateReturn'])
+            ->name('orders.escalateReturn');
+        Route::post('/orders/{order}/seller-orders/{sellerOrder}/return/cancel', [OrderController::class, 'cancelReturn'])
+            ->name('orders.cancelReturn');
+        Route::post('/orders/{order}/confirm-received', [OrderController::class, 'confirmReceived'])->name('orders.confirmReceived');
+        Route::post('/orders/{order}/seller-orders/{sellerOrder}/cancel', [OrderController::class, 'cancelSellerOrder'])
+            ->name('orders.cancelSellerOrder');
+
+        Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
+        Route::get('/chat/{id}', [ChatController::class, 'show'])->name('chat.show');
+
+        Route::get('/account', [AccountController::class, 'index'])->name('account.index');
+        Route::patch('/account', [AccountController::class, 'update'])->name('account.update');
+        Route::get('/account/photo', [AccountPhotoController::class, 'show'])->name('account.photo.show');
+        Route::post('/account/photo', [AccountPhotoController::class, 'update'])->name('account.photo.update')->middleware('throttle:10,1');
+        Route::delete('/account/photo', [AccountPhotoController::class, 'destroy'])->name('account.photo.destroy');
+
+        Route::post('/account/email', [AccountEmailController::class, 'request'])->name('account.email.request')->middleware('throttle:otp-verify');
+        Route::post('/account/email/verify', [AccountEmailController::class, 'verify'])->name('account.email.verify')->middleware('throttle:otp-verify');
+        Route::post('/account/email/resend', [AccountEmailController::class, 'resend'])->name('account.email.resend')->middleware('throttle:otp-verify');
+        Route::delete('/account/email', [AccountEmailController::class, 'cancel'])->name('account.email.cancel');
+
+        Route::get('/account/address', [AccountController::class, 'addressEdit'])->name('account.address');
+        Route::patch('/account/address', [AccountController::class, 'addressUpdate'])->name('account.address.update');
+        Route::post('/account/addresses', [AccountController::class, 'addressStore'])->name('account.addresses.store');
+        Route::patch('/account/addresses/{address}', [AccountController::class, 'addressRecordUpdate'])->name('account.addresses.update');
+        Route::post('/account/addresses/{address}/default', [AccountController::class, 'addressMakeDefault'])->name('account.addresses.default');
+        Route::delete('/account/addresses/{address}', [AccountController::class, 'addressDestroy'])->name('account.addresses.destroy');
+
+        Route::get('/account/password', [AccountController::class, 'passwordEdit'])->name('account.password');
+        Route::patch('/account/password', [AccountPasswordController::class, 'request'])->name('account.password.update')->middleware('throttle:password-update');
+        Route::post('/account/password/verify', [AccountPasswordController::class, 'verify'])->name('account.password.verify')->middleware('throttle:otp-verify');
+        Route::post('/account/password/resend', [AccountPasswordController::class, 'resend'])->name('account.password.resend')->middleware('throttle:otp-verify');
+        Route::delete('/account/password', [AccountPasswordController::class, 'cancel'])->name('account.password.cancel');
+
+        Route::get('/wishlist', [WishlistController::class, 'index'])->name('wishlist.index');
+        Route::get('/following', [StoreFollowController::class, 'index'])->name('following.index');
+        Route::post('/stores/{seller}/follow', [StoreFollowController::class, 'toggle'])->name('stores.follow');
+        Route::post('/wishlist/{productId}', [WishlistController::class, 'toggle'])->name('wishlist.toggle');
+        Route::delete('/wishlist/{id}', [WishlistController::class, 'destroy'])->name('wishlist.destroy');
+
+        Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+        Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');
+        Route::post('/settings/delete-account', [SettingsController::class, 'deleteAccount'])->name('settings.deleteAccount');
+
+        Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::get('/notifications/count', [NotificationController::class, 'count'])->name('notifications.count');
+        Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.markRead');
+        Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead'])->name('notifications.markAllRead');
+
+        Route::get('/messages', [MessageController::class, 'index'])->name('messages.index');
+        Route::get('/messages/unread-count', [MessageController::class, 'unreadCount'])->name('messages.unreadCount');
+        Route::get('/messages/{conversation}', [MessageController::class, 'show'])->name('messages.show');
+        Route::get('/messages/{conversation}/images/{message}', [MessageController::class, 'image'])->name('messages.image');
+        Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
+        Route::post('/messages/get-or-create', [MessageController::class, 'getOrCreateConversation'])->name('messages.getOrCreate');
+
+        Route::get('/vouchers', [VoucherWalletController::class, 'index'])->name('vouchers.index');
+        Route::post('/vouchers/{voucher}/claim', [VoucherWalletController::class, 'claim'])->name('vouchers.claim');
+    });
+});

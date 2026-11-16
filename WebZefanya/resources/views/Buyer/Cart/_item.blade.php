@@ -1,0 +1,160 @@
+{{--
+    Cart item row partial.
+    Expects: $item (CartItem with product.images/seller/category loaded)
+             $unavailable (bool) — dims the row and disables its checkbox
+--}}
+@php
+    $product  = $item->product;
+    $imageUrl = $item->cartImageUrl();
+    $pdpUrl   = $product ? route('buyer.products.show', $product->id) : null;
+    $stock    = $item->availableQuantity();
+    $catLabel = $product?->category?->label;
+    $unit     = $item->unitPriceCentavos();
+    $variantLabel = $item->cartVariantLabel();
+@endphp
+
+<div
+  class="js-cartpage-item-row grid grid-cols-[auto_4.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-3 sm:flex sm:gap-4 border-b border-buyer-line/60 px-5 py-4 transition-opacity duration-200 last:border-b-0 {{ $unavailable ? 'opacity-50' : '' }}"
+  data-item-id="{{ $item->id }}"
+  data-seller-id="{{ $product?->seller_id }}"
+  data-stock="{{ $stock }}"
+  data-unit-centavos="{{ $unit }}"
+  data-line-total-centavos="{{ $unavailable ? 0 : $item->lineTotalCentavos() }}"
+  data-available="{{ $unavailable ? '0' : '1' }}"
+>
+  {{-- Select checkbox --}}
+  <div class="mt-1 shrink-0">
+    <input
+      type="checkbox"
+      class="js-cartpage-item-check h-4 w-4 cursor-pointer rounded accent-primary-800"
+      data-item-id="{{ $item->id }}"
+      data-seller-id="{{ $product?->seller_id }}"
+      aria-label="Select {{ $product?->name ?? 'this item' }}"
+      @checked(! $unavailable)
+      @disabled($unavailable)
+    >
+  </div>
+
+  {{-- Thumbnail with the category chip pinned to its bottom-right corner --}}
+  <div class="relative h-[72px] w-[72px] shrink-0 overflow-hidden sm:h-[100px] sm:w-[100px] rounded-xl bg-secondary-100">
+    @if ($imageUrl)
+      <img src="{{ $imageUrl }}" alt="{{ $product->name }}" class="h-full w-full object-cover">
+    @else
+      <div class="flex h-full w-full items-center justify-center text-primary-300">
+        <i data-lucide="package" width="32" height="32"></i>
+      </div>
+    @endif
+    @if ($catLabel)
+      <span class="absolute right-1 bottom-1 max-w-[calc(100%-0.5rem)] truncate rounded bg-buyer-ink/75 px-1.5 py-0.5 text-[8px] font-bold tracking-[0.05em] text-white uppercase">
+        {{ $catLabel }}
+      </span>
+    @endif
+  </div>
+
+  {{-- Product info --}}
+  <div class="min-w-0 flex-1">
+    @if ($pdpUrl)
+      <a href="{{ $pdpUrl }}"
+         class="line-clamp-2 [overflow-wrap:anywhere] text-[13.5px] font-semibold leading-snug text-buyer-ink hover:underline hover:underline-offset-2">
+        {{ $product->name }}
+      </a>
+    @else
+      <span class="line-clamp-2 [overflow-wrap:anywhere] text-[13.5px] font-semibold leading-snug text-buyer-ink">
+        {{ $product?->name ?? 'Product no longer available' }}
+      </span>
+    @endif
+
+    {{-- Variant label ("Red / M") for variant lines; legacy lines show the
+         multi-quantity hint only. --}}
+    <p class="mt-1 text-[12px] font-medium text-neutral-600">
+      @if ($unavailable)
+        @if ($item->requiresVariantReselection())
+          Variation unavailable. Choose a color or size on the product page first.
+        @elseif (! $product?->isOnVacation() && $item->isVariationUnavailable())
+          Variation unavailable
+        @else
+          {{ $product?->isOnVacation() ? 'On vacation — purchasing is temporarily unavailable.' : 'No longer available' }}
+        @endif
+      @elseif ($variantLabel)
+        {{ $variantLabel }}@if ($item->quantity > 1) · Set of {{ $item->quantity }} (₱{{ number_format($unit / 100, 2) }} each)@endif
+      @elseif ($item->quantity > 1)
+        Set of {{ $item->quantity }} (₱{{ number_format($unit / 100, 2) }} each)
+      @endif
+      @if (! $unavailable && ($offerNote = $item->offerNote()))
+        <span class="mt-1 block">{{ $offerNote }}</span>
+      @endif
+    </p>
+
+    @if (! $unavailable && ($regularPrice = $item->resolvedPrice()?->formattedRegular()))
+      <p class="mt-1.5 text-[12px] leading-snug">
+        <span class="text-price-muted line-through text-[11px]">{{ $regularPrice }}</span>
+        <span class="block font-semibold text-primary-700">₱{{ number_format($unit / 100, 2) }} each</span>
+      </p>
+    @else
+      @unless($unavailable)
+      <p class="mt-1.5 text-[12px] font-semibold text-primary-700">
+        ₱{{ number_format($unit / 100, 2) }} each
+      </p>
+      @endunless
+    @endif
+
+    @if (! $unavailable && ($item->quantity > $stock || ($stock > 0 && $stock <= $product?->low_stock_threshold)))
+      <p class="mt-1 flex items-center gap-1 text-[11.5px] font-semibold text-primary-700">
+        <i data-lucide="alert-triangle" width="11" height="11"></i>
+        Only {{ $stock }} left
+      </p>
+    @endif
+  </div>
+
+  {{-- Right column: line total, quantity stepper, remove --}}
+  <div class="col-span-2 col-start-2 flex min-w-0 flex-wrap items-center justify-between gap-2 sm:shrink-0 sm:flex-col sm:items-end">
+    <span class="text-[12px] text-buyer-ink-soft">Subtotal <span class="js-cartpage-line-total font-serif text-[15px] font-semibold text-buyer-ink">
+      {{ $unavailable ? '—' : $item->formattedLineTotal() }}
+    </span></span>
+
+    @unless ($unavailable)
+      <div class="inline-flex items-center rounded-full border border-buyer-line bg-buyer-cream">
+        <button
+          type="button"
+          class="js-cartpage-qty-down flex h-8 w-8 items-center justify-center rounded-full text-buyer-ink-soft transition-colors hover:bg-secondary-100 disabled:opacity-30"
+          data-item-id="{{ $item->id }}"
+          data-stock="{{ $stock }}"
+          aria-label="Decrease quantity of {{ $product->name }}"
+          @disabled($item->quantity <= 1)
+        >
+          <i data-lucide="minus" width="12" height="12"></i>
+        </button>
+        <input
+          type="number"
+          class="js-cartpage-qty-input w-10 text-center text-[13px] font-semibold text-buyer-ink bg-transparent border-0 outline-none"
+          data-item-id="{{ $item->id }}"
+          data-stock="{{ $stock }}"
+          value="{{ $item->quantity }}"
+          min="1"
+          max="{{ $stock }}"
+          aria-label="Quantity of {{ $product->name }}"
+        >
+        <button
+          type="button"
+          class="js-cartpage-qty-up flex h-8 w-8 items-center justify-center rounded-full text-buyer-ink-soft transition-colors hover:bg-secondary-100 disabled:opacity-30"
+          data-item-id="{{ $item->id }}"
+          data-stock="{{ $stock }}"
+          aria-label="Increase quantity of {{ $product->name }}"
+          @disabled($item->quantity >= $stock)
+        >
+          <i data-lucide="plus" width="12" height="12"></i>
+        </button>
+      </div>
+    @endunless
+
+    <button
+      type="button"
+      class="js-cartpage-remove flex items-center gap-1 text-[12px] font-medium text-primary-700 transition-all hover:text-primary-900 hover:underline"
+      data-item-id="{{ $item->id }}"
+      aria-label="Remove {{ $product?->name ?? 'this item' }} from cart"
+    >
+      <i data-lucide="trash-2" width="13" height="13"></i>
+      Remove
+    </button>
+  </div>
+</div>

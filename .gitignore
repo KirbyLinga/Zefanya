@@ -1,0 +1,26 @@
+# Laravel (WebZefanya)
+/WebZefanya/vendor/
+/WebZefanya/node_modules/
+/WebZefanya/.env
+/WebZefanya/.env.*
+!/WebZefanya/.env.example
+/WebZefanya/public/build/
+/WebZefanya/public/hot
+/WebZefanya/public/storage
+/WebZefanya/storage/*.key
+/WebZefanya/storage/app/*
+/WebZefanya/storage/logs/*
+/WebZefanya/.phpunit.result.cache
+
+# Flutter (mobile)
+/mobile/build/
+/mobile/.dart_tool/
+/mobile/android/key.properties
+/mobile/android/app/*.jks
+/mobile/**/*.keystore
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

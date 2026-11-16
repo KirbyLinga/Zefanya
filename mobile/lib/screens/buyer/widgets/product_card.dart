@@ -1,0 +1,1026 @@
+// lib/screens/buyer/widgets/product_card.dart
+//
+// Shared product grid tile — used by Home, Search, and Categories so
+// the tint / bestseller-badge logic lives in exactly one place instead
+// of being copy-pasted per screen.
+//
+// IMPORTANT: BuyerShell uses IndexedStack, which keeps Home, Search,
+// Categories etc. all mounted simultaneously (just not painted) —
+// so if the same product appeared as a Hero on two of those tabs at
+// once with the same tag, Flutter throws "multiple heroes share the
+// same tag" the moment you push ProductDetailsScreen. `heroTag` exists
+// so each screen can namespace its tags (e.g. 'home-p1', 'search-p1')
+// and never collide — pass the matching tag into ProductDetailsScreen
+// so the flight still animates correctly from wherever the tap came from.
+
+import 'package:flutter/material.dart';
+import '../../../config/backend_profile.dart' show kActiveApiBaseUrl;
+import '../../../data/mock_data.dart';
+import '../../../theme/app_theme.dart';
+import '../../../utils/money_format.dart';
+import '../../../utils/motion.dart';
+import '../../../widgets/editorial_shapes.dart';
+import '../../../widgets/heart_button.dart';
+import '../../../widgets/pressable_scale.dart';
+import '../../../widgets/zefanya_mark.dart';
+
+/// Per-category tint for placeholder fills and category accents — so a
+/// grid isn't a wall of identical tiles even before real product photos
+/// exist. Shared so Search, Categories and Home match exactly.
+///
+/// These were light pastels (blush #F7D6D0, sage, soft pink) and read
+/// as a soft wash on the old near-white ground. On the dark card they
+/// read as a *glowing* rectangle in the one place a photo belongs —
+/// brighter than the product name, the price, and the card itself, so a
+/// tile mid-load looked like the bug and the loaded tile looked like the
+/// fix. They're now hue leans on the card ground (see
+/// [AppColors.hueOnSurface]): a warm rose, an olive and a terracotta
+/// that sit one step up from the card instead of a light year above it.
+///
+/// Hue — not brightness — is what tells the categories apart now, which
+/// is why each branch changes the *hue token*: blush for Fashion (the
+/// hero category, at the strongest lean), sage for Beauty, terracotta
+/// for Home & Living and anything a seller adds later.
+/// The raw brand hue for a category. Exposed separately from
+/// [productTint] because a *fill* and a *rule* need the same hue applied
+/// two different ways: the fill is a lean on the card ground, while the
+/// rule is a saturated line (see [AppColors.ruleOnGround]).
+Color productHue(String category) => switch (category) {
+  'Fashion' => AppColors.secondary,
+  'Beauty' => AppColors.tertiary,
+  _ => AppColors.accent,
+};
+
+Color productTint(String category) {
+  // Fashion is the hero category, so its lean is the strongest of the
+  // three; the others stay a step quieter.
+  final amount = category == 'Fashion' ? 0.34 : 0.30;
+  return AppColors.hueOnSurface(productHue(category), amount);
+}
+
+/// A product photo, sized to the slot it lands in.
+///
+/// A product with no real photo gets a neutral, on-brand placeholder
+/// (see [_ProductPlaceholder]) rather than unrelated stock photography.
+/// The placeholder is drawn, not fetched, so it cannot fail, carries no
+/// licensing question, and stays the same in every mode.
+///
+/// Takes the whole [Product] rather than an id and a tint, because it now
+/// needs something only the product knows: *which photo* to show, and its
+/// cover is [Product.photos]. The tint is derived here too (every one of the
+/// twelve call sites was passing `productTint(product.category)` by hand, so
+/// the argument was carrying no information — only a chance to get it wrong).
+/// With [photoIndex] this widget can render any photo of any product, which is
+/// what makes a swipeable gallery possible without a second image widget.
+class ProductImage extends StatelessWidget {
+  const ProductImage({
+    super.key,
+    required this.product,
+    this.photoIndex = 0,
+    this.imageUrl,
+    this.iconSize = 40,
+    this.alignment = Alignment.center,
+  });
+
+  final Product product;
+
+  /// An optional URL that overrides [Product.photos] for this render.
+  ///
+  /// Used by the product gallery to show the selected SKU's colour image while
+  /// keeping the same widget (and therefore the same loading/error treatment)
+  /// as every other product photo. Null keeps the normal cover/gallery path.
+  final String? imageUrl;
+
+  /// Which of the product's photos to show. Out-of-range values clamp to the
+  /// cover rather than throwing: this is driven by a page index, and an image
+  /// that fails to appear is a far worse outcome than one that repeats.
+  final int photoIndex;
+
+  final double iconSize;
+
+  /// Where the photo sits inside its slot. Center everywhere except the
+  /// featured deck's cover tile, which top-aligns so subjects are not
+  /// cropped from above.
+  final AlignmentGeometry alignment;
+
+  /// The source's own edge, in pixels — the ceiling for any decode request,
+  /// since asking a 1000px image for more would only enlarge it.
+  static const int _sourcePixels = 1000;
+
+  /// The URL to render, or null when this product has no real photo.
+  ///
+  /// Null is a state, not a missing value: it is what lets the widget paint
+  /// the neutral placeholder without inventing a stock-photo URL. An explicit
+  /// [imageUrl] still wins, because the variant picker can supply a photo for
+  /// a product whose cover has not been uploaded yet.
+  String? get _url {
+    final override = imageUrl;
+    if (override != null && override.trim().isNotEmpty) {
+      return _absolute(override);
+    }
+    final photos = product.photos;
+    if (photos.isEmpty) return null;
+    // Out-of-range falls back to the *cover*, in both directions. The
+    // obvious `clamp(0, length - 1)` is asymmetric: an index of 99 would
+    // land on the last photo and show a picture the card never showed,
+    // which is a worse outcome than repeating the cover — and it
+    // contradicted what this getter promised. Pinned by
+    // test/product_image_cache_test.dart.
+    final index = (photoIndex >= 0 && photoIndex < photos.length)
+        ? photoIndex
+        : 0;
+    return _absolute(photos[index]);
+  }
+
+  /// A server path such as `/storage/thumbnails/...` has no host, which a
+  /// browser page would supply but an app cannot: `Image.network` would fail
+  /// and the placeholder would show. Resolved against the API's own origin
+  /// (`zefanya.apiBaseUrl`). Full URLs and mock asset strings pass through.
+  static String _absolute(String url) {
+    if (!url.startsWith('/') || url.startsWith('//') || kActiveApiBaseUrl.isEmpty) {
+      return url;
+    }
+    final api = Uri.tryParse(kActiveApiBaseUrl);
+    return api == null || !api.hasScheme ? url : api.resolve(url).toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = productTint(product.category);
+    final url = _url;
+    if (url == null) {
+      return _ProductPlaceholder(tint: tint, iconSize: iconSize);
+    }
+    final ratio = MediaQuery.devicePixelRatioOf(context);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Unbounded (a row that will size to its child) — nothing to measure,
+        // so decode natively rather than guess.
+        final slotWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : null;
+        final requested = slotWidth == null
+            ? _sourcePixels
+            : (slotWidth * ratio).round();
+        final decode = requested.clamp(1, _sourcePixels);
+        // Never hand an unchanged size to ResizeImage: it would add a second
+        // cache entry for the same bitmap.
+        final cachePixels = decode >= _sourcePixels ? null : decode;
+
+        return Image.network(
+          // The URL comes from the product (see Product.photos), not from a
+          // template assembled here — so when real seller uploads arrive, this
+          // widget needs no change at all.
+          url,
+          fit: BoxFit.cover,
+          alignment: alignment,
+          width: double.infinity,
+          height: double.infinity,
+          // ResizeImage's dimensions are in *source* pixels, which is
+          // exactly what cacheWidth means to the engine.
+          cacheWidth: cachePixels,
+          cacheHeight: cachePixels,
+          // Flutter web only (ignored on Android/iOS): the web build reads
+          // image bytes with a cross-origin request, which the browser
+          // refuses when the image server sends no
+          // Access-Control-Allow-Origin header — and the server's
+          // /storage files carry none. `fallback` retries such an image
+          // as a plain <img> element, which needs no CORS.
+          webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
+          // Live mode serves photos over the network (4G): cross-fade
+          // each image IN OVER its tinted placeholder when the first
+          // frame arrives, instead of popping. The tint sits UNDER the
+          // fade (ColoredBox behind FadeTransition): the loading
+          // placeholder disappears before the first frame, so without
+          // the underlay the image would fade in over whatever is
+          // behind the tile. Opacity only, ~200ms, skipped under
+          // reduced motion (frameBuilder still fires — returns as-is).
+          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            if (wasSynchronouslyLoaded || frame == null) return child;
+            if (reduceMotion(context)) return child;
+            return ColoredBox(
+              color: tint,
+              child: _ImageFadeIn(child: child),
+            );
+          },
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            // Branded wait instead of Material's default spinner — this is
+            // the most frequently-seen loading state in the whole app
+            // (every tile, every grid, every time), so it's the highest
+            // leverage place for the monogram to show up.
+            return Container(
+              color: tint,
+              alignment: Alignment.center,
+              child: ZefanyaLoader(
+                size: iconSize * 0.8,
+                // tintInk, not a fixed brand token: the tint this sits on is a
+                // pale wash in light mode and a dark lean in dark mode, so the
+                // mark has to invert with it. A fixed light token disappears
+                // into the light wash; a fixed dark one disappears into the
+                // dark lean.
+                color: AppColors.tintInk.withValues(alpha: 0.75),
+              ),
+            );
+          },
+          // No internet, or a broken seller URL — fall back to the same
+          // neutral placeholder a product with no photo uses, rather than a
+          // broken-image glyph.
+          errorBuilder: (context, error, stackTrace) {
+            // Printed in release builds too (`flutter run --release` / adb
+            // logcat), so a photo that falls back to the placeholder says why.
+            debugPrint('[ProductImage] could not load $url: $error');
+            return _ProductPlaceholder(tint: tint, iconSize: iconSize);
+          },
+        );
+      },
+    );
+  }
+}
+
+/// A one-shot ~200ms opacity fade for a newly-arrived network image.
+///
+/// Stateful (not an AnimatedSwitcher): the image subtree is large and
+/// this avoids rebuilding it — only the opacity tweens. Controller
+/// disposed with the tile. Reduced motion never reaches here (the
+/// frameBuilder returns the image as-is), so no end-state handling.
+class _ImageFadeIn extends StatefulWidget {
+  const _ImageFadeIn({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_ImageFadeIn> createState() => _ImageFadeInState();
+}
+
+class _ImageFadeInState extends State<_ImageFadeIn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 200),
+  )..forward();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(opacity: _controller, child: widget.child);
+  }
+}
+
+/// A product with no photo still needs a cover — just not a photograph of
+/// something else.
+///
+/// This is a drawn placeholder, not an asset: it inherits the product's
+/// category tint, carries the same monogram as the rest of the brand, and
+/// cannot fail to load. It replaces the old Picsum fallback, which put
+/// unrelated stock photography on the card and quietly claimed it depicted
+/// the product. The arch is the app's "important image" silhouette, so the
+/// empty state reads as intentional rather than broken.
+class _ProductPlaceholder extends StatelessWidget {
+  const _ProductPlaceholder({required this.tint, required this.iconSize});
+
+  final Color tint;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    AppColors.watch(context);
+    final markSize = (iconSize * 1.15).clamp(20.0, 72.0);
+    final frameWidth = markSize * 1.2;
+    final frameHeight = markSize * 1.4;
+
+    return Semantics(
+      image: true,
+      label: 'No product photo available',
+      child: Container(
+        key: const ValueKey('product-placeholder'),
+        color: tint,
+        alignment: Alignment.center,
+        child: Container(
+          width: frameWidth,
+          height: frameHeight,
+          decoration: BoxDecoration(
+            color: Color.alphaBlend(
+              AppColors.surface.withValues(
+                alpha: AppColors.isDark ? 0.08 : 0.38,
+              ),
+              tint,
+            ),
+            border: Border.all(
+              color: AppColors.tintInk.withValues(alpha: 0.18),
+            ),
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(frameWidth),
+              bottom: const Radius.circular(8),
+            ),
+          ),
+          alignment: Alignment.center,
+          child: ZefanyaMark(
+            size: markSize * 0.55,
+            color: AppColors.tintInk.withValues(alpha: 0.72),
+            strokeWidth: 4,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The cover story: the single biggest editorial moment on Home.
+///
+/// Three things here that the rest of the app doesn't do, all of them
+/// deliberate and all from the same critique:
+///   • the image is an ARCH, not a rounded rectangle (#3) — the one
+///     silhouette in the app that can't be mistaken for a card;
+///   • the price is a 46pt numeral (#2) — dramatically bigger than
+///     anything around it, which is what "editorial" actually means
+///     in practice;
+///   • the arch's foot bleeds past the tile's own lower edge (#3),
+///     into the reserved padding below — image and shape occupy space
+///     a plain rectangle wouldn't reach.
+///
+/// That last point used to be "the arch crosses over the title", which
+/// was a bug, not an effect: the text column had a fixed 190px width
+/// regardless of screen size, so on narrower phones the image's left
+/// edge landed *inside* that width and silently painted over the last
+/// few letters — not an ellipsis, just glyphs hidden under an opaque
+/// photo. An overlap only reads as intentional when it crosses blank
+/// space; crossing text someone is meant to read is just a layout
+/// bug wearing a design justification. Fixed by measuring the actual
+/// available width (LayoutBuilder) and sizing the text column to stop
+/// short of the image with a fixed gap, on every screen size — never
+/// by tuning one fixed pixel value against one screenshot.
+class CoverStoryTile extends StatelessWidget {
+  const CoverStoryTile({
+    super.key,
+    required this.product,
+    required this.heroTag,
+    required this.onTap,
+    this.eyebrow = 'THIS WEEK',
+  });
+
+  final Product product;
+  final String heroTag;
+  final VoidCallback onTap;
+  final String eyebrow;
+
+  static const double _imageWidth = 172;
+  static const double _imageRightBleed =
+      6; // how far the arch pokes past the tile's own right edge
+  static const double _textImageGap =
+      16; // enforced empty space between title text and image — never crossed
+  static const double _bottomBleed =
+      24; // how far the arch's foot pokes below the tile's nominal bottom
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return PressableScale(
+      onTap: onTap,
+      semanticLabel: '${product.name}, ${formatPeso(product.price)}. $eyebrow.',
+      child: Padding(
+        // Reserves room for the foot's bottom bleed so Clip.none
+        // doesn't spill into whatever sliver comes next.
+        padding: const EdgeInsets.only(bottom: _bottomBleed),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Text never gets less than 110px (enough for a two-word
+            // title before it starts looking cramped) — below that,
+            // shrink the image instead of squeezing the text further,
+            // so very narrow screens degrade the photo, not the copy.
+            final rawTextWidth =
+                constraints.maxWidth - _imageWidth - _textImageGap;
+            final textWidth = rawTextWidth.clamp(110.0, 220.0);
+            final imageWidth = rawTextWidth < 110
+                ? (constraints.maxWidth - 110 - _textImageGap).clamp(
+                    90.0,
+                    _imageWidth,
+                  )
+                : _imageWidth;
+
+            return SizedBox(
+              height: 306,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // Type layer. Width is the measured-safe value above,
+                  // so the image is guaranteed to start _textImageGap
+                  // past its right edge — this text is never crossed.
+                  Positioned(
+                    left: 0,
+                    bottom:
+                        _bottomBleed, // sits above the arch's foot-bleed zone, not inside it
+                    child: SizedBox(
+                      width: textWidth,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(eyebrow, style: AppType.eyebrow),
+                          const SizedBox(height: 8),
+                          Text(
+                            product.name,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontSize: 19,
+                              height: 1.15,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 10),
+                          // The oversized numeral. Currency mark kept
+                          // small on purpose so the digits carry the
+                          // scale. Wrapped in FittedBox: at 46pt this
+                          // is the widest single element on the tile,
+                          // and textWidth can shrink to 110 on narrow
+                          // screens — scale down rather than overflow.
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    '₱',
+                                    style: AppType.priceNumeral(20),
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  formatPeso(
+                                    product.price,
+                                  ).replaceFirst('₱', '').trim(),
+                                  style: AppType.priceNumeral(46),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Arch image. Bleeds past the tile on two edges only
+                  // — right (into the sliver's own horizontal padding)
+                  // and bottom (into the padding this widget reserved
+                  // above) — both blank space, never the text column.
+                  Positioned(
+                    right: -_imageRightBleed,
+                    top: 0,
+                    bottom: -_bottomBleed,
+                    width: imageWidth,
+                    child: Transform.rotate(
+                      angle: 0.015,
+                      child: Arch(
+                        footRadius: 16,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.neutral.withValues(
+                                  alpha: 0.28,
+                                ),
+                                blurRadius: 24,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Hero(
+                            tag: heroTag,
+                            child: ProductImage(product: product),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Hand-placed tag, nested relative to the image's own
+                  // box rather than the tile's width — stays correctly
+                  // placed on the arch's shoulder regardless of how
+                  // much the responsive imageWidth above scaled it.
+                  Positioned(
+                    right: -_imageRightBleed + imageWidth - 46,
+                    top: 26,
+                    child: Transform.rotate(
+                      angle: -0.14,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.tertiary,
+                          borderRadius: radiusOf(ShapeTier.pill),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.15),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          'Featured',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            // Ink for a light fill, not primaryDark: sage is
+                            // the same pastel in both modes, but primaryDark
+                            // is lifted in dark mode and could only manage
+                            // 2.43:1 on it. See AppPalette.textOnLight.
+                            color: AppColors.textOnLight,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Full-width tile used to interrupt the grid partway down, so the
+/// feed has a rhythm (2-up, 2-up, WIDE, 2-up) instead of one uniform
+/// column of identical rows all the way to the bottom. Part of #6.
+class WideProductTile extends StatelessWidget {
+  const WideProductTile({
+    super.key,
+    required this.product,
+    required this.heroTag,
+    required this.onTap,
+    this.kicker = 'ALSO WORTH A LOOK',
+  });
+
+  final Product product;
+  final String heroTag;
+  final VoidCallback onTap;
+  final String kicker;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      // Leans the opposite way to the grid tile above it.
+      shape: editorialShape(1, ShapeTier.hero),
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          height:
+              128 +
+              (MediaQuery.textScalerOf(context).scale(14) - 14).clamp(
+                    0.0,
+                    35.0,
+                  ) *
+                  6,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(kicker, style: AppType.eyebrow),
+                      const SizedBox(height: 6),
+                      Text(
+                        product.name,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontSize: 15,
+                          height: 1.15,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          formatPeso(product.price),
+                          maxLines: 1,
+                          style: AppType.priceNumeral(22),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 120,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Hero(
+                      tag: heroTag,
+                      child: ProductImage(product: product),
+                    ),
+                    if (product.stock == 0)
+                      Container(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        alignment: Alignment.center,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface.withValues(alpha: 0.94),
+                            borderRadius: radiusOf(ShapeTier.pill),
+                            border: Border.all(color: AppColors.divider),
+                          ),
+                          child: Text(
+                            'Sold out',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: AppColors.danger,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ProductCard extends StatelessWidget {
+  const ProductCard({
+    super.key,
+    required this.product,
+    required this.heroTag,
+    required this.onTap,
+    this.index = 0,
+    this.promotional = false,
+  });
+
+  final Product product;
+
+  /// Position in its grid. Only used to alternate which diagonal the
+  /// card's big corners sit on — adjacent tiles lean opposite ways, so
+  /// the grid reads as a set of shapes rather than a wall of identical
+  /// rounded boxes, without any one tile looking like a mistake.
+  final int index;
+  final bool promotional;
+
+  /// Must be unique across every simultaneously-mounted screen — see
+  /// the file-level note above. Pass the same string into
+  /// ProductDetailsScreen's `heroTag` so the flight connects correctly.
+  final String heroTag;
+
+  final VoidCallback onTap;
+
+  static double cardExtent(BuildContext context) =>
+      264 + (MediaQuery.textScalerOf(context).scale(14) - 14).clamp(0, 35) * 12;
+
+  static SliverGridDelegate gridDelegate(BuildContext context) =>
+      SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: MediaQuery.textScalerOf(context).scale(14) >= 23
+            ? 1
+            : 2,
+        mainAxisSpacing: 14,
+        crossAxisSpacing: 12,
+        mainAxisExtent: cardExtent(context),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final previous = product.compareAtPrice;
+    final onSale = previous != null && previous > product.price;
+    final largeText = MediaQuery.textScalerOf(context).scale(14) >= 23;
+    final savings = onSale
+        ? ((previous - product.price) * 100 / previous).floor()
+        : 0;
+
+    return LayoutBuilder(
+      builder: (context, bounds) => Card(
+        margin: EdgeInsets.zero,
+        elevation: 0,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: promotional
+              ? editorialRadius(index, ShapeTier.card)
+              : BorderRadius.circular(10),
+          side: BorderSide(color: AppColors.divider),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Flexible(
+                child: SizedBox(
+                  height: bounds.maxHeight * (largeText ? .37 : .42),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Hero(
+                        tag: heroTag,
+                        child: ProductImage(product: product),
+                      ),
+                      if (promotional &&
+                          savings > 0 &&
+                          product.stock > 0 &&
+                          !product.sellerOnVacation)
+                        Positioned(
+                          left: 6,
+                          bottom: 6,
+                          // Slight rotation — a stamped/hand-placed tag rather
+                          // than a dead-straight pill. Cheap, vector-only
+                          // asymmetry that doesn't depend on photo quality,
+                          // unlike a floating product cutout would.
+                          child: Transform.rotate(
+                            angle: -0.09,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                // roseGround, not primaryDark: this tag carries
+                                // 12sp text, and dark mode's lifted rose caps out
+                                // at 4.42:1 for *any* ink. roseGround is the rose
+                                // surface that text is allowed to sit on.
+                                color: AppColors.roseGround,
+                                borderRadius: radiusOf(ShapeTier.pill),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.15),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                '$savings% off',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: AppColors.textOnDark,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (product.sellerOnVacation)
+                        Positioned(
+                          left: 6,
+                          bottom: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface.withValues(alpha: 0.94),
+                              borderRadius: radiusOf(ShapeTier.pill),
+                              border: Border.all(color: AppColors.divider),
+                            ),
+                            child: Text(
+                              'On vacation',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: AppColors.danger,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (product.stock == 0 && !product.sellerOnVacation)
+                        Positioned.fill(
+                          child: Container(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            alignment: Alignment.center,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface.withValues(
+                                  alpha: 0.94,
+                                ),
+                                borderRadius: radiusOf(ShapeTier.pill),
+                                border: Border.all(color: AppColors.divider),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                'Sold out',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: AppColors.danger,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: HeartButton(product: product, compact: true),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.name,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 13,
+                        height: 1.2,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      product.sellerName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        formatPeso(product.price),
+                        maxLines: 1,
+                        style: AppType.priceNumeral(
+                          22,
+                          color: onSale
+                              ? AppColors.accent
+                              : AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    if (onSale)
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          formatPeso(previous),
+                          maxLines: 1,
+                          semanticsLabel:
+                              'Original price ${formatPeso(previous)}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: AppColors.textSecondary,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                      ),
+                    // Trust signal row — but only claims that exist. A
+                    // product with no reviews must not render "★ 0.0": an
+                    // average over zero ratings is not a fact about the
+                    // product. The sold count is still true on its own, so
+                    // it stays without a star.
+                    if (product.ratingCount > 0 || product.soldCount > 0) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          if (product.ratingCount > 0) ...[
+                            Icon(
+                              Icons.star_rounded,
+                              size: 13,
+                              color: AppColors.sageIcon,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              product.rating.toStringAsFixed(1),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                          // One flexible tail (Claude Round A follow-up): the
+                          // rating row must survive a 150dp tile at 1.5x
+                          // text scale. The sold count alone flexing is not
+                          // enough — the ' · ' separator also measures wide
+                          // under fallback fonts (85px in-test), so the
+                          // whole tail shares one Flexible and ellipsizes
+                          // as a unit. On device this never pressures (real
+                          // metrics fit with room); in-test it degrades to
+                          // an ellipsis instead of a stripe.
+                          if (product.soldCount > 0)
+                            Flexible(
+                              child: Text(
+                                '${product.ratingCount > 0 ? '  ·  ' : ''}'
+                                '${_formatSoldCount(product.soldCount)} sold',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// '1200' -> '1.2k'; leaves smaller counts as-is so the row stays short
+/// enough to fit next to the rating without wrapping.
+String _formatSoldCount(int count) {
+  if (count >= 1000) {
+    return '${(count / 1000).toStringAsFixed(count % 1000 == 0 ? 0 : 1)}k';
+  }
+  return '$count';
+}
+
+/// Home price: a small raised ₱ beside the large Playfair numeral.
+///
+/// One shared widget (grid tile, rail card, anywhere else a price
+/// leads) so the currency treatment can't drift per screen. The ₱ is
+/// a Text at ~55% size, vertically centered against the numeral via
+/// a middle-aligned WidgetSpan — not a superscript offset, which
+/// would float differently per font.
+///
+/// Uses the literal ₱ glyph (never \u20b1 in source — see hard rule 1
+/// in the project brief) so the file stays greppable.
+class PriceLabel extends StatelessWidget {
+  const PriceLabel({
+    super.key,
+    required this.amount,
+    this.numeralSize = 22,
+    this.color,
+    this.semanticLabel,
+  });
+
+  /// Whole-peso amount to render.
+  final double amount;
+
+  /// Playfair numeral size; the ₱ scales proportionally.
+  final double numeralSize;
+
+  /// Defaults to [AppColors.accent] via [AppType.priceNumeral].
+  final Color? color;
+
+  /// Screen-reader label, e.g. 'Price: 349 pesos'. Defaults to the
+  /// visible text, which already reads acceptably.
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final numeral = AppType.priceNumeral(numeralSize, color: color);
+    final mark = numeral.copyWith(fontSize: numeralSize * 0.55);
+    final text = formatPeso(amount);
+    final numeralString = text.replaceFirst('₱', '').trim();
+    return Semantics(
+      label: semanticLabel ?? text,
+      excludeSemantics: true,
+      child: Text.rich(
+        TextSpan(
+          children: [
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Text('₱', style: mark),
+            ),
+            TextSpan(text: numeralString, style: numeral),
+          ],
+        ),
+      ),
+    );
+  }
+}

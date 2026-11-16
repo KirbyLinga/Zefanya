@@ -1,0 +1,246 @@
+@extends('Layouts.logistics')
+
+@use('App\Enums\OrderStatus')
+
+@section('title', 'Parcel #'.$sellerOrder->id.' — Details')
+
+@section('content')
+<div class="flex items-center justify-between mb-6">
+    <h1 class="font-serif text-2xl text-[var(--text-ink)]">Parcel #{{ $sellerOrder->id }}</h1>
+    <a href="{{ route('logistics.delivery-monitoring.index') }}" class="text-sm font-semibold text-primary-600 hover:text-primary-800">
+        <i data-lucide="arrow-left" class="w-4 h-4 inline mr-1"></i> Back to monitoring
+    </a>
+</div>
+
+<x-logistics-flash :messages="['success', 'warning', 'error']" />
+<x-parcel-route-progress :details="$routeDetails" />
+
+@if ($errors->any())
+    <div role="alert" class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        @foreach ($errors->all() as $error)
+            <p>{{ $error }}</p>
+        @endforeach
+    </div>
+@endif
+
+<div class="bg-white border border-[var(--border-strong)] rounded-lg shadow-sm overflow-hidden">
+    <div class="grid sm:grid-cols-2 gap-0">
+        <div class="p-6 border-b sm:border-b-0 sm:border-r border-[var(--border-strong)]">
+            <p class="text-xs font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] mb-2">Identifiers</p>
+            <dl class="space-y-2 text-base">
+                <div><dt class="text-xs text-[var(--text-muted)]">Order</dt><dd class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->id }}</dd></div>
+                @if ($sellerOrder->tracking_number)
+                    <div><dt class="text-xs text-[var(--text-muted)]">Tracking</dt><dd class="font-mono text-xs font-semibold text-[var(--text-ink)]">{{ $sellerOrder->tracking_number }}</dd></div>
+                @endif
+                <div><dt class="text-xs text-[var(--text-muted)]">Seller</dt><dd class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->seller?->business_name ?? '—' }}</dd></div>
+                <div><dt class="text-xs text-[var(--text-muted)]">Buyer</dt><dd class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->order?->buyer?->fullName() ?? '—' }}</dd></div>
+                <div><dt class="text-xs text-[var(--text-muted)]">Status</dt><dd class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->status->label((int) $sellerOrder->delivery_attempts) }}</dd></div>
+                @if ($sellerOrder->needs_reassignment)
+                    <div class="pt-2"><span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700">Needs reassignment</span></div>
+                @endif
+            </dl>
+        </div>
+        <div class="p-6 border-b sm:border-b-0 sm:border-r border-[var(--border-strong)]">
+            <p class="text-xs font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] mb-2">Custody & crew</p>
+            <dl class="space-y-2 text-base">
+                <div><dt class="text-xs text-[var(--text-muted)]">Custody provider</dt><dd class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->currentCustodyProviderId() ? 'Provider #' : '—' }}{{ $sellerOrder->currentCustodyProviderId() ?? '—' }}</dd></div>
+                @if ($sellerOrder->deliveryCourier)
+                    <div><dt class="text-xs text-[var(--text-muted)]">Delivery rider</dt><dd class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->deliveryCourier->name }}</dd></div>
+                    <div><dt class="text-xs text-[var(--text-muted)]">Vehicle</dt><dd class="text-xs text-[var(--text-muted)]">{{ $sellerOrder->deliveryCourier->vehicle_type ?? '—' }}</dd></div>
+                @else
+                    <div><dd class="text-xs text-[var(--text-muted)]">Not yet assigned</dd></div>
+                @endif
+                <div><dt class="text-xs text-[var(--text-muted)]">Assignments</dt><dd class="text-xs text-[var(--text-muted)]">{{ $sellerOrder->deliveryAssignments->count() }}</dd></div>
+            </dl>
+        </div>
+        <div class="p-6 border-b sm:border-b-0 sm:border-r border-[var(--border-strong)]">
+            <p class="text-xs font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] mb-2">Payment</p>
+            <dl class="space-y-2 text-base">
+                @if ($sellerOrder->payment)
+                    <div><dt class="text-xs text-[var(--text-muted)]">Method</dt><dd class="font-semibold text-[var(--text-ink)]">{{ $sellerOrder->payment->method?->label() ?? '—' }}</dd></div>
+                    <div><dt class="text-xs text-[var(--text-muted)]">Status</dt><dd class="font-semibold text-[var(--text-ink)]">{{ ucfirst($sellerOrder->payment->status?->value ?? '') ?? '—' }}</dd></div>
+                    <div><dt class="text-xs text-[var(--text-muted)]">Amount</dt><dd class="text-xs text-[var(--text-muted)]">{{ $sellerOrder->payment->formattedAmount() ?? '—' }}</dd></div>
+                @else
+                    <div><dd class="text-xs text-[var(--text-muted)]">No payment recorded</dd></div>
+                @endif
+            </dl>
+        </div>
+        <div class="p-6 border-b sm:border-b-0 sm:border-r border-[var(--border-strong)]">
+            <p class="text-xs font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] mb-2">Delivery evidence</p>
+            @if ($sellerOrder->deliveryProof)
+                <div class="space-y-2 text-base">
+                    <p class="font-semibold text-[var(--text-ink)]">Delivery proof logged</p>
+                    <p class="text-xs text-[var(--text-muted)]">By {{ $sellerOrder->deliveryProof->deliveryCourier?->name ?? '—' }} on {{ manila($sellerOrder->deliveryProof->created_at, 'M d, Y H:i', '—') }}</p>
+                </div>
+            @else
+                <p class="text-xs text-[var(--text-muted)]">No delivery proof recorded.</p>
+            @endif
+        </div>
+        <div class="p-6 border-b sm:border-b-0 sm:border-r border-[var(--border-strong)]">
+            <p class="text-xs font-semibold uppercase tracking-[0.6px] text-[var(--text-muted)] mb-2">Open incident</p>
+            @if ($openIncident)
+                <p class="text-sm font-semibold text-[var(--text-ink)]">{{ $incident->type ?? 'Incident' }} — open. Parcel is blocked until resolved.</p>
+            @else
+                <p class="text-xs text-[var(--text-muted)]">No open incidents.</p>
+            @endif
+        </div>
+    </div>
+</div>
+@if ($openIncident)
+<div class="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-5">
+    <div class="flex items-start gap-4">
+        <div class="flex-shrink-0">
+            <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600"></i>
+        </div>
+        <div class="flex-1">
+            <h2 class="text-base font-semibold text-amber-900 mb-1">Open incident blocks this delivery</h2>
+            <p class="text-sm text-amber-800 mb-3">Parcel {{ $sellerOrder->id }} has an unresolved exception. Review it in Parcel exceptions; lost/damaged resolutions may require Admin. Movement remains blocked until an authorized resolution.</p>
+            @if ($incident)
+                <p class="text-sm font-semibold text-amber-900">Incident #{{ $incident->id }} ({{ $incident->type }}) — open since {{ manila($incident->created_at->setTimezone('UTC'), 'M d, Y H:i') }}</p>
+            @endif
+        </div>
+    </div>
+</div>
+
+@endif
+
+@if (!$openIncident && $sellerOrder->handover_at !== null && in_array($sellerOrder->status, [OrderStatus::PickedUp, OrderStatus::AtSortingCenter, OrderStatus::Sorted, OrderStatus::AssignedToRider, OrderStatus::OutForDelivery, OrderStatus::DeliveryFailed], true))
+    <div class="mt-6 bg-white border border-[var(--border-strong)] rounded-lg p-5">
+        <h2 class="text-base font-semibold text-[var(--text-ink)] mb-3">Report lost / damaged</h2>
+        <p class="text-sm text-[var(--text-muted)] mb-4">Report a missing or damaged parcel before it can continue. Incidents are reviewed by Admin. Parcel operations pause while an incident is open.</p>
+        <form method="POST" enctype="multipart/form-data" action="{{ route('logistics.parcels.incidents.store', $sellerOrder) }}" class="space-y-4">
+            @csrf
+            <div>
+                <label for="type" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Incident type</label>
+                <select id="type" name="type" class="w-full border border-[var(--border-strong)] rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary-400 focus:border-transparent" required>
+                    <option value="lost" @selected(old('type') === 'lost')>Lost</option>
+                    <option value="damaged" @selected(old('type') === 'damaged')>Damaged</option>
+                </select>
+            </div>
+            <div>
+                <label for="reason" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Reason</label>
+                <input id="reason" name="reason" value="{{ old('reason') }}" maxlength="255" required class="w-full border border-[var(--border-strong)] rounded-lg p-3 text-sm">
+            </div>
+            <div>
+                <label for="description" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Notes</label>
+                <textarea id="description" name="description" rows="4" maxlength="1000" class="w-full border border-[var(--border-strong)] rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary-400 focus:border-transparent" required>{{ old('description') }}</textarea>
+            </div>
+            <div>
+                <label for="photo" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Photo (required for Damaged)</label>
+                <input id="photo" name="photo" type="file" @required(old('type') === 'damaged') accept="image/jpeg,image/png,image/webp" class="upload-input">
+                <p class="mt-1 text-xs text-[var(--text-muted)]">Required for Damaged; optional for Lost. JPEG, PNG or WebP up to 5 MB. Stored privately.</p>
+            </div>
+            <div class="flex justify-end">
+                <button type="submit" class="h-10 px-5 bg-primary-800 text-white font-semibold text-[13px] rounded-lg hover:bg-primary-900 transition-colors">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 mr-2"></i> Report lost/damaged
+                </button>
+            </div>
+        </form>
+    </div>
+@endif
+
+@if (! $openIncident && ! in_array($sellerOrder->status, [OrderStatus::Delivered, OrderStatus::Completed, OrderStatus::Returned, OrderStatus::Cancelled], true))
+    <div class="mt-6 bg-white border border-[var(--border-strong)] rounded-lg p-5">
+        <h2 class="text-base font-semibold text-[var(--text-ink)] mb-3">Report operational exception</h2>
+        <p class="text-sm text-[var(--text-muted)] mb-4">Use this for a missing parcel, wrong-hub receipt, or failed transfer. The parcel stays blocked until the exception is reviewed and resolved in <a href="{{ route('logistics.exceptions.index') }}" class="font-semibold text-primary-700 hover:text-primary-900">Parcel exceptions</a>.</p>
+        <form method="POST" enctype="multipart/form-data" action="{{ route('logistics.exceptions.store', $sellerOrder) }}" class="space-y-4">
+            @csrf
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <label for="exception_type" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Exception type</label>
+                    <select id="exception_type" name="type" class="w-full border border-[var(--border-strong)] rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary-400 focus:border-transparent" required>
+                        <option value="missing" @selected(old('type') === 'missing')>Missing</option>
+                        <option value="wrong_hub" @selected(old('type') === 'wrong_hub')>Wrong hub</option>
+                        <option value="inactive_connection" @selected(old('type') === 'inactive_connection')>Inactive connection</option>
+                        <option value="failed_transfer" @selected(old('type') === 'failed_transfer')>Failed transfer</option>
+                        <option value="damaged" @selected(old('type') === 'damaged')>Damaged</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="exception_blocked_leg" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Blocked leg (optional)</label>
+                    <input id="exception_blocked_leg" name="blocked_leg_index" type="number" min="0" value="{{ old('blocked_leg_index') }}" class="w-full border border-[var(--border-strong)] rounded-lg p-3 text-sm">
+                </div>
+            </div>
+            <div>
+                <label for="exception_reason" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Reason</label>
+                <input id="exception_reason" name="reason" value="{{ old('reason') }}" maxlength="255" required class="w-full border border-[var(--border-strong)] rounded-lg p-3 text-sm">
+            </div>
+            <div>
+                <label for="exception_description" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Notes</label>
+                <textarea id="exception_description" name="description" rows="3" maxlength="1000" class="w-full border border-[var(--border-strong)] rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary-400 focus:border-transparent">{{ old('description') }}</textarea>
+            </div>
+            <div>
+                <label for="exception_photo" class="block text-sm font-semibold text-[var(--text-ink)] mb-1">Photo (required for Damaged)</label>
+                <input id="exception_photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" class="upload-input">
+                <p class="mt-1 text-xs text-[var(--text-muted)]">JPEG, PNG or WebP up to 5 MB. Stored privately.</p>
+            </div>
+            <div class="flex justify-end">
+                <button type="submit" class="h-10 px-5 bg-primary-800 text-white font-semibold text-[13px] rounded-lg hover:bg-primary-900 transition-colors">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 mr-2"></i> Record exception
+                </button>
+            </div>
+        </form>
+    </div>
+@endif
+
+<section class="mt-6 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-5">
+    <h2 class="text-base font-semibold text-[var(--text-ink)]">Manual status override</h2>
+    <p class="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">Use only to record a verified operational correction. Your company, previous and new status, time and reason are recorded in the audit log.</p>
+    @if (! $openIncident && count($overrideOptions) > 0)
+        <form method="POST" action="{{ route('logistics.delivery-monitoring.override', $sellerOrder) }}" class="mt-4 space-y-4" onsubmit="return confirm('Apply this status change and record the reason in the audit log?');">
+            @csrf
+            <input type="hidden" name="expected_status" value="{{ $sellerOrder->status->value }}">
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <p class="mb-2 text-xs font-semibold text-[var(--text-muted)]">Current status</p>
+                    <p class="text-sm font-semibold text-[var(--text-ink)]">{{ $sellerOrder->status->label((int) $sellerOrder->delivery_attempts) }}</p>
+                </div>
+                <div>
+                    <label for="override-status" class="mb-2 block text-xs font-semibold text-[var(--text-ink)]">New status *</label>
+                    <select id="override-status" name="status" required class="min-h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-ink)] focus:border-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-200">
+                        <option value="">Select an authorized status</option>
+                        @foreach ($overrideOptions as $option)
+                            <option value="{{ $option->value }}" @selected(old('status') === $option->value)>{{ $option->label() }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label for="override-reason" class="mb-2 block text-xs font-semibold text-[var(--text-ink)]">Reason (10–300 characters) *</label>
+                <textarea id="override-reason" name="reason" rows="3" minlength="10" maxlength="300" required class="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--text-ink)] focus:border-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-200" placeholder="Explain the verified correction and why it is needed.">{{ old('reason') }}</textarea>
+            </div>
+            <button type="submit" class="min-h-11 rounded-lg bg-primary-800 px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">Apply and log status change</button>
+        </form>
+    @else
+        <p class="mt-3 rounded-lg bg-[var(--bg-page)] p-3 text-sm text-[var(--text-ink)]">{{ $openIncident ? 'Resolve the open incident before changing status.' : 'No Logistics status override is available at this step. Delivery requires the assigned rider, buyer code and proof; returns require physical receipt.' }}</p>
+    @endif
+</section>
+@endsection
+
+@push('scripts')
+<script>
+    (() => {
+        const incidentType = document.getElementById('type');
+        const incidentPhoto = document.getElementById('photo');
+        if (incidentType && incidentPhoto) {
+            const updatePhotoRequirement = () => {
+                incidentPhoto.required = incidentType.value === 'damaged';
+                incidentPhoto.setAttribute('aria-required', String(incidentPhoto.required));
+            };
+            incidentType.addEventListener('change', updatePhotoRequirement);
+            updatePhotoRequirement();
+        }
+
+        const exceptionType = document.getElementById('exception_type');
+        const exceptionPhoto = document.getElementById('exception_photo');
+        if (exceptionType && exceptionPhoto) {
+            const updateExceptionPhotoRequirement = () => {
+                exceptionPhoto.required = exceptionType.value === 'damaged';
+                exceptionPhoto.setAttribute('aria-required', String(exceptionPhoto.required));
+            };
+            exceptionType.addEventListener('change', updateExceptionPhotoRequirement);
+            updateExceptionPhotoRequirement();
+        }
+    })();
+</script>
+@endpush

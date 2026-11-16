@@ -1,0 +1,32 @@
+[
+  {
+    "file": "landscape.jpg",
+    "label": "landscape",
+    "source": "https://images.unsplash.com/photo-1498855926480-d98e83099315?w=512&q=85&fit=max"
+  },
+  {
+    "file": "dress.jpg",
+    "label": "dress",
+    "source": "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=512&q=85&fit=max"
+  },
+  {
+    "file": "shoes.jpg",
+    "label": "shoes",
+    "source": "https://images.unsplash.com/photo-1560343090-f0409e92791a?w=512&q=85&fit=max"
+  },
+  {
+    "file": "bag.jpg",
+    "label": "bag",
+    "source": "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=512&q=85&fit=max"
+  },
+  {
+    "file": "laptop.jpg",
+    "label": "laptop",
+    "source": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=512&q=85&fit=max"
+  },
+  {
+    "file": "book.jpg",
+    "label": "book",
+    "source": "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=512&q=85&fit=max"
+  }
+]

@@ -1,0 +1,875 @@
+// lib/screens/shared/chat_screen.dart
+//
+// Generic messaging thread — reused wherever a "Chat" button already
+// existed as a TODO stub: Product Details (buyer <-> seller) and
+// Active Delivery (courier <-> seller, courier <-> buyer). Message
+// history now lives in the shared ChatState (see state/chat_state.dart)
+// so it survives leaving the screen and even an app restart — the
+// simulated reply still exists purely to demonstrate the UI pattern,
+// since there's no real messaging backend yet.
+//
+// Design-pass note:
+// This was a stock bubble UI — BorderRadius.circular(16) on everything,
+// a timestamp stapled inside every single bubble, and a "typing"
+// indicator made of three dots that never moved. Because one instance
+// of this screen serves every buyer/seller/courier thread in the app,
+// it ran the pre-pass look at every call site at once. Three changes:
+//
+//   1. Bubbles are ANCHORED, not symmetric: the corner nearest the
+//      speaker is cut short (6) while the other three stay wide (24).
+//      That's the same big/small asymmetry editorialRadius uses, and
+//      it means you can tell who said what from the silhouette alone,
+//      before reading color.
+//   2. Consecutive messages from one speaker are grouped into a run —
+//      tight 3px spacing inside a run, 14px between runs — and the
+//      timestamp prints once, at the end of the run, outside the
+//      bubble. Previously every bubble carried its own time, which is
+//      most of what made the thread read as noisy.
+//   3. The typing dots actually animate.
+//   4. Reduced motion is now respected. This was missed in the initial
+//      retrofit (utils/motion.dart) — the animated dots above are the
+//      one motion in this file, easy to miss since the screen has no
+//      other animation to draw attention to it. Falls back to the dots
+//      held at their active color, not the old static grey circles —
+//      that static look is exactly the "can't tell typing from stalled"
+//      ambiguity point 3 exists to fix, so reduced motion shouldn't
+//      silently bring it back for anyone with the setting on.
+
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+import '../../state/chat_state.dart';
+import '../../theme/app_theme.dart';
+import '../../utils/chat_validation.dart';
+import '../../utils/image_picker_helper.dart';
+import '../../utils/motion.dart';
+import '../../widgets/pressable_scale.dart';
+
+/// Wide corners vs the short "anchor" corner nearest the speaker.
+const double _bubbleWide = 24;
+const double _bubbleAnchor = 6;
+
+typedef ChatAttachmentPicker =
+    Future<ChatAttachment?> Function(BuildContext context);
+
+class ChatScreen extends StatefulWidget {
+  const ChatScreen({
+    super.key,
+    required this.contactName,
+    required this.contactRole,
+    this.attachmentPicker,
+    this.conversationId,
+    this.sellerId,
+    this.productId,
+  });
+
+  final String contactName;
+  final String contactRole;
+  final int? conversationId;
+  final int? sellerId;
+  final int? productId;
+
+  /// Test seam. Production uses the gallery/camera sheet; a test can return an
+  /// oversized or unsupported file without touching a platform channel.
+  final ChatAttachmentPicker? attachmentPicker;
+
+  @override
+  State<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen> {
+  final _controller = TextEditingController();
+  final _scrollController = ScrollController();
+  bool _isTyping = false;
+  bool _hasText = false;
+  ChatAttachment? _pendingAttachment;
+  bool _isPickingAttachment = false;
+  String? _composerError;
+  List<ChatMessage> _liveMessages = [];
+  int? _conversationId;
+  bool _loading = false;
+  bool _loadFailed = false;
+  bool _sending = false;
+
+  bool get _live => widget.conversationId != null || widget.sellerId != null;
+  bool get _canSend =>
+      !_sending &&
+      (!_live || (!_loading && !_loadFailed && _conversationId != null)) &&
+      (_hasText || _pendingAttachment != null);
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() {
+      final has = _controller.text.trim().isNotEmpty;
+      if (has != _hasText) setState(() => _hasText = has);
+    });
+    // Seed an opening line the first time this contact's thread is
+    // opened — no-op if there's already history (incl. from a
+    // previous session, since ChatState is persisted).
+    final chat = context.read<ChatState>();
+    if (_live) {
+      _conversationId = widget.conversationId;
+      _loadLiveMessages();
+      return;
+    }
+    chat.registerContact(widget.contactName, widget.contactRole);
+    chat.seedIfEmpty(
+      widget.contactName,
+      const ChatMessage(
+        text: 'Hi! Thanks for reaching out — how can I help?',
+        isMe: false,
+        time: '10:02 AM',
+      ),
+    );
+  }
+
+  Future<void> _loadLiveMessages() async {
+    if (_loading || _sending) return;
+    final repository = context.read<ChatState>().liveRepository!;
+    setState(() {
+      _loading = true;
+      _loadFailed = false;
+    });
+    try {
+      final id = _conversationId ??= await repository.openBuyerConversation(
+        widget.sellerId!,
+        widget.productId!,
+      );
+      if (!mounted) return;
+      final messages = await repository.buyerMessages(id);
+      if (!mounted) return;
+      setState(() => _liveMessages = messages);
+      _scrollToBottom();
+    } catch (_) {
+      if (mounted) setState(() => _loadFailed = true);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<ChatAttachment?> _pickWithPicker() async {
+    if (_live && kIsWeb) {
+      final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (image == null) return null;
+      return ChatAttachment(
+        name: image.name,
+        sizeBytes: await image.length(),
+        path: image.path,
+      );
+    }
+    final picked = await pickAndSaveImage(context, filenamePrefix: 'chat');
+    if (picked == null) return null;
+    return ChatAttachment(
+      name: picked.uri.pathSegments.last,
+      sizeBytes: await picked.length(),
+      path: picked.path,
+    );
+  }
+
+  Future<void> _pickAttachment() async {
+    if (_isPickingAttachment || _sending) return;
+    if (!_live && !context.read<ChatState>().supportsAttachments) {
+      setState(() {
+        _composerError = 'Attachments are not available on this server yet.';
+      });
+      return;
+    }
+
+    setState(() => _isPickingAttachment = true);
+    try {
+      final picked =
+          await (widget.attachmentPicker?.call(context) ?? _pickWithPicker());
+      if (!mounted || picked == null) return;
+      if (_live &&
+          !RegExp(
+            r'\.(jpe?g|png)$',
+            caseSensitive: false,
+          ).hasMatch(picked.name)) {
+        setState(() => _composerError = 'Photos must be JPG or PNG files.');
+        return;
+      }
+      final problem = validateChatAttachment(picked);
+      if (problem != null) {
+        setState(() => _composerError = chatAttachmentProblemMessage(problem));
+        return;
+      }
+      setState(() {
+        _pendingAttachment = picked;
+        _composerError = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _composerError = 'Could not open that file.');
+    } finally {
+      if (mounted) setState(() => _isPickingAttachment = false);
+    }
+  }
+
+  Future<void> _send() async {
+    if (_live && !_canSend) return;
+    final text = _controller.text;
+    final problem = validateChatMessage(
+      text,
+      hasAttachment: _pendingAttachment != null,
+    );
+    if (problem != null) {
+      setState(() => _composerError = problem);
+      return;
+    }
+
+    final chat = context.read<ChatState>();
+    final attachment = _pendingAttachment;
+    if (_live) {
+      setState(() {
+        _sending = true;
+        _composerError = null;
+      });
+      try {
+        final bytes = attachment == null
+            ? null
+            : await XFile(attachment.path!).readAsBytes();
+        if (!mounted) return;
+        final sent = await chat.liveRepository!.sendBuyerMessage(
+          _conversationId!,
+          text.trim(),
+          image: bytes == null
+              ? null
+              : (bytes: bytes, filename: attachment!.name),
+        );
+        if (!mounted) return;
+        setState(() {
+          _liveMessages.add(sent);
+          _pendingAttachment = null;
+        });
+        if (_controller.text == text) _controller.clear();
+        _scrollToBottom();
+      } catch (_) {
+        if (mounted) {
+          setState(
+            () => _composerError =
+                'Could not confirm that the message was sent. Refresh the conversation before retrying.',
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _sending = false);
+      }
+      return;
+    }
+    chat.addMessage(
+      widget.contactName,
+      ChatMessage(
+        text: text.trim(),
+        isMe: true,
+        time: 'Now',
+        attachment: attachment,
+      ),
+    );
+    _controller.clear();
+    setState(() {
+      _pendingAttachment = null;
+      _composerError = null;
+    });
+    _scrollToBottom();
+
+    // A live thread gets the other side's messages from the server; only the
+    // mock has to invent a reply to keep the thread from looking like a dead end.
+    if (!chat.simulatesReplies) return;
+
+    // Mock mode: simulate a reply so the thread doesn't look like a dead end.
+    setState(() => _isTyping = true);
+    Future.delayed(const Duration(milliseconds: 1100), () {
+      if (!mounted) return;
+      setState(() => _isTyping = false);
+      chat.addMessage(
+        widget.contactName,
+        const ChatMessage(
+          text: 'Got it — I\'ll check and get back to you shortly.',
+          isMe: false,
+          time: 'Now',
+        ),
+      );
+      _scrollToBottom();
+    });
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  // Deterministic per-contact color so different threads are visually
+  // distinguishable instead of every avatar being the same flat sage
+  // circle regardless of who you're talking to.
+  // Four mode-invariant pastels, because the initial on top of them is
+  // dark ink now: a light fill needs a dark initial. primaryDark used to
+  // be in this list, and it's a *dark* fill — so whichever thread hashed
+  // to it had near-white initials at 1.6:1 in light mode, and would have
+  // had near-black ones at the same ratio in dark.
+  static List<Color> get _avatarPalette => [
+    AppColors.tertiary,
+    AppColors.primary,
+    AppColors.secondary,
+    Color.lerp(AppColors.secondary, AppColors.tertiary, 0.5)!,
+  ];
+
+  Color _avatarColorFor(String name) =>
+      _avatarPalette[name.hashCode.abs() % _avatarPalette.length];
+
+  @override
+  Widget build(BuildContext context) {
+    AppColors.watch(context);
+    final theme = Theme.of(context);
+    final chat = context.watch<ChatState>();
+    final messages = _live
+        ? _liveMessages
+        : chat.messagesFor(widget.contactName);
+    // A thread on screen is read. The greeting is seeded asynchronously after
+    // initState, and a simulated reply arrives while the thread is open, so
+    // this checks every build rather than only on open.
+    if (!_live && chat.unreadFor(widget.contactName) > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.read<ChatState>().markRead(widget.contactName);
+      });
+    }
+    final avatarColor = _avatarColorFor(widget.contactName);
+
+    return Scaffold(
+      backgroundColor:
+          Colors.transparent, // the app-wide gradient in main.dart paints this
+      appBar: AppBar(
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                // Lightened, not darkened. The old gradient lerped toward
+                // black, which ate exactly the contrast the dark initial
+                // needs; a sheen toward white keeps the dimension and helps
+                // the ink instead of fighting it.
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color.lerp(avatarColor, Colors.white, 0.3)!,
+                    avatarColor,
+                  ],
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                widget.contactName.isNotEmpty
+                    ? widget.contactName[0].toUpperCase()
+                    : '?',
+                // Dark ink, because every colour in _avatarPalette is a
+                // light pastel — see the note there.
+                style: TextStyle(
+                  color: AppColors.textOnLight,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Role above name, as an eyebrow — same lockup the
+                  // rest of the app uses for "tiny label, then the
+                  // thing itself".
+                  Text(
+                    widget.contactRole.toUpperCase(),
+                    style: AppType.eyebrow.copyWith(letterSpacing: 1.2),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    widget.contactName,
+                    style: theme.textTheme.titleSmall?.copyWith(height: 1.1),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          if (_live)
+            IconButton(
+              tooltip: 'Refresh messages',
+              onPressed: _loading || _sending ? null : _loadLiveMessages,
+              icon: const Icon(Icons.refresh),
+            )
+          else
+            IconButton(
+              tooltip: 'Call ${widget.contactName}',
+              onPressed: () {
+                // clearSnackBars() first — this icon has no cooldown, so
+                // mashing it queued a fresh 4s "Calling..." behind each
+                // previous one instead of just restarting the one shown.
+                ScaffoldMessenger.of(context)
+                  ..clearSnackBars()
+                  ..showSnackBar(
+                    SnackBar(content: Text('Calling ${widget.contactName}...')),
+                  );
+              },
+              icon: const Icon(Icons.call_outlined),
+            ),
+        ],
+      ),
+      body: Column(
+        children: [
+          if (_loading || _sending) const LinearProgressIndicator(),
+          if (_loadFailed)
+            TextButton(
+              onPressed: _loadLiveMessages,
+              child: const Text('Could not load conversation. Retry'),
+            ),
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              itemCount: messages.length + (_isTyping ? 1 : 0),
+              itemBuilder: (context, i) {
+                if (_isTyping && i == messages.length) {
+                  return const _TypingIndicator();
+                }
+                final message = messages[i];
+                // A "run" is consecutive messages from the same
+                // speaker. The tail of a run is what carries the
+                // timestamp and the gap before the next speaker.
+                final next = i + 1 < messages.length ? messages[i + 1] : null;
+                final nextIsTyping = _isTyping && i == messages.length - 1;
+                final isRunEnd =
+                    nextIsTyping || next == null || next.isMe != message.isMe;
+                return _Bubble(
+                  theme: theme,
+                  message: message,
+                  isRunEnd: isRunEnd,
+                  image: message.imageId == null
+                      ? null
+                      : _BuyerMessageImage(
+                          key: ValueKey(message.imageId),
+                          conversationId: _conversationId!,
+                          messageId: message.imageId!,
+                        ),
+                );
+              },
+            ),
+          ),
+          if (_composerError case final error?)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  error,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+              ),
+            ),
+          _buildInputBar(theme),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInputBar(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.divider)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.neutral.withValues(alpha: 0.1),
+            blurRadius: 12,
+            offset: const Offset(0, -3),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_pendingAttachment != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.attach_file,
+                        size: 16,
+                        color: AppColors.primaryDark,
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          _pendingAttachment!.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      InkWell(
+                        onTap: () => setState(() => _pendingAttachment = null),
+                        child: Icon(
+                          Icons.close,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            Row(
+              children: [
+                IconButton(
+                  onPressed: _isPickingAttachment ? null : _pickAttachment,
+                  tooltip: 'Attach file',
+                  icon: Icon(
+                    Icons.attach_file,
+                    size: 20,
+                    color: _isPickingAttachment
+                        ? AppColors.textSecondary
+                        : AppColors.primaryDark,
+                  ),
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _send(),
+                    decoration: const InputDecoration(
+                      hintText: 'Type a message...',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Fades to 40% opacity when there is nothing to send — a
+                // pending attachment counts, not only typed text.
+                AnimatedOpacity(
+                  opacity: _canSend ? 1.0 : 0.4,
+                  duration: const Duration(milliseconds: 150),
+                  child: PressableScale(
+                    onTap: _send,
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryDark,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.send_rounded,
+                        size: 18,
+                        color: AppColors.textOnDark,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One message. The short corner is always on the speaker's side, so
+/// the silhouette alone says who's talking.
+class _BuyerMessageImage extends StatefulWidget {
+  const _BuyerMessageImage({
+    super.key,
+    required this.conversationId,
+    required this.messageId,
+  });
+
+  final int conversationId;
+  final int messageId;
+
+  @override
+  State<_BuyerMessageImage> createState() => _BuyerMessageImageState();
+}
+
+class _BuyerMessageImageState extends State<_BuyerMessageImage> {
+  late final Future<Uint8List> _bytes = context
+      .read<ChatState>()
+      .liveRepository!
+      .buyerMessageImage(widget.conversationId, widget.messageId);
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Uint8List>(
+    future: _bytes,
+    builder: (context, snapshot) {
+      if (snapshot.hasError) return const Text('Photo unavailable');
+      if (!snapshot.hasData) return const LinearProgressIndicator();
+      return Image.memory(
+        snapshot.requireData,
+        semanticLabel: 'Message photo',
+        errorBuilder: (_, _, _) => const Text('Photo unavailable'),
+      );
+    },
+  );
+}
+
+class _Bubble extends StatelessWidget {
+  const _Bubble({
+    required this.theme,
+    required this.message,
+    required this.isRunEnd,
+    this.image,
+  });
+
+  final ThemeData theme;
+  final ChatMessage message;
+  final bool isRunEnd;
+  final Widget? image;
+
+  @override
+  Widget build(BuildContext context) {
+    AppColors.watch(context);
+    final isMe = message.isMe;
+
+    final radius = BorderRadius.only(
+      topLeft: Radius.circular(isMe ? _bubbleWide : _bubbleAnchor),
+      topRight: Radius.circular(isMe ? _bubbleAnchor : _bubbleWide),
+      bottomLeft: const Radius.circular(_bubbleWide),
+      bottomRight: const Radius.circular(_bubbleWide),
+    );
+
+    return Padding(
+      // Tight inside a run, open between runs — the rhythm is what
+      // makes a thread scannable without any extra chrome.
+      padding: EdgeInsets.only(bottom: isRunEnd ? 14 : 3),
+      child: Column(
+        crossAxisAlignment: isMe
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.74,
+            ),
+            decoration: BoxDecoration(
+              color: isMe ? AppColors.primaryDark : AppColors.surfaceMuted,
+              borderRadius: radius,
+              border: isMe ? null : Border.all(color: AppColors.divider),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (image != null) image!,
+                if (message.attachment != null) ...[
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.insert_drive_file_outlined,
+                        size: 16,
+                        color: isMe
+                            ? AppColors.textOnDark
+                            : AppColors.primaryDark,
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          message.attachment!.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: isMe
+                                ? AppColors.textOnDark
+                                : AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (message.text.isNotEmpty) const SizedBox(height: 5),
+                ],
+                if (message.text.isNotEmpty)
+                  Text(
+                    message.text,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      height: 1.35,
+                      color: isMe
+                          ? AppColors.textOnDark
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // One timestamp per run, outside the bubble. Previously every
+          // bubble carried its own, which is most of what made the
+          // thread feel cluttered.
+          if (isRunEnd)
+            Padding(
+              padding: const EdgeInsets.only(top: 5, left: 4, right: 4),
+              child: Text(
+                message.time.toUpperCase(),
+                style: AppType.eyebrow.copyWith(letterSpacing: 1.2),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Three dots that actually move. The previous version generated three
+/// static circles, so "typing" looked identical to a stalled thread.
+///
+/// Reduced motion: NOT the old static-grey-dots look — that's the exact
+/// ambiguity this widget was built to fix, so falling back to it would
+/// silently undo the point for anyone with the setting on. Held instead
+/// at the same peak color the animated dots reach mid-bounce, so it
+/// still reads as "active" at a glance, just without the motion.
+class _TypingIndicator extends StatefulWidget {
+  const _TypingIndicator();
+
+  @override
+  State<_TypingIndicator> createState() => _TypingIndicatorState();
+}
+
+class _TypingIndicatorState extends State<_TypingIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  );
+
+  bool _started = false;
+  bool _reduced = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    _reduced = reduceMotion(context);
+    if (!_reduced) _controller.repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    AppColors.watch(context);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          border: Border.all(color: AppColors.divider),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(_bubbleAnchor),
+            topRight: Radius.circular(_bubbleWide),
+            bottomLeft: Radius.circular(_bubbleWide),
+            bottomRight: Radius.circular(_bubbleWide),
+          ),
+        ),
+        child: _reduced
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(
+                  3,
+                  (i) => Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2.5),
+                    child: Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.primaryDark,
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(3, (i) {
+                      // Each dot is a third of a cycle behind the last, so
+                      // the pulse travels left to right.
+                      final phase = (_controller.value - i * 0.18) % 1.0;
+                      final lift = phase < 0.4
+                          ? Curves.easeInOut.transform(phase / 0.4)
+                          : 0.0;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2.5),
+                        child: Transform.translate(
+                          offset: Offset(0, -3 * lift),
+                          child: Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color.lerp(
+                                AppColors.textSecondary.withValues(alpha: 0.45),
+                                AppColors.primaryDark,
+                                lift,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  );
+                },
+              ),
+      ),
+    );
+  }
+}

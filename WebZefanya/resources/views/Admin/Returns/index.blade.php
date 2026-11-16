@@ -1,0 +1,339 @@
+@extends('Admin.Layouts.app')
+@section('title', 'Returns & disputes')
+@section('content-width', 'max-w-none')
+@section('content')
+<section class="case-workspace" aria-labelledby="case-heading">
+<x-admin.tabs :tabs="[
+    ['label' => 'Returns & disputes', 'route' => 'admin.returns.index'],
+    ['label' => 'Parcel incidents', 'route' => 'admin.incidents.index'],
+    ...(\App\Services\Logistics\ParcelLossService::available() ? [['label' => 'Lost parcels', 'route' => 'admin.lost-parcels.index']] : []),
+]" />
+<header class="case-heading"><div><p class="case-eyebrow">Case management</p><h1 id="case-heading">Returns &amp; disputes</h1><p class="case-description">Review return requests, resolve disputes and track return custody.</p></div><span class="case-total"><i data-lucide="undo-2" aria-hidden="true"></i><strong>{{ number_format($returns->total()) }}</strong> total returns</span></header>
+<div class="case-panel-heading case-directory-heading"><h2>Return directory</h2>@if ($only)<span>Return #{{ $only }} only · <a class="font-semibold text-primary-800 underline" href="{{ route('admin.returns.index') }}">Show all returns</a></span>@else<span>All return statuses</span>@endif</div>
+<x-logistics-flash :messages="['success', 'warning', 'error']" />
+@if ($errors->any())<div role="alert" class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-900">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
+
+@if (! $only && $returns->isNotEmpty())
+<div class="case-panel">
+    <div class="case-table-hint"><i data-lucide="move-horizontal" aria-hidden="true"></i>Scroll horizontally to see all return details.</div>
+    <div class="case-table-scroll" role="region" aria-label="Return directory" tabindex="0">
+        <table class="case-table">
+            <thead><tr><th scope="col">Return / tracking</th><th scope="col">Status</th><th scope="col">Reason</th><th scope="col">Requested</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead>
+            <tbody>
+            @foreach ($returns as $record)
+                <tr>
+                    <td><strong class="text-[var(--text-ink)]">Return #{{ $record->id }}</strong><small class="font-mono">{{ $record->sellerOrder->tracking_number ?? 'Tracking requires review' }}</small></td>
+                    <td><span class="inline-flex rounded-md border border-[var(--border-strong)] bg-[var(--bg-raised)] px-2.5 py-1 text-xs font-semibold text-[var(--text-ink)]">{{ $record->status->label() }}</span>@if ($record->inDispute())<small>In dispute</small>@endif</td>
+                    <td class="text-[var(--text-ink)]">{{ $record->reason }}</td>
+                    <td class="whitespace-nowrap text-[var(--text-muted)]">{{ manila($record->requested_at, 'M j, Y g:i A') }}</td>
+                    <td><a class="case-action" href="{{ route('admin.returns.index', ['return' => $record->id]) }}" aria-label="View return {{ $record->id }}">View details <i data-lucide="arrow-right" aria-hidden="true"></i></a></td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table>
+    </div>
+</div>
+@else
+<div class="space-y-5">@forelse ($returns as $record)
+<article class="case-return-record min-w-0">
+    <div class="mb-5 flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-l-4 border-[var(--border-strong)] border-l-primary-700 bg-[var(--bg-surface)] p-5 shadow-sm">
+        <div class="min-w-0">
+            <p class="font-mono text-xs font-semibold text-[var(--text-muted)]">{{ $record->sellerOrder->tracking_number ?? 'Tracking requires review' }}</p>
+            <h2 class="mt-1 font-sans text-xl font-semibold text-[var(--text-ink)]">{{ $record->status->label() }}</h2>
+            <p class="mt-1 text-sm text-[var(--text-muted)]">{{ $record->reason }} &middot; Requested {{ manila($record->requested_at, 'M j, Y g:i A') }}</p>
+            @if (\App\Models\Logistics\ParcelReturn::refundPolicyAvailable())<p class="mt-2 text-xs text-[var(--text-muted)]">{{ $record->refundPaymentLabel() }}</p>@endif
+        </div>
+        <a href="{{ route('admin.returns.index') }}" class="case-action"><i data-lucide="arrow-left" aria-hidden="true"></i>Back to returns</a>
+    </div>
+    @if ($record->financial_review_required)
+        <section aria-label="Financial summary" class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div class="min-w-0 rounded-2xl border border-l-4 border-[var(--border-strong)] border-l-primary-700 bg-[var(--bg-surface)] p-5 shadow-sm"><p class="text-xs text-[var(--text-muted)]">Buyer payment</p><p class="mt-2 break-words font-sans text-xl font-semibold text-[var(--text-ink)]">@if ($record->sellerOrder->payment)&#8369;{{ number_format($record->sellerOrder->payment->amount_minor / 100, 2) }}@else Not recorded @endif</p></div>
+            <div class="min-w-0 rounded-2xl border border-l-4 border-[var(--border-strong)] border-l-blue-500 bg-[var(--bg-surface)] p-5 shadow-sm"><p class="text-xs text-[var(--text-muted)]">Original shipping</p><p class="mt-2 break-words font-sans text-xl font-semibold text-[var(--text-ink)]">&#8369;{{ number_format($record->sellerOrder->shipping_fee_minor / 100, 2) }}</p></div>
+            <div class="min-w-0 rounded-2xl border border-l-4 border-[var(--border-strong)] border-l-emerald-500 bg-[var(--bg-surface)] p-5 shadow-sm"><p class="text-xs text-[var(--text-muted)]">Responsible party</p><p class="mt-2 break-words text-sm font-semibold text-[var(--text-ink)]">{{ $record->faultLabel() }}</p></div>
+            <div class="min-w-0 rounded-2xl border border-l-4 border-[var(--border-strong)] border-l-violet-400 bg-[var(--bg-surface)] p-5 shadow-sm"><p class="text-xs text-[var(--text-muted)]">Refund status</p><p class="mt-2 break-words text-sm font-semibold text-[var(--text-ink)]">{{ $record->refundPaymentLabel(internal: true) }}</p></div>
+        </section>
+    @endif
+    <div class="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,1fr)]">
+    <div class="min-w-0">
+    <section aria-label="Return details" class="rounded-xl border border-[var(--border-strong)] bg-[var(--bg-raised)] p-4 sm:p-5">
+        <h3 class="font-sans text-[15px] font-semibold text-[var(--text-ink)]">Return details</h3>
+        <dl class="mt-3 divide-y divide-[var(--border-strong)] text-sm">
+            <div class="grid gap-1 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] sm:gap-4"><dt class="font-semibold text-[var(--text-ink)]">Current accountable hub</dt><dd class="min-w-0 text-[var(--text-muted)]">{{ $record->sellerOrder->custodyHub?->name ?? $record->sellerOrder->originStation?->name ?? 'Needs verification' }}</dd></div>
+            <div class="grid gap-1 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] sm:gap-4"><dt class="font-semibold text-[var(--text-ink)]">Original handover hub</dt><dd class="min-w-0 text-[var(--text-muted)]">{{ $record->originHub?->name ?? 'Needs Admin verification' }}</dd></div>
+            <div class="grid gap-1 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] sm:gap-4"><dt class="font-semibold text-[var(--text-ink)]">Return destination</dt><dd class="min-w-0 text-[var(--text-muted)]">{{ $record->seller_address['full'] ?? 'Original pickup address requires review' }}</dd></div>
+            <div class="grid gap-1 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] sm:gap-4"><dt class="font-semibold text-[var(--text-ink)]">Requested</dt><dd class="text-[var(--text-muted)]">{{ manila($record->requested_at, 'M j, Y g:i A') }}</dd></div>
+            @if ($record->seller_received_at)<div class="grid gap-1 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] sm:gap-4"><dt class="font-semibold text-[var(--text-ink)]">Seller receipt</dt><dd class="text-[var(--text-muted)]">{{ manila($record->seller_received_at, 'M j, Y g:i A') }}</dd></div>@endif
+        </dl>
+    </section>
+    @isset($buyerHistories[$record->id])
+        <x-admin.buyer-return-history :history="$buyerHistories[$record->id]" :buyer="$record->sellerOrder->order?->buyer" />
+    @endisset
+    @if ($record->financial_review_required)
+        <details class="mt-4 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-4" open>
+            <summary class="cursor-pointer font-sans text-[15px] font-semibold text-[var(--text-ink)]">Financial explanation</summary>
+            <x-return-money :record="$record" audience="admin" />
+        </details>
+    @endif
+    </div>
+    @if ($record->financial_review_required && $record->faultCanChange())
+    <aside aria-label="Responsibility decision" class="min-w-0">
+            <form method="POST" action="{{ route('admin.returns.fault', $record) }}" class="space-y-3 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 sm:p-5">@csrf<input type="hidden" name="_ui_form" value="{{ route('admin.returns.fault', $record) }}">
+                <fieldset class="grid gap-2 text-sm text-[var(--text-ink)]">
+                    <legend class="mb-2 font-sans text-[15px] font-semibold">Decide who pays</legend>
+                    <label class="flex min-w-0 items-start gap-3 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-raised)] p-3"><input type="radio" name="fault_party" value="{{ \App\Models\Logistics\ParcelReturn::FAULT_SELLER }}" required @checked($record->fault_party === \App\Models\Logistics\ParcelReturn::FAULT_SELLER)> Seller (wrong, defective or not as described)</label>
+                    <label class="flex min-w-0 items-start gap-3 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-raised)] p-3"><input type="radio" name="fault_party" value="{{ \App\Models\Logistics\ParcelReturn::FAULT_LOGISTICS }}" @checked($record->isLogisticsFault())> Logistics (damaged in transit)</label>
+                </fieldset>
+                <label class="block text-xs font-semibold text-[var(--text-ink)]" for="fault-note-{{ $record->id }}">Why (shown to Admins only)</label>
+                <textarea id="fault-note-{{ $record->id }}" name="fault_note" required minlength="10" maxlength="1000" rows="2" class="block w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] p-3 text-sm text-[var(--text-ink)]"></textarea>
+                <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary-800 px-4 text-sm font-semibold text-white hover:bg-primary-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">Save who pays</button>
+            </form>
+    </aside>
+    @endif
+    </div>
+    <div class="mt-5 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-4 shadow-sm sm:p-5">
+        <h3 class="font-sans text-[15px] font-semibold text-[var(--text-ink)]">Return review and activity</h3>
+    <div class="mt-4 space-y-2 text-xs text-[var(--text-muted)]">
+        @foreach ($record->sellerOrder->manifestItems as $item)
+            @if ($item->manifest?->direction === 'return')<p>Reverse manifest #{{ $item->manifest_id }} | {{ $item->manifest->status->value }} | Dispatch {{ manila($item->manifest->dispatched_at, 'M j g:i A', 'pending') }} | Receipt {{ manila($item->received_at, 'M j g:i A', 'pending') }}</p>@endif
+        @endforeach
+        @foreach ($record->sellerOrder->parcelHandoffs as $handoff)
+            @if ($handoff->direction === 'return')<p>Reverse handoff #{{ $handoff->id }} | {{ $handoff->status->value }} | Dispatch {{ manila($handoff->dispatched_at, 'M j g:i A', 'pending') }} | Receipt {{ manila($handoff->received_at, 'M j g:i A', 'pending') }}</p>@endif
+        @endforeach
+    </div>
+
+    @if ($record->inDispute())
+        <p class="mt-3 text-xs font-semibold text-[var(--text-ink)]">In Dispute. The seller is locked out until you resolve this.</p>
+        <p class="mt-1 text-xs text-[var(--text-muted)]">Seller's rejection: {{ $record->seller_decision_reason }}</p>
+        <form method="POST" action="{{ route('admin.returns.dispute', $record) }}" class="mt-3 space-y-2">@csrf<input type="hidden" name="_ui_form" value="{{ route('admin.returns.dispute', $record) }}">
+            <fieldset class="flex flex-wrap gap-4 text-xs text-[var(--text-ink)]">
+                <label class="flex items-center gap-2"><input type="radio" name="outcome" value="upheld" required> Keep the rejection</label>
+                <label class="flex items-center gap-2"><input type="radio" name="outcome" value="overturned"> Approve the return</label>
+            </fieldset>
+            <label class="block text-xs" for="dispute-note-{{ $record->id }}">Resolution note</label>
+            <textarea id="dispute-note-{{ $record->id }}" name="note" required minlength="10" maxlength="1000" class="block w-full rounded-sm border border-[var(--border-strong)] p-2 text-xs"></textarea>
+            <button type="submit" class="rounded-sm bg-primary-700 px-3 py-2 text-xs text-white">Resolve dispute</button>
+        </form>
+    @endif
+    @if (\App\Models\Logistics\ParcelReturn::recoveryAvailable())
+        @if ((int) $record->collection_failed_attempts > 0)
+            <div class="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                <p class="font-semibold">{{ $record->collectionEscalated() ? 'Needs your decision: collection failed '.$record->collection_failed_attempts.' times.' : 'Missed collections: '.$record->collection_failed_attempts.' of '.\App\Models\Logistics\ParcelReturn::MAX_COLLECTION_ATTEMPTS }}</p>
+                @foreach ($record->events->filter(fn ($event) => str_starts_with($event->event_key, 'collection_failed')) as $event)
+                    <p>{{ $event->occurred_at->timezone('Asia/Manila')->format('M j, Y g:i A') }} · Rider #{{ $event->actor_id }} · {{ $record->collectionFailureLabel($event->metadata['reason'] ?? null) }}@if (! empty($event->metadata['notes'])) · {{ $event->metadata['notes'] }}@endif</p>
+                @endforeach
+                @if ($record->collectionRetryAuthorized())
+                    <p class="mt-2 font-semibold">One extra collection was authorized {{ $record->collection_retry_authorized_at->timezone('Asia/Manila')->format('M j, Y g:i A') }}. No further attempt is allowed after it.</p>
+                @elseif ($record->collectionEscalated() && (int) $record->collection_failed_attempts === \App\Models\Logistics\ParcelReturn::MAX_COLLECTION_ATTEMPTS)
+                    <form method="POST" action="{{ route('admin.returns.collection-retry', $record) }}" class="mt-2 space-y-2">
+                        @csrf<input type="hidden" name="_ui_form" value="{{ route('admin.returns.collection-retry', $record) }}">
+                        <label class="block" for="retry-note-{{ $record->id }}">Authorize one more buyer collection (why the buyer can now hand it over)</label>
+                        <textarea id="retry-note-{{ $record->id }}" name="retry_note" required minlength="10" maxlength="1000" rows="2" class="block w-full rounded-sm border border-[var(--border-strong)] p-2 text-xs"></textarea>
+                        <button type="submit" class="rounded-sm border border-primary-700 px-3 py-2 text-xs font-semibold text-primary-800">Authorize one more attempt</button>
+                    </form>
+                @endif
+            </div>
+        @endif
+        @if ($record->receiptDisputed())
+            <div class="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                <p class="font-semibold">Seller receipt disputed: {{ \App\Models\Logistics\ParcelReturn::RECEIPT_DISPUTE_ISSUES[$record->receipt_dispute_issue] ?? 'Other' }}</p>
+                <p class="mt-1">{{ $record->receipt_dispute_note }}</p>
+                @foreach ($record->receipt_dispute_photos ?? [] as $index => $photo)
+                    <a class="mr-2 font-semibold underline" href="{{ route('admin.returns.receipt-dispute.photo', [$record, $index]) }}" target="_blank" rel="noopener">Photo {{ $index + 1 }}</a>
+                @endforeach
+                <p class="mt-1">The parcel stays with {{ $record->originProvider?->business_name ?? 'Logistics' }} at {{ $record->originHub?->name ?? 'the origin hub' }}. To charge Logistics for transit damage, use "Decide who pays" below.</p>
+                <form method="POST" action="{{ route('admin.returns.receipt-dispute.resume', $record) }}" class="mt-2 space-y-2">@csrf<input type="hidden" name="_ui_form" value="{{ route('admin.returns.receipt-dispute.resume', $record) }}">
+                    <label class="block" for="resume-note-{{ $record->id }}">Send back to handover (the Seller must receive it with a verified code)</label>
+                    <textarea id="resume-note-{{ $record->id }}" name="resume_note" required minlength="10" maxlength="1000" rows="2" class="block w-full rounded-sm border border-[var(--border-strong)] p-2 text-xs"></textarea>
+                    <button type="submit" class="rounded-sm bg-primary-700 px-3 py-2 text-xs text-white">Send back to handover</button>
+                </form>
+            </div>
+        @endif
+        @if ($record->receiptDisputed() || ($record->isBuyerRequest() && $record->status === \App\Enums\ParcelReturnStatus::Requested && $record->collected_at === null))
+            <details class="mt-3 text-xs" @if ($record->collectionEscalated()) open @endif>
+                <summary class="cursor-pointer font-semibold text-red-800">Close this return</summary>
+                <p class="mt-1 text-[var(--text-muted)]">{{ $record->receiptDisputed() ? 'Closes the disputed return where it stands. Custody, refund and who pays do not change.' : 'Not collected yet: the buyer keeps the item, no refund is due and the Seller\'s held earnings come back.' }}</p>
+                <form method="POST" action="{{ route('admin.returns.close', $record) }}" class="mt-2 space-y-2" data-app-confirm data-confirm-title="Close return" data-confirm-label="Close Return" data-confirm-danger="true" data-confirm-message="Permanently close Return #{{ $record->id }} for parcel {{ $record->seller_order_id }}? This cannot be undone. {{ $record->receiptDisputed() ? 'Custody, refund, and fault assignment will not change.' : 'The buyer keeps the item, no refund is due, and held Seller earnings are released.' }}">@csrf<input type="hidden" name="_ui_form" value="{{ route('admin.returns.close', $record) }}">
+                    <label class="block" for="close-reason-{{ $record->id }}">Reason (shown to the buyer and Seller)</label>
+                    <textarea id="close-reason-{{ $record->id }}" name="close_reason" required minlength="10" maxlength="1000" rows="2" class="block w-full rounded-sm border border-[var(--border-strong)] p-2 text-xs"></textarea>
+                    <button type="submit" class="rounded-sm border border-red-700 px-3 py-2 text-xs font-semibold text-red-800">Close return</button>
+                </form>
+            </details>
+        @endif
+        @if ($record->closed_at)
+            <p class="mt-3 text-xs text-[var(--text-ink)]">{{ $record->status->label() }} {{ $record->closed_at->timezone('Asia/Manila')->format('M j, Y g:i A') }} by {{ $record->closed_by_type }} #{{ $record->closed_by_id }}. {{ $record->closed_reason }}</p>
+        @endif
+        @if ($record->dispositionCanBeRecorded())
+            <div class="mt-3 rounded-md border border-[var(--border-strong)] bg-[var(--bg-raised)] p-3 text-xs">
+                <p class="font-semibold text-[var(--text-ink)]">Physical disposition</p>
+                @if ($record->disposition)
+                    <p class="mt-1 text-[var(--text-ink)]">{{ $record->dispositionLabel() }} · {{ $record->disposition_set_at?->timezone('Asia/Manila')->format('M j, Y g:i A') }}. {{ $record->disposition_note }}</p>
+                @else
+                    <p class="mt-1 text-[var(--text-muted)]">Not recorded yet. This tracks where the parcel physically went; it does not move custody, refund or stock.</p>
+                @endif
+                <form method="POST" action="{{ route('admin.returns.disposition', $record) }}" class="mt-2 grid gap-2 sm:grid-cols-2">
+                    @csrf<input type="hidden" name="_ui_form" value="{{ route('admin.returns.disposition', $record) }}">
+                    <label class="text-xs">What happened
+                        <select name="disposition" required class="mt-1 block w-full rounded-sm border border-[var(--border-strong)] p-2 text-xs">
+                            @foreach (\App\Models\Logistics\ParcelReturn::DISPOSITIONS as $value => $label)
+                                <option value="{{ $value }}" @selected($record->disposition === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="text-xs sm:col-span-2" for="disposition-note-{{ $record->id }}">Evidence and detail
+                        <textarea id="disposition-note-{{ $record->id }}" name="disposition_note" required minlength="10" maxlength="1000" rows="2" class="mt-1 block w-full rounded-sm border border-[var(--border-strong)] p-2 text-xs"></textarea>
+                    </label>
+                    <button type="submit" class="rounded-sm border border-primary-700 px-3 py-2 text-xs font-semibold text-primary-800 sm:col-span-2">Record disposition</button>
+                </form>
+            </div>
+        @endif
+    @endif
+    @if ($record->exception_reason)
+        <p class="mt-3 text-xs text-red-800">Unresolved: {{ $record->exception_reason }}</p>
+        <form method="POST" action="{{ route('admin.returns.resolve', $record) }}" class="mt-3 flex flex-wrap gap-2">@csrf<input type="hidden" name="_ui_form" value="{{ route('admin.returns.resolve', $record) }}"><input name="resolution_note" required maxlength="1000" placeholder="Resolution evidence" aria-label="Resolution evidence" class="min-w-0 flex-1 rounded-sm border border-[var(--border-strong)] p-2 text-xs"><button type="submit" class="rounded-sm bg-primary-700 px-3 py-2 text-xs text-white">Record exception resolution</button></form>
+        <form method="POST" action="{{ route('admin.returns.reverse-route', $record) }}" class="mt-3 space-y-2">@csrf<input type="hidden" name="_ui_form" value="{{ route('admin.returns.reverse-route', $record) }}">
+            <label class="block text-xs text-[var(--text-ink)]" for="reverse-route-{{ $record->id }}">No reverse partnership? Authorize this parcel to go back to the provider that handed it over.</label>
+            <input id="reverse-route-{{ $record->id }}" name="note" required minlength="10" maxlength="1000" placeholder="Why this return is authorized" class="block w-full rounded-sm border border-[var(--border-strong)] p-2 text-xs">
+            <button type="submit" class="rounded-sm border border-primary-700 px-3 py-2 text-xs font-semibold text-primary-800">Authorize reverse route</button>
+        </form>
+    @else<p class="mt-3 text-xs text-[var(--text-muted)]">No unresolved routing exception. Resolution does not confirm Seller receipt.</p>@endif
+    @if (blank($record->seller_address['full'] ?? null) && $record->status->value === 'RETURN_REQUESTED')
+        <form method="POST" action="{{ route('admin.returns.origin', $record) }}" class="mt-4 grid gap-2 sm:grid-cols-2">@csrf<input type="hidden" name="_ui_form" value="{{ route('admin.returns.origin', $record) }}">
+            <label class="text-xs">Verified original hub<select name="origin_hub_id" required class="mt-1 block w-full border p-2">@foreach ($hubs as $hub)<option value="{{ $hub->id }}">{{ $hub->provider?->business_name }} | {{ $hub->name }}</option>@endforeach</select></label>
+            <label class="text-xs">Original barangay code<input name="barangay_code" required maxlength="20" class="mt-1 block w-full border p-2"></label>
+            <label class="text-xs">Original pickup address<input name="address" required maxlength="1000" class="mt-1 block w-full border p-2"></label>
+            <label class="text-xs">Historical verification evidence<input name="evidence" required maxlength="1000" class="mt-1 block w-full border p-2"></label>
+            <button type="submit" class="rounded-sm bg-primary-700 px-3 py-2 text-xs text-white">Verify original location</button>
+        </form>
+    @endif
+    @if ($record->financial_review_required)
+        @php
+            $paidMinor = $record->sellerOrder->payment?->refundableCollectedMinor() ?? 0;
+            $refundRevision = (int) $record->refund_revision;
+            $submittedRefundRevision = filter_var(old('refund_revision'), FILTER_VALIDATE_INT) ?: 0;
+        @endphp
+        @if ($record->refunded_at)
+            @if (\App\Models\Logistics\ParcelReturn::refundPolicyAvailable())<p class="mt-3 text-xs font-semibold text-[var(--text-ink)]">{{ $record->refundPaymentLabel(internal: true) }}</p>@endif
+            <p class="mt-3 text-xs text-[var(--text-ink)]">Refund recorded {{ $record->refunded_at->timezone('Asia/Manila')->format('M j, Y g:i A') }}. Reference: {{ $record->refund_reference }}.
+                @if ($record->refund_amount_minor !== null)₱{{ number_format($record->refund_amount_minor / 100, 2) }} to {{ $record->refund_recipient }}, paid {{ $record->refund_paid_on?->format('M j, Y') }}.@endif
+                @if ($record->refund_proof_path)<a class="font-semibold text-primary-800 underline" href="{{ route('admin.returns.refund-proof', $record) }}" target="_blank" rel="noopener">View proof</a>.@endif</p>
+            @if ($record->refund_reason)<p class="mt-1 text-xs text-[var(--text-muted)]">Why less than the buyer paid: {{ $record->refund_reason }}</p>@endif
+            <details class="mt-2 text-xs">
+                <summary class="cursor-pointer font-semibold text-red-800">The transfer failed? Void this refund</summary>
+                <form method="POST" action="{{ route('admin.returns.refund.void', $record) }}" class="mt-2 space-y-2" data-app-confirm data-confirm-title="Void refund record" data-confirm-label="Void Refund Record" data-confirm-danger="true" data-confirm-message="Void the refund record for Return #{{ $record->id }} / parcel {{ $record->seller_order_id }}? The existing record remains in history; a corrected refund may then be recorded.">@csrf<input type="hidden" name="_ui_form" value="{{ route('admin.returns.refund.void', $record) }}">
+                    <input type="hidden" name="refund_revision" value="{{ old('_ui_form') === route('admin.returns.refund.void', $record) ? $submittedRefundRevision : $refundRevision }}">
+                    <label class="block" for="void-reason-{{ $record->id }}">What went wrong (bounced transfer, wrong account…)</label>
+                    <textarea id="void-reason-{{ $record->id }}" name="void_reason" required minlength="10" maxlength="1000" rows="2" class="block w-full rounded-sm border border-[var(--border-strong)] p-2 text-xs"></textarea>
+                    <button type="submit" class="rounded-sm border border-red-700 px-3 py-2 text-xs font-semibold text-red-800">Void refund</button>
+                </form>
+            </details>
+        @elseif ($record->isCancelled())
+            <p class="mt-3 text-xs text-[var(--text-muted)]">Cancelled before collection: the buyer kept the item, so there is nothing to refund.</p>
+        @elseif ($paidMinor <= 0)
+            <p class="mt-3 text-xs text-[var(--text-muted)]">No money was collected from the buyer, so there is nothing to refund.</p>
+        @elseif ($record->needsAdminFaultDecision())
+            <p class="mt-3 text-xs text-amber-800">Recording the refund is available after you decide who pays.</p>
+        @elseif (\App\Models\Logistics\ParcelReturn::refundPolicyAvailable())
+            @if (in_array(auth('admin')->user()?->role, ['admin', 'super_admin'], true))
+                @include('Admin.Returns._refund-policy', ['record' => $record])
+            @else
+                <p class="mt-3 text-xs text-[var(--text-muted)]">Refund authorization and payment evidence review require an Admin or Super Admin.</p>
+            @endif
+        @else
+            <form method="POST" action="{{ route('admin.returns.refund', $record) }}" enctype="multipart/form-data" class="mt-3 grid gap-2 sm:grid-cols-2">@csrf<input type="hidden" name="_ui_form" value="{{ route('admin.returns.refund', $record) }}">
+                <input type="hidden" name="refund_revision" value="{{ old('_ui_form') === route('admin.returns.refund', $record) ? $submittedRefundRevision : $refundRevision }}">
+                <input name="reference" required maxlength="255" placeholder="COD refund reference" aria-label="COD refund reference" class="min-w-0 rounded-sm border border-[var(--border-strong)] p-2 text-xs">
+                <input name="amount" required inputmode="decimal" placeholder="Amount refunded (PHP)" aria-label="Amount refunded in pesos" class="min-w-0 rounded-sm border border-[var(--border-strong)] p-2 text-xs">
+                <input name="recipient" required maxlength="255" placeholder="Who received it (name and account)" aria-label="Refund recipient" class="min-w-0 rounded-sm border border-[var(--border-strong)] p-2 text-xs">
+                <input type="date" name="paid_on" required max="{{ now('Asia/Manila')->toDateString() }}" value="{{ now('Asia/Manila')->toDateString() }}" aria-label="Date the refund was paid" class="min-w-0 rounded-sm border border-[var(--border-strong)] p-2 text-xs">
+                <label class="text-xs text-[var(--text-ink)] sm:col-span-2">Reason, required if you refund less than ₱{{ number_format($paidMinor / 100, 2) }} (the buyer and Seller see it)
+                    <textarea name="refund_reason" maxlength="1000" rows="2" class="mt-1 block w-full rounded-sm border border-[var(--border-strong)] p-2 text-xs"></textarea>
+                </label>
+                @unless ($record->refundApproved())
+                    <fieldset class="rounded-sm border border-amber-700 p-2 text-xs text-[var(--text-ink)] sm:col-span-2">
+                        <legend class="px-1 font-semibold text-amber-800">This return is not approved: exception required</legend>
+                        <p class="text-[var(--text-muted)]">Record a refund only for a legally required or separately approved exception. It is kept in the return history and audit log.</p>
+                        <select name="refund_exception_basis" required aria-label="Exception basis" class="mt-2 block w-full rounded-sm border border-[var(--border-strong)] p-2 text-xs">
+                            <option value="">Choose the exception</option>
+                            @foreach (\App\Models\Logistics\ParcelReturn::REFUND_EXCEPTION_BASES as $basis => $label)
+                                <option value="{{ $basis }}" @selected(old('refund_exception_basis') === $basis)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        <label class="mt-2 block">Who approved it, or the legal requirement (10–1000 characters)
+                            <textarea name="refund_exception_note" required minlength="10" maxlength="1000" rows="2" class="mt-1 block w-full rounded-sm border border-[var(--border-strong)] p-2 text-xs">{{ old('refund_exception_note') }}</textarea>
+                        </label>
+                        @if ($record->fault_set_by_admin_id === null)
+                            <p class="mt-2 font-semibold text-[var(--text-ink)]">Who pays has not been decided</p>
+                            <p class="text-[var(--text-muted)]">An exception does not make the Seller pay by default. Choose who pays and why; no return trip is charged.</p>
+                            <select name="refund_funding_party" required aria-label="Who pays for this exception refund" class="mt-1 block w-full rounded-sm border border-[var(--border-strong)] p-2 text-xs">
+                                <option value="">Choose who pays</option>
+                                <option value="{{ \App\Models\Logistics\ParcelReturn::FAULT_SELLER }}" @selected(old('refund_funding_party') === \App\Models\Logistics\ParcelReturn::FAULT_SELLER)>Seller</option>
+                                <option value="{{ \App\Models\Logistics\ParcelReturn::FAULT_LOGISTICS }}" @selected(old('refund_funding_party') === \App\Models\Logistics\ParcelReturn::FAULT_LOGISTICS)>Logistics</option>
+                                @if (\App\Models\Logistics\PlatformRefundExpense::available())
+                                    <option value="{{ \App\Models\Logistics\ParcelReturn::FAULT_PLATFORM }}" @selected(old('refund_funding_party') === \App\Models\Logistics\ParcelReturn::FAULT_PLATFORM)>Zefanya (platform expense; Seller and Logistics not charged)</option>
+                                @endif
+                            </select>
+                            <label class="mt-2 block">Why this party pays (10–1000 characters)
+                                <textarea name="refund_funding_note" required minlength="10" maxlength="1000" rows="2" class="mt-1 block w-full rounded-sm border border-[var(--border-strong)] p-2 text-xs">{{ old('refund_funding_note') }}</textarea>
+                            </label>
+                        @else
+                            <p class="mt-2 text-[var(--text-muted)]">Who pays was decided by an admin: {{ $record->faultLabel() }}.</p>
+                        @endif
+                    </fieldset>
+                @endunless
+                <label class="text-xs text-[var(--text-ink)] sm:col-span-2">Proof of payment (optional, image or PDF up to 5 MB)
+                    <input type="file" name="proof" accept=".jpg,.jpeg,.png,.pdf" class="upload-input">
+                </label>
+                <button type="submit" class="rounded-sm bg-primary-700 px-3 py-2 text-xs text-white sm:col-span-2">Record refund</button>
+            </form>
+            <p class="mt-2 text-xs text-amber-800">A full refund is everything the buyer paid, shipping included. If you refund less, whoever pays is charged only the amount refunded.</p>
+        @endif
+        @php $voided = $record->events->filter(fn ($event) => str_starts_with($event->event_key, 'refund_voided')); @endphp
+        @if ($voided->isNotEmpty())
+            <div class="mt-3 text-xs text-[var(--text-muted)]">
+                <p class="font-semibold text-[var(--text-ink)]">Voided refunds</p>
+                @foreach ($voided as $event)
+                    <p>{{ $event->occurred_at->timezone('Asia/Manila')->format('M j, Y g:i A') }} · ₱{{ number_format(((int) ($event->metadata['amount_minor'] ?? 0)) / 100, 2) }} to {{ $event->metadata['recipient'] ?? '?' }} (ref {{ $event->metadata['reference'] ?? '?' }}) · {{ $event->metadata['void_reason'] ?? '' }}</p>
+                @endforeach
+            </div>
+        @endif
+    @endif
+    @if ($record->returnCharges->isNotEmpty())
+        <div data-return-charges class="mt-4 space-y-2 rounded-md border border-[var(--border-strong)] p-3 text-xs">
+            <p class="font-semibold text-[var(--text-ink)]">Return charges with Logistics</p>
+            @foreach ($record->returnCharges as $charge)
+                <div class="flex flex-wrap items-center gap-2">
+                    <p class="min-w-0 flex-1 text-[var(--text-ink)]">{{ $charge->label() }}: {{ $charge->owedToZefanya() ? ($charge->provider?->business_name ?? 'Logistics').' repays Zefanya' : 'Zefanya pays '.($charge->provider?->business_name ?? 'Logistics') }} ₱{{ number_format($charge->amount_minor / 100, 2) }}.
+                        @if ($charge->settled_at)<span class="text-[var(--text-muted)]">Settled {{ $charge->settled_at->timezone('Asia/Manila')->format('M j, Y') }}, ref {{ $charge->settlement_reference }}.</span>@else<span class="font-semibold text-amber-800">Not settled.</span>@endif</p>
+                    @if (! $charge->settled_at)
+                        <form method="POST" action="{{ route('admin.return-charges.settle', $charge) }}" class="flex gap-2">@csrf<input type="hidden" name="_ui_form" value="{{ route('admin.return-charges.settle', $charge) }}">
+                            <input name="reference" required maxlength="100" placeholder="Payment reference" aria-label="Payment reference for return charge {{ $charge->id }}" class="w-40 rounded-sm border border-[var(--border-strong)] p-2 text-xs">
+                            <button type="submit" class="rounded-sm border border-primary-700 px-3 py-2 text-xs font-semibold text-primary-800">{{ $charge->owedToZefanya() ? 'Mark repaid' : 'Mark paid' }}</button>
+                        </form>
+                    @endif
+                </div>
+            @endforeach
+        </div>
+    @endif
+    @if ($record->seller_received_at && ! $record->stock_restored_at)
+        <p class="mt-3 text-xs text-amber-800">Inventory held | {{ $record->stock_condition }}</p>
+        @if ($record->stock_condition === 'resellable' && config('returns.restore_verified_resellable') === true)
+            <form method="POST" action="{{ route('admin.returns.stock', $record) }}" class="mt-2">@csrf<input type="hidden" name="_ui_form" value="{{ route('admin.returns.stock', $record) }}"><button class="rounded-sm bg-primary-700 px-3 py-2 text-xs text-white" type="submit">Release approved resellable stock</button></form>
+        @endif
+    @endif
+    <ol class="mt-4 space-y-1 text-xs text-[var(--text-muted)]">@foreach ($record->events as $event)<li>{{ manila($event->occurred_at, 'M j, Y g:i A') }} | {{ $event->event_key }} | {{ $event->actor_type }} #{{ $event->actor_id }}</li>@endforeach</ol>
+    <ul class="mt-3 space-y-1 text-xs">@foreach ($record->sellerOrder->parcelHandoffExceptions as $exception)<li>{{ $exception->status }} | {{ $exception->resolution_note ?? $exception->reason }}</li>@endforeach</ul>
+    </div>
+</article>
+@empty
+<div class="case-panel case-empty"><span class="case-empty-icon"><i data-lucide="clipboard-check" aria-hidden="true"></i></span>
+@if ($returns->total() > 0)
+<h3>No returns on this page</h3><p>Browse the first page to see existing returns and disputes.</p><a class="case-action" href="{{ $returns->url(1) }}">Back to first page</a>
+@else
+<h3>No returns or disputes to review</h3><p>Return requests, disputes and custody details will appear here.</p><a class="case-action" href="{{ route('admin.incidents.index') }}"><i data-lucide="arrow-right" aria-hidden="true"></i>View parcel incidents</a>
+@endif
+</div>@endforelse</div>
+@endif
+@if (! $only && $returns->total() > 0)<footer class="case-pagination"><p>Showing <strong>{{ $returns->firstItem() ?? 0 }} to {{ $returns->lastItem() ?? 0 }}</strong> of <strong>{{ number_format($returns->total()) }}</strong> returns</p>{{ $returns->links() }}</footer>@endif
+</section>
+@include('Components.admin-form-recovery')
+@endsection

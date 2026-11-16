@@ -1,0 +1,37 @@
+[
+  {
+    "label": "book",
+    "file": "book.jpg",
+    "source": "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=512&q=85&fit=max"
+  },
+  {
+    "label": "stack-books",
+    "file": "stack-books.jpg",
+    "source": "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=512&q=85&fit=max"
+  },
+  {
+    "label": "dress",
+    "file": "dress.jpg",
+    "source": "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=512&q=85&fit=max"
+  },
+  {
+    "label": "shoes",
+    "file": "shoes.jpg",
+    "source": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=512&q=85&fit=max"
+  },
+  {
+    "label": "bag",
+    "file": "bag.jpg",
+    "source": "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=512&q=85&fit=max"
+  },
+  {
+    "label": "laptop",
+    "file": "laptop.jpg",
+    "source": "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=512&q=85&fit=max"
+  },
+  {
+    "label": "phone",
+    "file": "phone.jpg",
+    "source": "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=512&q=85&fit=max"
+  }
+]

@@ -1,0 +1,63 @@
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+import tailwindcss from '@tailwindcss/vite';
+
+export default defineConfig({
+    plugins: [
+        tailwindcss(),
+        laravel({
+            input: [
+                'resources/css/app.css',
+                'resources/css/login-modal.css',
+                'resources/css/auth.css',
+                'resources/css/buyer/buyer-register-modal.css',
+                'resources/css/seller/products-index.css',
+                'resources/js/app.js',
+                'resources/js/submit-guard.js',
+                'resources/js/session-expired.js',
+                'resources/js/admin/auto-filters.js',
+                'resources/js/registration-resubmission.js',
+                'resources/js/buyer/buyer.js',
+                'resources/js/buyer/buyer-register-modal.js',
+                'resources/js/buyer/messages.js',
+                'resources/js/buyer/category-scroll.js',
+                'resources/js/buyer/products-load-more.js',
+                'resources/js/seller/seller-register-modal.js',
+                'resources/js/logistics/logistics-register-modal.js',
+                'resources/js/rider/rider-register-modal.js',
+                'resources/js/rider/sidebar-tooltips.js',
+                'resources/js/rider/notification-bell.js',
+                'resources/js/rider/proof.js',
+                'resources/js/parcel-scanner.js',
+                'resources/js/seller/product-create-modal.js',
+                'resources/js/seller/products-index.js',
+                'resources/js/seller/theme-toggle.js',
+                'resources/js/seller/notification-bell.js',
+                'resources/js/seller/sidebar-tooltips.js',
+                'resources/js/logistics/sidebar-tooltips.js',
+                'resources/js/logistics/notification-bell.js',
+                'resources/js/logistics/hubs.js',
+                'resources/js/logistics/coverage-lookup.js',
+                'resources/js/logistics/manifests.js',
+                'resources/js/buyer/home.js',
+                'resources/js/buyer/product-show.js',
+                'resources/js/buyer/cart.js',
+                'resources/js/buyer/checkout-carriers.js',
+                'resources/js/buyer/address-lookup.js',
+                'resources/js/buyer/navbar.js',
+                'resources/js/buyer/navbar-search.js',
+                'resources/js/buyer/search.js',
+                'resources/js/buyer/visual-search.js',
+                'resources/js/buyer/wishlist-cards.js',
+                'resources/js/buyer/add-to-cart-animation.js',
+            ],
+            refresh: true,
+        }),
+    ],
+    server: {
+        host: '127.0.0.1',
+        watch: {
+            ignored: ['**/storage/framework/views/**'],
+        },
+    },
+});
