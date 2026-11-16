@@ -1,5 +1,7 @@
 # Phase 11.7 database compatibility and upgrade requirements
 
+See the [Phase 12 stabilization report](PHASE_12_MYSQL_STABILIZATION_REPORT.md) for the corrected barangay rollback and the read-only comparison against the actual populated database. The findings below record the earlier rehearsal.
+
 The integration baseline is `20c9bb1` on `integration/phase11-stable`. The `webzefanya-live` reference was the supplied `migrations.zip`, SHA-256 `2a89931d5ce6e70a9753345f6bbf218eae6495d5e2c06fe15732bb65c0d05142`. The archive was extracted to a temporary directory. Each migration history was applied independently to an empty schema on a separate, loopback-only MySQL 8.0.44 instance on port `33179`. Before each write, the test runtime checked the resolved database name, port, and MySQL data directory. The populated `zefanya` database was left untouched.
 
 ## Migration history and schema comparison
