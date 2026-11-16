@@ -16,4 +16,14 @@ class TransferCourierAssignment extends Model
     {
         return $this->belongsTo(TransferCourier::class, 'transfer_courier_id');
     }
+
+    public function manifest(): BelongsTo
+    {
+        return $this->belongsTo(Manifest::class);
+    }
+
+    public function handoff(): BelongsTo
+    {
+        return $this->belongsTo(ParcelHandoff::class, 'parcel_handoff_id');
+    }
 }

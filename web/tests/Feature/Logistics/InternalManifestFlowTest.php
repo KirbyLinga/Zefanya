@@ -17,6 +17,7 @@ use App\Services\Logistics\ParcelHandoffVerification;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\AssignsTransferCouriers;
 use Tests\TestCase;
 
 /**
@@ -25,6 +26,7 @@ use Tests\TestCase;
  */
 class InternalManifestFlowTest extends TestCase
 {
+    use AssignsTransferCouriers;
     use LazilyRefreshDatabase;
 
     private LogisticsProvider $provider;
@@ -122,6 +124,22 @@ class InternalManifestFlowTest extends TestCase
         $this->actingAs($otherProvider, 'logistics')
             ->get(route('logistics.manifests.show', $manifest))
             ->assertNotFound();
+    }
+
+    public function test_courier_management_shows_manifest_assignment_history(): void
+    {
+        $manifest = $this->manifests->create($this->provider, $this->calamba->id, $this->provinceHub->id);
+        $this->assignTransferCourier($manifest, $this->provider);
+
+        $this->actingAs($this->provider, 'logistics')
+            ->get(route('logistics.transfer-couriers.index'))
+            ->assertOk()
+            ->assertSee('name="vehicle_type"', false)
+            ->assertSee('Calamba Station → Laguna Province Hub');
+
+        $this->get(route('logistics.transfer-couriers.index', ['edit' => $manifest->fresh()->transfer_courier_id]))
+            ->assertOk()
+            ->assertSee('name="name" value="Test Transfer Courier"', false);
     }
 
     public function test_dispatch_requires_a_valid_scan_for_every_parcel_and_records_departure_once(): void

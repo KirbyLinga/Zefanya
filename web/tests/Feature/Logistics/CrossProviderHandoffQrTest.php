@@ -16,11 +16,13 @@ use App\Services\Logistics\ParcelHandoffVerification;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Tests\Support\AssignsTransferCouriers;
 use Tests\Support\BootstrapsCrossProviderHandoffs;
 use Tests\TestCase;
 
 class CrossProviderHandoffQrTest extends TestCase
 {
+    use AssignsTransferCouriers;
     use BootstrapsCrossProviderHandoffs;
     use LazilyRefreshDatabase;
 
@@ -86,6 +88,18 @@ class CrossProviderHandoffQrTest extends TestCase
         $this->handoff = $this->handoffs->request($this->parcel, $this->origin);
         $this->handoffs->accept($this->handoff, $this->destination);
         $this->handoff->refresh();
+    }
+
+    public function test_courier_management_shows_handoff_assignment_history(): void
+    {
+        $this->withoutVite();
+        $this->assignTransferCourier($this->handoff, $this->origin);
+
+        $this->actingAs($this->origin, 'logistics')
+            ->get(route('logistics.transfer-couriers.index'))
+            ->assertOk()
+            ->assertSee('Test Transfer Courier')
+            ->assertSee($this->handoff->sendingHub->name.' → '.$this->handoff->receivingHub->name);
     }
 
     public function test_only_the_origin_can_dispatch_an_accepted_handoff(): void
