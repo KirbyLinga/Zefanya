@@ -85,7 +85,11 @@ class ParcelLossTest extends TestCase
         $stock = Product::query()->where('seller_id', $this->parcel->seller_id)->value('stock_quantity');
         $incident = $this->reportMissing($this->parcel);
 
-        $this->actingAs($this->admin, 'admin')->post(route('admin.incidents.resolve', $incident), [
+        $this->actingAs($this->admin, 'admin')->get(route('admin.incidents.index'))
+            ->assertOk()->assertSee($this->parcel->tracking_number)
+            ->assertSee('Liability is determined separately for each parcel from its verified custody.');
+
+        $this->post(route('admin.incidents.resolve', $incident), [
             'resolution' => 'CLOSE_LOST', 'resolution_note' => 'Truck never arrived; driver unreachable.',
         ])->assertSessionHasNoErrors();
 

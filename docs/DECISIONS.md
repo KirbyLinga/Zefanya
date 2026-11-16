@@ -6,6 +6,7 @@ This file records deviations from the repository's baseline instructions or deci
 
 - Preserve the orphaned original Admin identifier in the legacy column. Keep a restrictive Admin foreign key for current actors and require exactly one actor reference per setting change. The Admin view identifies unresolved actors without changing access or edit permissions.
 - Align the loss schema only when both imported loss tables are empty. Recreate the Seller promotion table definitions from their integration migration and start with an empty history.
+- Keep the incident queue usable when a case is open. The bulk action never accepted a liable-provider override. Its page now describes the existing per-parcel custody behavior, and the loss regression opens the populated queue before resolving the case.
 - Verify each earnings entry independently in the Rider workbook test. The scrollable list can render one entry before the other, so the test locates each by its job ID and checks its exact result and payout in the same entry.
 
 ## Phase 12.3: Teammate database rehearsal

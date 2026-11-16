@@ -60,8 +60,7 @@
                 <p class="mt-1 text-xs text-neutral-600">Each parcel is confirmed on its own: one that cannot be closed does not stop the others. No stock is restored.</p>
                 <div class="mt-3 grid gap-3 sm:grid-cols-2">
                     <label class="block text-xs font-semibold text-neutral-600">Reason<input name="reason" required maxlength="1000" class="mt-1 w-full rounded-lg border border-neutral-300 p-2 text-sm"></label>
-                    <label class="block text-xs font-semibold text-neutral-600">Liable company
-                        <select name="liable_provider_id" class="mt-1 w-full rounded-lg border border-neutral-300 p-2 text-sm"><option value="">Decide from verified custody</option>@foreach ($liableProviders as $p)<option value="{{ $p->id }}">{{ $p->business_name }}</option>@endforeach</select></label>
+                    <p class="self-end text-xs text-neutral-600">Liability is determined separately for each parcel from its verified custody.</p>
                 </div>
                 <button type="submit" class="mt-3 h-10 rounded-lg bg-primary-800 px-4 text-[13px] font-semibold text-white hover:bg-primary-900">Confirm selected as lost</button>
             </form>
