@@ -294,7 +294,12 @@ void main() {
     });
 
     test('a server total that differs from the one the buyer saw stops the order', () async {
-      final live = _Live([ok({'items': [cartLine]}), ok({'items': [cartLine]}), ok(quote), ok(quote)]);
+      final live = _Live([
+        ok({'items': [{...cartLine, 'quantity': 1}]}),
+        ok({'items': [cartLine]}),
+        ok(quote),
+        ok(quote),
+      ]);
 
       await expectLater(
         live.orders.place(const [line], expectedTotal: 2000),

@@ -5,6 +5,7 @@
 // used and no parcel can be marked delivered. Evidence files are real PNGs so
 // the validator runs for real.
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -51,12 +52,14 @@ class _Rig {
   _Rig({
     PodLocationProvider? location,
     int failNext = 0,
-    Duration latency = Duration.zero,
-  }) : service = MockProofOfDeliveryService(
-         latency: latency,
-         clock: () => DateTime(2026, 11, 14, 10, 31),
-         failNextSubmissions: failNext,
-       ) {
+    MockProofOfDeliveryService? upload,
+  }) : service =
+           upload ??
+           MockProofOfDeliveryService(
+             latency: Duration.zero,
+             clock: () => DateTime(2026, 11, 14, 10, 31),
+             failNextSubmissions: failNext,
+           ) {
     var n = 0;
     controller = ProofOfDeliveryController(
       jobId: '42',
@@ -73,6 +76,20 @@ class _Rig {
   final MockProofOfDeliveryService service;
   late final ProofOfDeliveryController controller;
   final List<PodEvidence> released = [];
+}
+
+class _PausedUpload extends MockProofOfDeliveryService {
+  _PausedUpload() : super(latency: Duration.zero);
+
+  final started = Completer<void>();
+  final finish = Completer<void>();
+
+  @override
+  Future<PodReceipt> submit(PodSubmission submission) async {
+    if (!started.isCompleted) started.complete();
+    await finish.future;
+    return super.submit(submission);
+  }
 }
 
 void main() {
@@ -209,7 +226,10 @@ void main() {
 
         expect(await r.controller.submit(), isFalse);
         expect(r.service.attempts, 0);
-        expect(r.controller.evidence, e); // kept so the screen can offer Replace
+        expect(
+          r.controller.evidence,
+          e,
+        ); // kept so the screen can offer Replace
         expect(r.controller.evidenceProblem, isNotNull);
         expect(r.controller.canSubmit, isFalse);
 
@@ -296,11 +316,14 @@ void main() {
       expect(await r.controller.submit(), isTrue);
     });
 
-    test('a throwing location provider becomes the unavailable state', () async {
-      final r = _Rig(location: _ThrowingLocation());
-      await r.controller.refreshGps();
-      expect(r.controller.gpsUnavailable, isTrue);
-    });
+    test(
+      'a throwing location provider becomes the unavailable state',
+      () async {
+        final r = _Rig(location: _ThrowingLocation());
+        await r.controller.refreshGps();
+        expect(r.controller.gpsUnavailable, isTrue);
+      },
+    );
 
     test('structurally impossible coordinates are treated as no fix', () async {
       final bads = [
@@ -389,40 +412,40 @@ void main() {
     });
 
     test('tapping twice while sending sends once', () async {
-      final r = _Rig(latency: const Duration(milliseconds: 20));
+      final upload = _PausedUpload();
+      final r = _Rig(upload: upload);
       await r.controller.refreshGps();
       await r.controller.setEvidence(await _evidence(PodEvidenceMethod.photo));
 
       final first = r.controller.submit();
+      await upload.started.future;
       final second = r.controller.submit();
-      expect(await second, isFalse);
+      upload.finish.complete();
       expect(await first, isTrue);
+      expect(await second, isFalse);
       expect(r.service.attempts, 1);
       expect(r.service.accepted, hasLength(1));
     });
 
     test('evidence is locked while sending and after success', () async {
-      final r = _Rig(latency: const Duration(milliseconds: 20));
+      final upload = _PausedUpload();
+      final r = _Rig(upload: upload);
       await r.controller.refreshGps();
       final photo = await _evidence(PodEvidenceMethod.photo);
+      final signature = await _evidence(PodEvidenceMethod.signature);
       await r.controller.setEvidence(photo);
 
       final sending = r.controller.submit();
-      expect(
-        await r.controller.setEvidence(
-          await _evidence(PodEvidenceMethod.signature),
-        ),
-        isFalse,
-      );
+      await upload.started.future;
+      final editWhileSending = await r.controller.setEvidence(signature);
       await r.controller.clearEvidence();
-      expect(r.controller.evidence, photo);
-      await sending;
-      expect(
-        await r.controller.setEvidence(
-          await _evidence(PodEvidenceMethod.signature),
-        ),
-        isFalse,
-      );
+      final evidenceWhileSending = r.controller.evidence;
+      upload.finish.complete();
+
+      expect(editWhileSending, isFalse);
+      expect(evidenceWhileSending, photo);
+      expect(await sending, isTrue);
+      expect(await r.controller.setEvidence(signature), isFalse);
       expect(r.controller.evidence, photo);
     });
 

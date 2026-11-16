@@ -2,6 +2,12 @@
 
 This file records deviations from the repository's baseline instructions or decisions required during execution.
 
+## Phase 12.3: Teammate database rehearsal
+
+- Apply the friend-import bridge only outside the regular migration path on a dedicated MySQL schema. Preserve imported rows and prove referenced actors before attaching the known restrictions. Leave the orphaned platform-settings actors and different parcel-loss history for a source-backed mapping.
+- Exercise checkout review and placement with the existing verified-write allowlist. Reuse a matching server cart line without issuing a quantity update. Keep a mismatched-quantity fixture to exercise the existing update path.
+- Pause the proof-of-delivery test transport explicitly for the in-flight evidence and duplicate-submit assertions. This keeps file validation and the original acceptance checks while removing the timing dependency.
+
 ## Phase 12.1: Native MySQL stabilization
 
 - Keep the historical barangay rollback's refusal to merge coverage, using a constant projection in its grouped existence query. Verify the permitted round trip and the refusal with existing data-preservation assertions.

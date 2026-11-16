@@ -63,6 +63,13 @@ http.Response _ok(Object? data) => http.Response.bytes(
   headers: {'content-type': 'application/json; charset=utf-8'},
 );
 
+const _serverLine = {
+  'id': 7,
+  'product_id': 11,
+  'variant_id': null,
+  'quantity': 2,
+};
+
 class _Rig {
   _Rig({this.holdCartRead = false, this.cartReadFails = false}) {
     client = guardedWebZefanyaClient(
@@ -79,25 +86,30 @@ class _Rig {
             throw http.ClientException('connection reset');
           }
           await cartGate?.future;
-          return _stream(_ok({'items': <Object?>[]}));
+          return _stream(_ok({'items': _cartItems}));
         }
         if (path.endsWith('/buyer/cart/items') && request.method == 'POST') {
-          return _stream(
-            _ok({
-              'items': [
-                {'id': 7, 'product_id': 11, 'variant_id': null, 'quantity': 2},
-              ],
-            }),
-          );
+          _cartItems.add(_serverLine);
+          return _stream(_ok({'items': _cartItems}));
         }
         if (path.endsWith('/buyer/checkout/quote')) {
           return _stream(_ok(_quote()));
+        }
+        if (path.endsWith('/buyer/checkout') && request.method == 'POST') {
+          return _stream(
+            _ok({
+              'id': 5,
+              'shipments': [
+                {'id': 12, 'status': 'PLACED', 'items': []},
+              ],
+            }),
+          );
         }
         return _stream(
           http.Response(jsonEncode({'message': 'unexpected $path'}), 404),
         );
       }),
-      allowWrites: true,
+      allowVerifiedWrites: true,
     );
     orders = Repositories.webzefanya(client).order as LiveOrderRepository;
     if (holdCartRead) cartGate = Completer<void>();
@@ -106,6 +118,7 @@ class _Rig {
   final bool holdCartRead;
   final bool cartReadFails;
   final _tokens = InMemoryTokenStore();
+  final _cartItems = <Map<String, Object?>>[];
   late final ApiClient client;
   late final LiveOrderRepository orders;
   Completer<void>? cartGate;
@@ -144,6 +157,29 @@ void main() {
       'POST /api/buyer/checkout/quote',
     ]);
     // Every request used Buyer A's token.
+    expect(r.auth.toSet(), {'Bearer token-buyer-a'});
+  });
+
+  test('review and placement work with only verified writes enabled', () async {
+    final r = _Rig();
+    await r.signIn('buyer-a');
+
+    final review = await r.orders.reviewCheckout(_lines, const []);
+    final placed = await r.orders.place(
+      _lines,
+      expectedTotal: review.total,
+      expectedAddressFingerprint: review.addressFingerprint,
+    );
+
+    expect(placed.single.id, '12');
+    expect(r.writes, [
+      'POST /api/buyer/cart/items',
+      'POST /api/buyer/checkout/quote',
+      'POST /api/buyer/checkout/quote',
+      'POST /api/buyer/checkout/quote',
+      'POST /api/buyer/checkout/quote',
+      'POST /api/buyer/checkout',
+    ]);
     expect(r.auth.toSet(), {'Bearer token-buyer-a'});
   });
 

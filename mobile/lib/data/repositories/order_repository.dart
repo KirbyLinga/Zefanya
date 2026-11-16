@@ -839,14 +839,7 @@ class LiveOrderRepository extends LiveRepository
           : int.tryParse(line.variantId!);
 
       final existing = _findLine(cart, productId, variantId);
-      if (existing != null) {
-        cart = unwrapMap(
-          await client.patchJson(
-            '/buyer/cart/items/${existing['id']}',
-            body: {'quantity': line.quantity},
-          ),
-        );
-      } else {
+      if (existing == null) {
         cart = unwrapMap(
           await client.postJson(
             '/buyer/cart/items',
@@ -855,6 +848,13 @@ class LiveOrderRepository extends LiveRepository
               'variant_id': ?variantId,
               'quantity': line.quantity,
             },
+          ),
+        );
+      } else if ((existing['quantity'] as num?)?.toInt() != line.quantity) {
+        cart = unwrapMap(
+          await client.patchJson(
+            '/buyer/cart/items/${existing['id']}',
+            body: {'quantity': line.quantity},
           ),
         );
       }
