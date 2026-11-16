@@ -2,6 +2,12 @@
 
 This file records deviations from the repository's baseline instructions or decisions required during execution.
 
+## Phase 12.4: Imported operational schema
+
+- Preserve the orphaned original Admin identifier in the legacy column. Keep a restrictive Admin foreign key for current actors and require exactly one actor reference per setting change. The Admin view identifies unresolved actors without changing access or edit permissions.
+- Align the loss schema only when both imported loss tables are empty. Recreate the Seller promotion table definitions from their integration migration and start with an empty history.
+- Verify each earnings entry independently in the Rider workbook test. The scrollable list can render one entry before the other, so the test locates each by its job ID and checks its exact result and payout in the same entry.
+
 ## Phase 12.3: Teammate database rehearsal
 
 - Apply the friend-import bridge only outside the regular migration path on a dedicated MySQL schema. Preserve imported rows and prove referenced actors before attaching the known restrictions. Leave the orphaned platform-settings actors and different parcel-loss history for a source-backed mapping.

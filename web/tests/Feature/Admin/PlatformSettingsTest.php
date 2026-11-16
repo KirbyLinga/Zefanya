@@ -10,8 +10,10 @@ use App\Models\Logistics\LogisticsProvider;
 use App\Models\Rider\Rider;
 use App\Models\Seller\Seller;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\View;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -60,6 +62,26 @@ class PlatformSettingsTest extends TestCase
 
         $this->assertSame($setting->value, $setting->fresh()->value);
         $this->assertDatabaseCount('platform_setting_histories', 0);
+    }
+
+    public function test_legacy_setting_history_shows_the_recorded_id_when_the_admin_is_missing(): void
+    {
+        $entry = new PlatformSettingHistory;
+        $entry->setRawAttributes([
+            'setting_key' => 'platform_name',
+            'previous_value' => 'Original name',
+            'new_value' => 'Historical name',
+            'admin_id' => null,
+            'legacy_admin_id' => 732,
+            'created_at' => now(),
+        ], true);
+        $entry->setRelation('admin', null);
+        View::composer('Admin.Settings.index', fn ($view) => $view->with('history', new LengthAwarePaginator([$entry], 1, 20)));
+
+        $this->actingAs(Admin::factory()->create(['role' => 'admin']), 'admin')
+            ->get(route('admin.settings.index'))->assertOk()
+            ->assertSee('Original name')->assertSee('Historical name')
+            ->assertSee('Unresolved Admin')->assertSee('recorded ID 732');
     }
 
     public static function restrictedRoles(): array

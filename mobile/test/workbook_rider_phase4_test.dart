@@ -503,14 +503,24 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 100));
 
-      await tester.scrollUntilVisible(
-        find.byKey(ValueKey('transaction-result-$deliveredId')),
-        300,
-      );
-      expect(find.textContaining('Delivered · ZEF-EARN-01'), findsOneWidget);
-      expect(find.textContaining('Returned · ZEF-EARN-02'), findsOneWidget);
-      expect(find.text(formatPeso(85)), findsWidgets);
-      expect(find.text(formatPeso(50)), findsWidgets);
+      final scrollable = find.byType(Scrollable).first;
+      for (final (jobId, result, payout) in [
+        (deliveredId, 'Delivered · ZEF-EARN-01', 85),
+        (returnedId, 'Returned · ZEF-EARN-02', 50),
+      ]) {
+        tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+        await tester.pump();
+        final label = find.byKey(ValueKey('transaction-result-$jobId'));
+        await tester.scrollUntilVisible(label, 300, scrollable: scrollable);
+        expect(tester.widget<Text>(label).data, result);
+        final row = find
+            .ancestor(of: label, matching: find.byType(Column))
+            .first;
+        expect(
+          find.descendant(of: row, matching: find.text(formatPeso(payout))),
+          findsOneWidget,
+        );
+      }
     });
   });
 

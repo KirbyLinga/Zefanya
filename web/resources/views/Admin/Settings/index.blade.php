@@ -81,11 +81,20 @@
                 </thead>
                 <tbody class="divide-y divide-neutral-200 text-neutral-700">
                     @forelse ($history as $entry)
+                        @php($recordedAdminId = $entry->getRawOriginal('legacy_admin_id') ?? $entry->admin_id)
                         <tr>
                             <td class="px-5 py-4">{{ $definitions[$entry->setting_key]['label'] ?? $entry->setting_key }}</td>
                             <td class="max-w-xs break-words px-5 py-4">{{ $entry->previous_value }}</td>
                             <td class="max-w-xs break-words px-5 py-4">{{ $entry->new_value }}</td>
-                            <td class="px-5 py-4">{{ $entry->admin->name }} <span class="text-xs">(ID {{ $entry->admin_id }})</span></td>
+                            <td class="px-5 py-4">
+                                @if ($entry->admin)
+                                    {{ $entry->admin->name }} <span class="text-xs">(ID {{ $entry->admin_id }})</span>
+                                @elseif ($recordedAdminId !== null)
+                                    Unresolved Admin <span class="text-xs">(recorded ID {{ $recordedAdminId }})</span>
+                                @else
+                                    Admin reference unavailable
+                                @endif
+                            </td>
                             <td class="whitespace-nowrap px-5 py-4">{{ manila($entry->created_at, 'Y-m-d H:i:s') }}</td>
                         </tr>
                     @empty
