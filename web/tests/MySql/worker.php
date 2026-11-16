@@ -98,6 +98,7 @@ final class T05Worker extends TestCase
         $sql = strtolower($sql);
 
         return match ($point) {
+            'coverage_claim' => str_starts_with($sql, 'insert into `areas`'),
             'cod_collection_write' => str_starts_with($sql, 'update `payments`'),
             'return_event' => str_starts_with($sql, 'insert into `parcel_return_events`'),
             'parcel' => str_starts_with($sql, 'select') && str_contains($sql, 'from `seller_orders`') && str_contains($sql, 'for update'),
@@ -164,7 +165,17 @@ final class T05Worker extends TestCase
             }
         });
         $start = microtime(true);
-        if (in_array($task['action'], ['phase6_reroute', 'phase6_receive'], true)) {
+        if ($task['action'] === 'coverage_claim') {
+            try {
+                DB::transaction(fn () => DB::table('areas')->insert($task['area']));
+                $result = ['status' => 'claimed', 'success' => true];
+            } catch (QueryException $exception) {
+                if ((int) ($exception->errorInfo[1] ?? 0) !== 1062) {
+                    throw $exception;
+                }
+                $result = ['status' => 'duplicate', 'success' => false];
+            }
+        } elseif (in_array($task['action'], ['phase6_reroute', 'phase6_receive'], true)) {
             $provider = LogisticsProvider::query()->findOrFail($task['provider']);
             try {
                 if ($task['action'] === 'phase6_reroute') {

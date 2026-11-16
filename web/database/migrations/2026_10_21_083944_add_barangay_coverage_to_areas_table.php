@@ -54,7 +54,7 @@ return new class extends Migration
     {
         // Restoring municipality uniqueness can be impossible after legitimate
         // barangay claims. Refuse before DDL rather than delete or merge records.
-        if (DB::table('areas')->whereNotNull('city_municipality_code')
+        if (DB::table('areas')->selectRaw('1')->whereNotNull('city_municipality_code')
             ->groupBy('logistics_provider_id', 'city_municipality_code')
             ->havingRaw('COUNT(*) > 1')->exists()) {
             throw new RuntimeException('Cannot roll back: multiple barangay areas share a municipality. Export/reconcile coverage first.');

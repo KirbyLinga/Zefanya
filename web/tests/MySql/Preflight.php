@@ -21,6 +21,10 @@ final class Preflight
 
     public const ACCOUNT = 'zefanya_concurrency_runner@localhost';
 
+    private static string $serverUuid = self::UUID;
+
+    private static int $serverPort = 3306;
+
     public static function halt(): never
     {
         fwrite(STDERR, "T05 isolation verification failed; stopping before further database work.\n");
@@ -33,9 +37,31 @@ final class Preflight
         if (is_file($root.'/bootstrap/cache/config.php') || getenv('APP_CONFIG_CACHE')) {
             throw new RuntimeException('T05 refuses cached or redirected configuration.');
         }
-        $values = Dotenv::createArrayBacked($root.'/.codex', 't05.env')->load();
+        $uuid = getenv('T05_SERVER_UUID');
+        $values = $uuid === false
+            ? Dotenv::createArrayBacked($root.'/.codex', 't05.env')->load()
+            : [
+                'APP_ENV' => 'testing',
+                'DB_CONNECTION' => 'mysql',
+                'DB_HOST' => '127.0.0.1',
+                'DB_PORT' => getenv('T05_DB_PORT'),
+                'DB_DATABASE' => self::DATABASE,
+                'DB_USERNAME' => 'zefanya_concurrency_runner',
+                'DB_PASSWORD' => getenv('T05_DB_PASSWORD'),
+                'T05_SERVER_UUID' => $uuid,
+            ];
+        self::$serverUuid = self::UUID;
+        self::$serverPort = 3306;
+        if (isset($values['T05_SERVER_UUID'])) {
+            $port = filter_var($values['DB_PORT'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1024, 'max_range' => 65535]]);
+            if ($port === false || $port === 3306 || ! preg_match('/\A[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\z/', $values['T05_SERVER_UUID'])) {
+                throw new RuntimeException('T05 requires a pinned disposable server UUID and a separate port.');
+            }
+            self::$serverUuid = $values['T05_SERVER_UUID'];
+            self::$serverPort = $port;
+        }
         $expected = ['APP_ENV' => 'testing', 'DB_CONNECTION' => 'mysql', 'DB_HOST' => '127.0.0.1',
-            'DB_PORT' => '3306', 'DB_DATABASE' => self::DATABASE, 'DB_USERNAME' => 'zefanya_concurrency_runner'];
+            'DB_PORT' => (string) self::$serverPort, 'DB_DATABASE' => self::DATABASE, 'DB_USERNAME' => 'zefanya_concurrency_runner'];
         foreach ($expected as $key => $value) {
             if (($values[$key] ?? null) !== $value) {
                 throw new RuntimeException('T05 credential-file identity mismatch: '.$key);
@@ -59,7 +85,7 @@ final class Preflight
     public static function identity(PDO $pdo): array
     {
         $row = $pdo->query('SELECT @@server_uuid AS uuid, @@port AS port, DATABASE() AS db, CURRENT_USER() AS account')->fetch(PDO::FETCH_ASSOC);
-        if ($row['uuid'] !== self::UUID || (int) $row['port'] !== 3306 || $row['db'] !== self::DATABASE || $row['account'] !== self::ACCOUNT) {
+        if ($row['uuid'] !== self::$serverUuid || (int) $row['port'] !== self::$serverPort || $row['db'] !== self::DATABASE || $row['account'] !== self::ACCOUNT) {
             throw new RuntimeException('T05 isolation identity failed.');
         }
 
@@ -131,7 +157,7 @@ final class Preflight
         }
         $mysql = config('database.connections.mysql');
         if ($mysql['database'] !== self::DATABASE || $mysql['username'] !== 'zefanya_concurrency_runner'
-            || $mysql['host'] !== '127.0.0.1' || ! empty($mysql['url']) || ! empty($mysql['unix_socket'])
+            || $mysql['host'] !== '127.0.0.1' || (int) $mysql['port'] !== self::$serverPort || ! empty($mysql['url']) || ! empty($mysql['unix_socket'])
             || ! empty($mysql['read']) || ! empty($mysql['write'])) {
             throw new RuntimeException('T05 effective connection is unsafe.');
         }
@@ -165,7 +191,7 @@ final class Preflight
         self::verify($pdo);
         $marker = dirname(__DIR__, 2).'/.codex/t05-owned-schema.json';
         $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
-        $ownership = ['database' => self::DATABASE, 'uuid' => self::UUID];
+        $ownership = ['database' => self::DATABASE, 'uuid' => self::$serverUuid];
         if ($tables !== [] && (! is_file($marker) || json_decode(file_get_contents($marker), true) !== $ownership)) {
             throw new RuntimeException('T05 refuses a nonempty unowned schema.');
         }
@@ -187,7 +213,7 @@ final class Preflight
         $pdo = DB::connection()->getPdo();
         self::verify($pdo);
         $marker = dirname(__DIR__, 2).'/.codex/t05-owned-schema.json';
-        if (! is_file($marker) || json_decode(file_get_contents($marker), true) !== ['database' => self::DATABASE, 'uuid' => self::UUID]) {
+        if (! is_file($marker) || json_decode(file_get_contents($marker), true) !== ['database' => self::DATABASE, 'uuid' => self::$serverUuid]) {
             throw new RuntimeException('T05 refuses cleanup without verified disposable-schema ownership.');
         }
         DB::statement('SET FOREIGN_KEY_CHECKS=0');

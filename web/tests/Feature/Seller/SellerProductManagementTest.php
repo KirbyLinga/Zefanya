@@ -385,7 +385,7 @@ class SellerProductManagementTest extends TestCase
         $item = OrderItem::factory()->create(['product_id' => $busy->id, 'variant_id' => $busy->variants()->sole()->id]);
         $item->sellerOrder->forceFill(['status' => OrderStatus::Preparing])->save();
         $response = $this->postJson(route('seller.products.bulk'), [
-            'action' => 'archive', 'product_ids' => [$busy->id, $restricted->id, $free->id],
+            'action' => 'archive', 'product_ids' => [$free->id, $restricted->id, $busy->id],
         ])->assertOk()->assertJsonPath('skipped', ['Busy Basket', 'Restricted Basket (admin-restricted)']);
         $this->assertStringContainsString('Busy Basket (unfinished orders)', $response->json('message'));
         $this->assertStringContainsString('Restricted Basket (admin-restricted)', $response->json('message'));

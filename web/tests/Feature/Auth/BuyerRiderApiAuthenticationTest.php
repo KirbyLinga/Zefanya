@@ -84,6 +84,9 @@ class BuyerRiderApiAuthenticationTest extends TestCase
         $cases = [];
         foreach (['buyer', 'rider'] as $role) {
             foreach (['pending', 'rejected', 'suspended', 'unverified', 'deactivated', 'email_unverified'] as $state) {
+                if ($role === 'buyer' && $state === 'deactivated') {
+                    $state = 'archived';
+                }
                 $cases["{$role}:{$state}"] = [$role, $state];
             }
         }
@@ -97,12 +100,17 @@ class BuyerRiderApiAuthenticationTest extends TestCase
         $account = $this->account($role);
         $token = $account->createToken('existing', [$role])->plainTextToken;
         $this->withToken($token)->getJson("/api/{$role}/profile")->assertOk();
-        $account->forceFill($state === 'email_unverified' ? ['email_verified_at' => null] : ['status' => $state])->save();
+        $account->forceFill(match ($state) {
+            'archived' => ['archived_at' => now()],
+            'email_unverified' => ['email_verified_at' => null],
+            default => ['status' => $state],
+        })->save();
+        $status = $state === 'archived' ? 401 : 403;
         $this->freshAuthentication();
-        $this->withToken($token)->getJson("/api/{$role}/profile")->assertForbidden()->assertJsonPath('success', false);
+        $this->withToken($token)->getJson("/api/{$role}/profile")->assertStatus($status)->assertJsonPath('success', false);
         $this->freshAuthentication();
         $this->postJson("/api/{$role}/login", ['email' => $account->email, 'password' => 'ApiPassword@2026'])
-            ->assertForbidden()->assertJsonPath('success', false);
+            ->assertStatus($status)->assertJsonPath('success', false);
         $this->assertSame(1, $account->tokens()->count());
     }
 
@@ -188,10 +196,10 @@ class BuyerRiderApiAuthenticationTest extends TestCase
     }
 
     #[DataProvider('roles')]
-    public function test_active_accounts_remain_eligible_and_missing_ability_is_forbidden(string $role): void
+    public function test_eligible_accounts_can_login_but_missing_ability_is_forbidden(string $role): void
     {
         $account = $this->account($role);
-        $account->forceFill(['status' => 'active'])->save();
+        $account->forceFill(['status' => $role === 'rider' ? 'active' : 'approved'])->save();
         $this->postJson("/api/{$role}/login", ['email' => $account->email, 'password' => 'ApiPassword@2026'])->assertOk();
         $token = $account->createToken('no-abilities', []);
         $this->freshAuthentication();

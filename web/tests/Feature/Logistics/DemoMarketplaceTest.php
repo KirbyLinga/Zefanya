@@ -59,6 +59,8 @@ class DemoMarketplaceTest extends TestCase
     {
         config(['database.default' => 'mysql', 'database.connections.mysql.driver' => 'mysql', 'database.connections.mysql.database' => 'Zefanya']);
 
+        $oldOverride = getenv('DEMO_SEED_CONFIRM_LIVE');
+        $oldDatabase = getenv('DEMO_SEED_DATABASE');
         putenv('DEMO_SEED_CONFIRM_LIVE=Zefanya');
         putenv('DEMO_SEED_DATABASE=Zefanya');
         try {
@@ -66,8 +68,8 @@ class DemoMarketplaceTest extends TestCase
             $this->expectExceptionMessage('Refusing to seed database [Zefanya]');
             DemoMarketplaceSeeder::assertSafeTarget();
         } finally {
-            putenv('DEMO_SEED_CONFIRM_LIVE');
-            putenv('DEMO_SEED_DATABASE');
+            putenv($oldOverride === false ? 'DEMO_SEED_CONFIRM_LIVE' : 'DEMO_SEED_CONFIRM_LIVE='.$oldOverride);
+            putenv($oldDatabase === false ? 'DEMO_SEED_DATABASE' : 'DEMO_SEED_DATABASE='.$oldDatabase);
         }
     }
 

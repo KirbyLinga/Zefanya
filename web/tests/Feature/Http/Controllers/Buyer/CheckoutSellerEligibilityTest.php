@@ -9,6 +9,7 @@ use App\Models\Buyer\CheckoutToken;
 use App\Models\Catalog\Product;
 use App\Models\Seller\Seller;
 use App\Models\Shared\Order;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -43,6 +44,17 @@ class CheckoutSellerEligibilityTest extends TestCase
     public function test_ineligible_seller_blocks_all_purchase_entry_points_and_preserves_cart(string $status): void
     {
         [$buyer, $seller, $product, $variant, $line] = $this->fixture();
+        if ($status === 'inactive' && DB::connection()->getDriverName() === 'mysql') {
+            try {
+                $seller->forceFill(['status' => $status])->save();
+                $this->fail('MySQL must reject the legacy inactive Seller status.');
+            } catch (QueryException $exception) {
+                $this->assertSame(1265, (int) $exception->errorInfo[1]);
+            }
+            $this->assertSame('approved', $seller->fresh()->status);
+
+            return;
+        }
         $seller->forceFill($status === 'archived' ? ['archived_at' => now()] : ['status' => $status])->save();
         $this->assertFalse($line->fresh()->isAvailable());
         $this->get(route('buyer.products.show', $product))->assertNotFound();

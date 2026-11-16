@@ -8,7 +8,7 @@ require_once __DIR__.'/Race.php';
 
 try {
     Preflight::configure();
-    $pdo = new PDO('mysql:host=127.0.0.1;port=3306;dbname=zefanya_concurrency_test;charset=utf8mb4',
+    $pdo = new PDO('mysql:host=127.0.0.1;port='.getenv('DB_PORT').';dbname='.Preflight::DATABASE.';charset=utf8mb4',
         getenv('DB_USERNAME'), getenv('DB_PASSWORD'), [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]);
     Preflight::verify($pdo);
 } catch (Throwable $exception) {

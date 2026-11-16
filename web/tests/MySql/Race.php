@@ -97,6 +97,7 @@ final class Race
                     foreach (DB::connection()->getPdo()->query('SHOW FULL PROCESSLIST')->fetchAll(\PDO::FETCH_ASSOC) as $row) {
                         $sql = strtolower((string) ($row['Info'] ?? ''));
                         $target = match ($b['watch'] ?? '') {
+                            'coverage_claim' => str_starts_with($sql, 'insert into `areas`'),
                             'parcel' => str_contains($sql, 'from `seller_orders`') && str_contains($sql, 'for update'),
                             'order' => str_contains($sql, 'from `orders`') && str_contains($sql, 'for update'),
                             'provider' => str_contains($sql, 'from `logistics_providers`') && str_contains($sql, 'for update'),

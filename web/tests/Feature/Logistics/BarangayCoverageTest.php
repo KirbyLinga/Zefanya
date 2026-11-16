@@ -20,11 +20,13 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\TestWith;
+use Tests\Support\RunsIsolatedMySqlRace;
 use Tests\TestCase;
 
 class BarangayCoverageTest extends TestCase
 {
     use LazilyRefreshDatabase;
+    use RunsIsolatedMySqlRace;
 
     private function station(?LogisticsProvider $provider = null): LogisticsHub
     {
@@ -246,6 +248,12 @@ class BarangayCoverageTest extends TestCase
 
     public function test_concurrent_connections_produce_exactly_one_active_claim(): void
     {
+        if (DB::connection()->getDriverName() === 'mysql') {
+            $this->assertIsolatedMySqlRacePasses('test_native_barangay_claim_has_exactly_one_winner');
+
+            return;
+        }
+
         $this->station();
         $database = tempnam(sys_get_temp_dir(), 'coverage-race-');
         $barrier = $database.'.go';

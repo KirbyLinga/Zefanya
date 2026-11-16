@@ -27,7 +27,11 @@ class ScaleSeederTest extends TestCase
 
     public function test_the_command_refuses_an_unknown_tier_and_a_non_mysql_connection(): void
     {
-        $this->artisan('scale:seed', ['--tier' => 'huge'])->assertFailed();
-        $this->artisan('scale:seed', ['--tier' => 'small'])->assertFailed();
+        $this->artisan('scale:seed', ['--tier' => 'huge'])
+            ->expectsOutput('Choose a tier: small, medium, large.')->assertFailed();
+
+        config(['database.default' => 'sqlite']);
+        $this->artisan('scale:seed', ['--tier' => 'small'])
+            ->expectsOutput('scale:seed needs a MySQL connection.')->assertFailed();
     }
 }

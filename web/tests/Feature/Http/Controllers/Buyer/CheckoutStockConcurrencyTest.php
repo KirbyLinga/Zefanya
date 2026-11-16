@@ -18,8 +18,8 @@ use App\Services\Buyer\CartSummary;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use ReflectionMethod;
-use Symfony\Component\Process\Process;
 use Tests\Support\BootstrapsCheckoutCarriers;
+use Tests\Support\RunsIsolatedMySqlRace;
 use Tests\TestCase;
 
 /**
@@ -32,6 +32,7 @@ class CheckoutStockConcurrencyTest extends TestCase
 {
     use BootstrapsCheckoutCarriers;
     use LazilyRefreshDatabase;
+    use RunsIsolatedMySqlRace;
 
     /**
      * Create a product plus its auto Default variant at a known stock level.
@@ -212,14 +213,6 @@ class CheckoutStockConcurrencyTest extends TestCase
 
         // The dedicated runner verifies identity/grants before migrating and
         // uses separate HTTP worker processes with an observed MySQL lock wait.
-        $process = new Process([
-            PHP_BINARY, base_path('tests/MySql/run.php'),
-            '--filter=test_last_available_unit_has_exactly_one_winner', '--testdox',
-        ], base_path());
-        $process->setTimeout(90);
-        $process->run();
-
-        $this->assertSame(0, $process->getExitCode(), $process->getOutput().$process->getErrorOutput());
-        $this->assertStringContainsString('OK (1 test,', $process->getOutput());
+        $this->assertIsolatedMySqlRacePasses('test_last_available_unit_has_exactly_one_winner');
     }
 }

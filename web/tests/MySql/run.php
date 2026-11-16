@@ -6,8 +6,17 @@ require_once __DIR__.'/Preflight.php';
 use Symfony\Component\Process\Process;
 use Tests\MySql\Preflight;
 
-$lock = fopen(dirname(__DIR__, 2).'/.codex/t05-runner.lock', 'c');
-if (! flock($lock, LOCK_EX | LOCK_NB)) {
+$directory = dirname(__DIR__, 2).'/.codex';
+if (! is_file($directory.'/t05.env') && getenv('T05_SERVER_UUID') === false) {
+    fwrite(STDERR, "T05 requires an explicit disposable MySQL configuration.\n");
+    exit(2);
+}
+if (! is_dir($directory) && ! mkdir($directory, 0700, true) && ! is_dir($directory)) {
+    fwrite(STDERR, "T05 could not create its test lock directory.\n");
+    exit(2);
+}
+$lock = fopen($directory.'/t05-runner.lock', 'c');
+if ($lock === false || ! flock($lock, LOCK_EX | LOCK_NB)) {
     fwrite(STDERR, "Another T05 runner owns the disposable database.\n");
     exit(2);
 }

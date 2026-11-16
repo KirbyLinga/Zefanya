@@ -247,7 +247,7 @@ class ProductController extends Controller
             'action' => ['required', 'in:activate,inactivate,archive'],
         ]);
         $seller = Auth::guard('seller')->user();
-        $products = Product::forSeller($seller->id)->whereIn('id', $data['product_ids'])->get();
+        $products = Product::forSeller($seller->id)->whereIn('id', $data['product_ids'])->orderBy('id')->get();
         abort_unless($products->count() === count($data['product_ids']), 403);
         $skipped = [];
         $skipMessages = [];

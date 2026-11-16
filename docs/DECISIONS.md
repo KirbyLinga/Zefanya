@@ -2,6 +2,14 @@
 
 This file records deviations from the repository's baseline instructions or decisions required during execution.
 
+## Phase 12.1: Native MySQL stabilization
+
+- Keep the historical barangay rollback's refusal to merge coverage, using a constant projection in its grouped existence query. Verify the permitted round trip and the refusal with existing data-preservation assertions.
+- Retain the SQLite coverage race and use two real InnoDB connections when the suite runs on MySQL. The checkout and coverage races share the separately provisioned, UUID-pinned test runner and keep the application-schema access denial and restricted grants.
+- Use reachable account states in native auth tests, verify MySQL rejects the impossible Seller enum value, and explicitly select the non-MySQL configuration for the scale command's negative case.
+- Supply a dedicated MySQL demo schema and preserve its explicit seeding opt-in around negative guard tests. Keep production protections and all demo delivery assertions.
+- Sort the Seller bulk product selection by product ID so native MySQL and SQLite produce the same skip order. Reverse the request fixture to exercise the stable order and retain the per-product reason and archival assertions.
+
 ## Phase 11.7: Native MySQL compatibility
 
 - Compare return collection audit metadata by exact keys, types, and values after sorting the JSON object keys. MySQL normalizes the order of those keys. The test still checks the actor, collection retry and escalation, and notifications.
