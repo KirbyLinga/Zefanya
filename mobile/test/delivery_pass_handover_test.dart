@@ -102,13 +102,16 @@ Future<void> _attachProofAndOpenHandover(WidgetTester tester) async {
   final proof = find.text('Tap to attach a photo');
   await tester.scrollUntilVisible(proof, 300);
   await tester.tap(proof);
-  // The picker copies the file through real file I/O, which fake time does
-  // not advance. Give the copy a moment to finish before the next frame.
-  await tester.runAsync(
-    () => Future<void>.delayed(const Duration(milliseconds: 150)),
-  );
-  await tester.pumpAndSettle();
-  expect(find.text('Photo attached'), findsOneWidget);
+  // The picker uses real file I/O, so wait for the rendered result.
+  final attached = find.text('Photo attached');
+  final deadline = DateTime.now().add(const Duration(seconds: 10));
+  while (attached.evaluate().isEmpty && DateTime.now().isBefore(deadline)) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 25)),
+    );
+    await tester.pump();
+  }
+  expect(attached, findsOneWidget);
 
   await tester.tap(find.text('Confirm Order Delivered'));
   await tester.pumpAndSettle();

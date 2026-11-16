@@ -719,7 +719,12 @@ class _ReturnPickupsSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 16),
-          Text('RETURNS TO COLLECT', style: AppType.eyebrow),
+          Text(
+            courier.capabilities.riderReturnCollect
+                ? 'RETURNS TO COLLECT'
+                : 'RETURN ASSIGNMENTS',
+            style: AppType.eyebrow,
+          ),
           const SizedBox(height: 8),
           for (final item in returns)
             _ReturnPickupCard(item: item, theme: theme),
@@ -758,12 +763,13 @@ class _ReturnPickupCard extends StatelessWidget {
             Text(item.pickupAddress!, style: theme.textTheme.bodySmall),
           if ((item.buyerPhone ?? '').isNotEmpty)
             Text(item.buyerPhone!, style: theme.textTheme.bodySmall),
-          Text(
-            '${item.itemCount} item${item.itemCount == 1 ? '' : 's'}${(item.reason ?? '').isEmpty ? '' : ' · ${item.reason}'}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: AppColors.textSecondary,
+          if (!item.readOnly)
+            Text(
+              '${item.itemCount} item${item.itemCount == 1 ? '' : 's'}${(item.reason ?? '').isEmpty ? '' : ' · ${item.reason}'}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
-          ),
           if ((item.statusLabel ?? '').isNotEmpty)
             Text(
               item.statusLabel!,
@@ -786,7 +792,7 @@ class _ReturnPickupCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'Collect this return in the Rider web portal.',
+                'View this return in the Rider web portal.',
                 key: ValueKey('return-web-portal-${item.id}'),
                 style: theme.textTheme.bodySmall,
               ),

@@ -209,7 +209,7 @@ class ProfileScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              isCourier ? 'COURIER' : 'BUYER',
+                              isCourier ? 'RIDER' : 'BUYER',
                               style: AppType.eyebrow.copyWith(
                                 color: AppColors.secondary,
                               ),

@@ -227,4 +227,18 @@ void main() {
     expect(find.byType(SettingsScreen), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
   });
+
+  testWidgets('Profile identifies the delivery role as Rider', (tester) async {
+    _phoneSize(tester);
+    await tester.pumpWidget(
+      _wrap(
+        child: const ProfileScreen(),
+        auth: AuthState()..role = UserRole.courier,
+        theme: ThemeState(),
+      ),
+    );
+
+    expect(find.text('RIDER'), findsOneWidget);
+    expect(find.text('COURIER'), findsNothing);
+  });
 }

@@ -100,10 +100,15 @@ void main() {
     await tester.pumpWidget(_app(courier!, const PickupDashboardScreen()));
     await tester.pump(const Duration(milliseconds: 800));
 
-    expect(find.text('RETURNS TO COLLECT'), findsOneWidget);
+    expect(find.text('RETURN ASSIGNMENTS'), findsOneWidget);
     expect(find.byKey(const ValueKey('return-pickup-RET-555')), findsOneWidget);
     expect(find.text('RET-555'), findsOneWidget);
     expect(find.text('Assigned return pickup'), findsOneWidget);
+    expect(
+      find.text('View this return in the Rider web portal.'),
+      findsOneWidget,
+    );
+    expect(find.text('0 items'), findsNothing);
     expect(
       find.byKey(const ValueKey('return-web-portal-RET-555')),
       findsOneWidget,
